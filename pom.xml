@@ -30,10 +30,7 @@
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>bamboo.core.Bamboo</mainClass>
-                                </transformer>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                                    <resource>META-INF/services/java.sql.Driver</resource>
+                                    <mainClass>tinycdxserver.Server</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>
@@ -48,16 +45,6 @@
             <groupId>org.fusesource.leveldbjni</groupId>
             <artifactId>leveldbjni-linux64</artifactId>
             <version>1.8</version>
-        </dependency>
-        <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-            <version>2.6.1</version>
-        </dependency>
-        <dependency>
-            <groupId>org.kevoree.corelibrary.javase</groupId>
-            <artifactId>org.kevoree.library.javase.nanohttp</artifactId>
-            <version>2.0.5</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>

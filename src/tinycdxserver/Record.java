@@ -114,4 +114,16 @@ public class Record {
         encodeValue(bb);
         return bb.array();
     }
+    
+    public String toString() {
+        StringBuilder out = new StringBuilder();
+        out.append(keyurl).append(' ');
+        out.append(Long.toString(timestamp)).append(' ');
+        out.append(original).append(' ');
+        out.append(mimetype).append(' ');
+        out.append(Integer.toString(status)).append(' ');
+        out.append(digest).append(' ');
+        out.append(Long.toString(length));
+        return out.toString();
+    }
 }
