@@ -735,6 +735,7 @@ public abstract class NanoHTTPD {
         public static final int BUFSIZE = 8192;
         private final OutputStream outputStream;
         private PushbackInputStream inputStream;
+        private BoundedInputStream bodyStream;
         private int splitbyte;
         private int rlen;
         private String uri;
@@ -814,10 +815,16 @@ public abstract class NanoHTTPD {
                 }
 
                 uri = pre.get("uri");
-
+                long contentLength =  Long.parseLong(headers.getOrDefault("content-length", "0"));
+                bodyStream = new BoundedInputStream(inputStream, contentLength);
+                bodyStream.setPropagateClose(false);
 
                 // Ok, now do the serve()
                 Response r = serve(this);
+
+                // ensure body is consumed
+                bodyStream.skip(contentLength);
+
                 if (r == null) {
                     throw new ResponseException(Response.Status.INTERNAL_ERROR, "SERVER INTERNAL ERROR: Serve() returned a null response.");
                 } else {
@@ -1001,7 +1008,7 @@ public abstract class NanoHTTPD {
 
         @Override
         public final InputStream getInputStream() {
-            return inputStream;
+            return bodyStream;
         }
     }
 }

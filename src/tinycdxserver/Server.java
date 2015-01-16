@@ -1,5 +1,8 @@
 package tinycdxserver;
 
+import org.iq80.leveldb.DB;
+import org.iq80.leveldb.DBIterator;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.nio.channels.Channel;
@@ -39,13 +42,8 @@ public class Server extends NanoHTTPD {
 
     Response post(IHTTPSession session) throws IOException {
         String collection = session.getUri().substring(1);
-        final Index index = manager.getIndex(collection, true);
-
-        String clength = session.getHeaders().get("content-length");
-        long length = Long.parseLong(clength);
-        InputStream stream = new BoundedInputStream(session.getInputStream(), length);
-        BufferedReader in = new BufferedReader(new InputStreamReader(stream));
-
+        final DB index = manager.getIndex(collection, true);
+        BufferedReader in = new BufferedReader(new InputStreamReader(session.getInputStream()));
         long added = 0;
         for (;;) {
             String line = in.readLine();
@@ -62,7 +60,7 @@ public class Server extends NanoHTTPD {
             record.compressedoffset = Long.parseLong(fields[9]);
             record.file = fields[10];
             record.redirecturl = "";
-            index.put(record);
+            index.put(record.encodeKey(), record.encodeValue());
             added++;
         }
         return new Response(Response.Status.OK, "text/plain", "Added " + added + " records\n");
@@ -70,7 +68,7 @@ public class Server extends NanoHTTPD {
 
     Response query(IHTTPSession session) throws IOException {
         String collection = session.getUri().substring(1);
-        final Index index = manager.getIndex(collection);
+        final DB index = manager.getIndex(collection);
         if (index == null) {
             return new Response(Response.Status.NOT_FOUND, "text/plain", "Collection does not exist\n");
         }
@@ -82,14 +80,17 @@ public class Server extends NanoHTTPD {
             @Override
             public void stream(OutputStream outputStream) throws IOException {
                 Writer out = new BufferedWriter(new OutputStreamWriter(outputStream));
-                ResultSet results = index.get(url);
+                DBIterator it = index.iterator();
                 try {
-                    for (Record record : results) {
+                    it.seek(Record.encodeKey(url, 0));
+                    while (it.hasNext()) {
+                        Record record = new Record(it.next());
+                        if (!record.keyurl.equals(url)) break;
                         out.append(record.toString()).append('\n');
                     }
                     out.flush();
                 } finally {
-                    results.close();
+                    it.close();
                 }
             }
         });
