@@ -10,6 +10,11 @@ import java.io.IOException;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
 
+/**
+ * A thin wrapper around LevelDB which stores CDX records in a space-efficient binary format.
+ *
+ * See {@link tinycdxserver.Record} for details of the binary encoding.
+ */
 public class Index {
     private final DB db;
 

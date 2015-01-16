@@ -5,11 +5,25 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 
-
+/**
+ * A CDX record which can be encoded to a reasonable space-efficient packed representation.
+ *
+ * Records are encoded as two byte arrays called the key and the value.  The record's key is designed to be bytewise
+ * sorted and is simply the keyurl concatenated with the timestamp as a big-endian 64-bit value.
+ *
+ * <pre>
+ *     0              keyurl.length                 keyurl.size + 8
+ *     +--------------+-----------------------------+
+ *     | ASCII keyurl | 64-bit big-endian timestamp |
+ *     +--------------+-----------------------------+
+ * </pre>
+ *
+ * The record's consists of a static list fields packed using {@link tinycdxserver.VarInt}.  The first field in the
+ * value is a schema version number to allow fields to be added or removed in later versions.
+ */
 public class Record {
     private static int CURRENT_VERSION = 0;
     private static final DateTimeFormatter arcTimeFormat = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
-
 
     public String keyurl;
     public long timestamp;
@@ -24,10 +38,13 @@ public class Record {
 
     public Record(byte[] key, byte[] value) {
         decodeKey(key);
-        decodeValueV0(ByteBuffer.wrap(value));
+        decodeValue(ByteBuffer.wrap(value));
     }
 
-    private void decodeKey(byte[] key) {
+    public Record() {
+    }
+
+    public void decodeKey(byte[] key) {
         keyurl = new String(key, 0, key.length - 8, StandardCharsets.US_ASCII);
         ByteBuffer keyBuf = ByteBuffer.wrap(key);
         keyBuf.order(ByteOrder.BIG_ENDIAN);
