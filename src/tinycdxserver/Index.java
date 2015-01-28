@@ -16,7 +16,7 @@ import java.util.NoSuchElementException;
 /**
  * A thin wrapper around LevelDB which stores CDX records in a space-efficient binary format.
  *
- * See {@link tinycdxserver.Record} for details of the binary encoding.
+ * See {@link tinycdxserver.Record} for details of the binary DEFAULT_ENCODING.
  */
 public class Index implements Closeable {
     private final DB db;

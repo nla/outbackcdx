@@ -1,10 +1,15 @@
 package tinycdxserver;
 
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
 import java.io.*;
 import java.net.ServerSocket;
 import java.nio.channels.Channel;
 import java.nio.channels.ServerSocketChannel;
-import java.util.LongSummaryStatistics;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.Map;
 
 public class Server extends NanoHTTPD {
@@ -53,7 +58,7 @@ public class Server extends NanoHTTPD {
             if (line == null) break;
             String[] fields = line.split(" ");
             Record record = new Record();
-            record.keyurl = fields[0];
+            record.urlkey = fields[0];
             record.timestamp = Long.parseLong(fields[1]);
             record.original = fields[2];
             record.mimetype = fields[3];
@@ -76,6 +81,9 @@ public class Server extends NanoHTTPD {
         }
 
         Map<String,String> params = session.getParms();
+        if (params.containsKey("q")) {
+            return XmlQuery.query(session, index);
+        }
         final String url = params.get("url");
 
         return new Response(Response.Status.OK, "text/plain", new IStreamer() {

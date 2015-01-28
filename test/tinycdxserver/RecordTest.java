@@ -31,7 +31,7 @@ public class RecordTest {
         assertEquals(src.redirecturl, dst.redirecturl);
         assertEquals(src.status, dst.status);
         assertEquals(src.timestamp, dst.timestamp);
-        assertEquals(src.keyurl, dst.keyurl);
+        assertEquals(src.urlkey, dst.urlkey);
     }
 
     static Record dummyRecord() {
@@ -45,7 +45,7 @@ public class RecordTest {
         src.redirecturl = "redirecturl";
         src.status = 200;
         src.timestamp = 20140101123400L;
-        src.keyurl = "keyurl";
+        src.urlkey = "urlkey";
         return src;
     }
 }

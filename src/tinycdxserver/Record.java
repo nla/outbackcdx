@@ -9,12 +9,12 @@ import java.time.format.DateTimeFormatter;
  * A CDX record which can be encoded to a reasonable space-efficient packed representation.
  *
  * Records are encoded as two byte arrays called the key and the value.  The record's key is designed to be bytewise
- * sorted and is simply the keyurl concatenated with the timestamp as a big-endian 64-bit value.
+ * sorted and is simply the urlkey concatenated with the timestamp as a big-endian 64-bit value.
  *
  * <pre>
- *     0              keyurl.length                 keyurl.size + 8
+ *     0              urlkey.length                 urlkey.size + 8
  *     +--------------+-----------------------------+
- *     | ASCII keyurl | 64-bit big-endian timestamp |
+ *     | ASCII urlkey | 64-bit big-endian timestamp |
  *     +--------------+-----------------------------+
  * </pre>
  *
@@ -23,9 +23,9 @@ import java.time.format.DateTimeFormatter;
  */
 public class Record {
     private static int CURRENT_VERSION = 0;
-    private static final DateTimeFormatter arcTimeFormat = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    static final DateTimeFormatter arcTimeFormat = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
-    public String keyurl;
+    public String urlkey;
     public long timestamp;
     public String original;
     public String mimetype;
@@ -45,7 +45,7 @@ public class Record {
     }
 
     public void decodeKey(byte[] key) {
-        keyurl = new String(key, 0, key.length - 8, StandardCharsets.US_ASCII);
+        urlkey = new String(key, 0, key.length - 8, StandardCharsets.US_ASCII);
         ByteBuffer keyBuf = ByteBuffer.wrap(key);
         keyBuf.order(ByteOrder.BIG_ENDIAN);
         timestamp = keyBuf.getLong(key.length - 8);
@@ -61,7 +61,7 @@ public class Record {
     }
 
     public byte[] encodeKey() {
-        return encodeKey(keyurl, timestamp);
+        return encodeKey(urlkey, timestamp);
     }
 
     public void decodeValue(ByteBuffer bb) {
@@ -117,7 +117,7 @@ public class Record {
     
     public String toString() {
         StringBuilder out = new StringBuilder();
-        out.append(keyurl).append(' ');
+        out.append(urlkey).append(' ');
         out.append(Long.toString(timestamp)).append(' ');
         out.append(original).append(' ');
         out.append(mimetype).append(' ');

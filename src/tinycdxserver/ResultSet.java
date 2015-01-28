@@ -37,7 +37,7 @@ public class ResultSet implements Iterable<Record>, Closeable {
                 if (iterator.hasNext()) {
                     Map.Entry<byte[], byte[]> entry = iterator.next();
                     record = new Record(entry.getKey(), entry.getValue());
-                    int cmp = record.keyurl.compareTo(endKeyurl);
+                    int cmp = record.urlkey.compareTo(endKeyurl);
                     if (cmp < 0 || (cmp == 0 && record.timestamp <= endTimestamp)) {
                         return true;
                     }

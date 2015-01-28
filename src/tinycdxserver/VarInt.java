@@ -4,7 +4,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Protobuf-style base-128 variable length integer encoding.
+ * Protobuf-style base-128 variable length integer DEFAULT_ENCODING.
  *
  * VarInts are encoded little-endian. The most signficant bit of each byte is a flag that indicates whether the VarInt
  * continues for subsequent bytes.  An VarInt which requires n bytes to be encoded would thus look like:
