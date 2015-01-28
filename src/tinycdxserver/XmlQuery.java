@@ -1,5 +1,8 @@
 package tinycdxserver;
 
+import org.iq80.leveldb.DB;
+import org.iq80.leveldb.DBIterator;
+
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
@@ -31,7 +34,7 @@ public class XmlQuery {
         out.writeEndElement();
     }
 
-    public static NanoHTTPD.Response query(NanoHTTPD.IHTTPSession session, final Index index) {
+    public static NanoHTTPD.Response query(NanoHTTPD.IHTTPSession session, final DB index) {
         Map<String,String> params = session.getParms();
         Map<String,String> query = decodeQueryString(params.get("q"));
 
@@ -48,15 +51,19 @@ public class XmlQuery {
         return new NanoHTTPD.Response(NanoHTTPD.Response.Status.OK, "application/xml;charset=" + DEFAULT_ENCODING, new NanoHTTPD.IStreamer() {
             @Override
             public void stream(OutputStream outputStream) throws IOException {
-                ResultSet results = index.get(url);
-
-                XMLOutputFactory factory = XMLOutputFactory.newInstance();
+                DBIterator it = index.iterator();
                 try {
+                    it.seek(Record.encodeKey(url, 0));
+                    XMLOutputFactory factory = XMLOutputFactory.newInstance();
                     XMLStreamWriter out = factory.createXMLStreamWriter(outputStream, DEFAULT_ENCODING);
                     out.writeStartDocument(DEFAULT_ENCODING, "1.0");
                     out.writeStartElement("wayback");
 
-                    if (results.iterator().hasNext()) {
+                    Record record = null;
+                    if (it.hasNext()) {
+                        record = new Record(it.next());
+                    }
+                    if (record != null && record.urlkey.equals(url)) {
                         out.writeStartElement("request");
                         writeElement(out, "startdate", "19960101000000");
                         writeElement(out, "enddate", Record.arcTimeFormat.format(LocalDateTime.now(ZoneOffset.UTC)));
@@ -69,7 +76,7 @@ public class XmlQuery {
                         out.writeEndElement(); // </request>
 
                         out.writeStartElement("results");
-                        for (Record record : results) {
+                        do {
                             writeElement(out, "compressedoffset", record.compressedoffset);
                             writeElement(out, "mimetype", record.mimetype);
                             writeElement(out, "file", record.file);
@@ -80,7 +87,9 @@ public class XmlQuery {
                             writeElement(out, "robotflags", "-"); // TODO
                             writeElement(out, "url", record.original);
                             writeElement(out, "capturedate", record.timestamp);
-                        }
+                            if (!it.hasNext()) break;
+                            record = new Record(it.next());;
+                        } while (record.urlkey.equals(url));
                         out.writeEndElement(); // </results>
                     } else {
                         out.writeStartElement("error");
@@ -94,7 +103,7 @@ public class XmlQuery {
                 } catch (XMLStreamException e) {
                     throw new RuntimeException(e);
                 } finally {
-                    results.close();
+                    it.close();
                 }
             }
         });

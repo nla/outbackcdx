@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 
 /**
  * A CDX record which can be encoded to a reasonable space-efficient packed representation.
@@ -35,6 +36,10 @@ public class Record {
     public String file;
     public long compressedoffset;
     public String redirecturl;
+
+    public Record(Map.Entry<byte[], byte[]> entry) {
+        this(entry.getKey(), entry.getValue());
+    }
 
     public Record(byte[] key, byte[] value) {
         decodeKey(key);
