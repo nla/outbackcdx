@@ -8,6 +8,8 @@ import java.nio.charset.CoderResult;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.regex.Pattern;
 
 /**
@@ -22,13 +24,51 @@ public class UrlCanonicalizer {
             Pattern.compile("/\\([0-9a-z]{24}\\)(/[^\\?]+.aspx)"),
             Pattern.compile(";jsessionid=[0-9a-z]{32}()$")
     };
-    private static final Pattern QUERY_SESSIONID = Pattern.compile("jsessionid=[0-9a-z]{16,}"
+    private static final Pattern QUERY_SESSIONID = Pattern.compile(
+            "jsessionid=[0-9a-z]{10,}"
             + "|sessionid=[0-9a-z]{16,}"
             + "|phpsessid=[0-9a-z]{16,}"
             + "|sid=[0-9a-z]{16,}"
             + "|aspsessionid[a-z]{8}=[0-9a-z]{16,}");
     private static final Pattern CF_SESSIONID = Pattern.compile("(?:^|&)cfid=[0-9]+&cftoken=[0-9a-z-]+");
     private static final Pattern TABS_OR_LINEFEEDS = Pattern.compile("[\t\r\n]");
+    private static final Pattern UNDOTTED_IP = Pattern.compile("(?:0x)?[0-9]{1,12}");
+    private static final Pattern DOTTED_IP = Pattern.compile("[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}");
+
+    private static URL makeUrl(String rawUrl) throws MalformedURLException {
+        rawUrl = TABS_OR_LINEFEEDS.matcher(rawUrl).replaceAll("");
+        if (!hasScheme(rawUrl)) {
+            rawUrl = "http://" + rawUrl;
+        }
+        return new URL(rawUrl);
+    }
+
+    public static String toUnschemedSurt(String url) {
+        try {
+            return toUnschemedSurt(makeUrl(url));
+        } catch (MalformedURLException e) {
+            return url;
+        }
+    }
+
+    public static String toUnschemedSurt(URL url) {
+        StringBuilder result = new StringBuilder();
+        String host = url.getHost();
+        if (!DOTTED_IP.matcher(host).matches()) {
+            List<String> segments = Arrays.asList(host.split("\\."));
+            Collections.reverse(segments);
+            host = String.join(",", segments) + ")";
+        }
+        result.append(host);
+        if (url.getPort() != -1) {
+            result.append(':').append(Integer.toString(url.getPort()));
+        }
+        result.append(url.getPath());
+        if (url.getQuery() != null) {
+            result.append('?').append(url.getQuery());
+        }
+        return result.toString();
+    }
 
     public static URL canonicalize(URL url) throws MalformedURLException {
         String scheme = canonicalizeScheme(url.getProtocol());
@@ -41,15 +81,15 @@ public class UrlCanonicalizer {
     }
 
     public static String canonicalize(String rawUrl) {
-        rawUrl = TABS_OR_LINEFEEDS.matcher(rawUrl).replaceAll("");
-        if (!hasScheme(rawUrl)) {
-            rawUrl = "http://" + rawUrl;
-        }
         try {
-            return canonicalize(new URL(rawUrl)).toString();
+            return canonicalize(makeUrl(rawUrl)).toString();
         } catch (MalformedURLException e) {
             return rawUrl;
         }
+    }
+
+    public static String surtCanonicalize(String url) {
+        return toUnschemedSurt(canonicalize(url));
     }
 
     private static boolean hasScheme(String url) {
@@ -87,6 +127,7 @@ public class UrlCanonicalizer {
                 }
             }
             query = String.join("&", filtered);
+            query = canonicalizeUrlEncoding(query);
             query = CF_SESSIONID.matcher(query).replaceFirst("");
             if (query.equals("")) {
                 query = null;
@@ -121,13 +162,13 @@ public class UrlCanonicalizer {
         return host;
     }
 
-    private static Pattern UNDOTTED_IP = Pattern.compile("(?:0x)?[0-9]{1,12}");
-
     private static String canonicalizePathSegments(String path) {
         ArrayList<String> out = new ArrayList<String>();
         for (String segment : path.split("/")) {
             if (segment.equals("..")) {
-                out.remove(out.size() - 1);
+                if (!out.isEmpty()) {
+                    out.remove(out.size() - 1);
+                }
             } else if (!segment.equals("") && !segment.equals(".")) {
                 out.add(segment);
             }
@@ -180,7 +221,7 @@ public class UrlCanonicalizer {
         return out.toString();
     }
 
-    private static String urlDecode(String s) {
+    static String urlDecode(String s) {
         ByteBuffer bb = null;
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < s.length(); i++) {

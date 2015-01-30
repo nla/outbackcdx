@@ -56,9 +56,9 @@ public class Server extends NanoHTTPD {
             if (line == null) break;
             String[] fields = line.split(" ");
             Record record = new Record();
-            record.urlkey = fields[0];
             record.timestamp = Long.parseLong(fields[1]);
             record.original = fields[2];
+            record.urlkey = UrlCanonicalizer.surtCanonicalize(record.original);
             record.mimetype = fields[3];
             record.status = Integer.parseInt(fields[4]);
             record.digest = fields[5];
@@ -82,7 +82,7 @@ public class Server extends NanoHTTPD {
         if (params.containsKey("q")) {
             return XmlQuery.query(session, index);
         }
-        final String url = params.get("url");
+        final String url = UrlCanonicalizer.surtCanonicalize(params.get("url"));
 
         return new Response(Response.Status.OK, "text/plain", new IStreamer() {
             @Override

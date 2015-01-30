@@ -15,7 +15,6 @@ public class UrlCanonicalizerTest {
         assertEquals(expected, canon);
     }
 
-
     @Test
     public void test() throws MalformedURLException, URISyntaxException {
         t("http://abr.business.gov.au/(dhj3bi55ekqndn3mjb5myu45)/entityTypeDetails.aspx?SearchText=125", "http://abr.business.gov.au/entitytypedetails.aspx?searchtext=125");
@@ -30,6 +29,7 @@ public class UrlCanonicalizerTest {
         t("http://host/%2525252525252525", "http://host/%25");
         t("http://host/asdf%25%32%35asd", "http://host/asdf%25asd");
         t("http://host/%%%25%32%35asd%%", "http://host/%25%25%25asd%25%25");
+        t("http://host/?%%%25%32%35asd%%", "http://host/?%25%25%25asd%25%25");
         t("http://www.google.com/", "http://google.com/");
         t("http://%31%36%38%2e%31%38%38%2e%39%39%2e%32%36/%2E%73%65%63%75%72%65/%77%77%77%2E%65%62%61%79%2E%63%6F%6D/", "http://168.188.99.26/.secure/www.ebay.com");
         t("http://195.127.0.11/uploads/%20%20%20%20/.verify/.eBaysecure=updateuserdataxplimnbqmn-xplmvalidateinfoswqpcmlx=hgplmcx/", "http://195.127.0.11/uploads/%20%20%20%20/.verify/.ebaysecure=updateuserdataxplimnbqmn-xplmvalidateinfoswqpcmlx=hgplmcx");
@@ -57,5 +57,9 @@ public class UrlCanonicalizerTest {
         t("https://www.securesite.com/", "https://securesite.com/");
         t("http://host.com/ab%23cd", "http://host.com/ab%23cd");
         t("http://host.com//twoslashes?more//slashes", "http://host.com/twoslashes?more//slashes");
+
+        t("http://example.org/too/many/../../../dots", "http://example.org/dots");
+
+        assertEquals("au,gov,acma,web)/apservices/action/challenge?method=viewchallenge", UrlCanonicalizer.toUnschemedSurt(UrlCanonicalizer.canonicalize("http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge")));
     }
 }
