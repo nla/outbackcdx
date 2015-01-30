@@ -17,6 +17,7 @@ import java.util.Map;
 
 public class Server extends NanoHTTPD {
     private final DataStore manager;
+    boolean verbose = false;
 
     public Server(DataStore manager, String hostname, int port) {
         super(hostname, port);
@@ -52,7 +53,9 @@ public class Server extends NanoHTTPD {
         long added = 0;
         for (;;) {
             String line = in.readLine();
-            System.out.println(line);
+            if (verbose) {
+                System.out.println(line);
+            }
             if (line == null) break;
             String[] fields = line.split(" ");
             Record record = new Record();
@@ -111,6 +114,7 @@ public class Server extends NanoHTTPD {
         System.err.println("  -d datadir    Directory to store index data under");
         System.err.println("  -i            Inherit the server socket via STDIN (for use with systemd, inetd etc)");
         System.err.println("  -p port       Local port to listen on");
+        System.err.println("  -v            Verbose logging");
         System.exit(1);
     }
 
@@ -119,6 +123,7 @@ public class Server extends NanoHTTPD {
         int port = 8080;
         boolean inheritSocket = false;
         File dataPath = new File("data");
+        boolean verbose = false;
 
         for (int i = 0; i < args.length; i++) {
             if (args[i].equals("-p")) {
@@ -129,6 +134,8 @@ public class Server extends NanoHTTPD {
                 inheritSocket = true;
             } else if (args[i].equals("-d")) {
                 dataPath = new File(args[++i]);
+            } else if (args[i].equals("-v")) {
+                verbose = true;
             } else {
                 usage();
             }
@@ -143,6 +150,7 @@ public class Server extends NanoHTTPD {
             } else {
                 server = new Server(dataStore, host, port);
             }
+            server.verbose = verbose;
             server.start();
             Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
                 @Override
