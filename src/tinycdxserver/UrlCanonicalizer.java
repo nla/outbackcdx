@@ -187,11 +187,11 @@ public class UrlCanonicalizer {
                 // not valid
             }
         }
-        try {
-            return InetAddresses.toUriString(InetAddresses.forUriString(host));
-        } catch (IllegalArgumentException e) {
-            return host; // not an IP
+        InetAddress ip = InetAddresses.forUriString(host);
+        if (ip != null) {
+            return InetAddresses.toUriString(ip);
         }
+        return host; // not an IP
     }
 
     private static String canonicalizeUrlEncoding(String s) {
