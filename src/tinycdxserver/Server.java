@@ -65,7 +65,7 @@ public class Server extends NanoHTTPD {
                 record.original = fields[2];
                 record.urlkey = UrlCanonicalizer.surtCanonicalize(record.original);
                 record.mimetype = fields[3];
-                record.status = Integer.parseInt(fields[4]);
+                record.status = fields[4].equals("-") ? 0 : Integer.parseInt(fields[4]);
                 record.digest = fields[5];
                 record.compressedoffset = Long.parseLong(fields[9]);
                 record.file = fields[10];
