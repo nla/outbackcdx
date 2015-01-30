@@ -57,19 +57,24 @@ public class Server extends NanoHTTPD {
                 System.out.println(line);
             }
             if (line == null) break;
-            String[] fields = line.split(" ");
-            Record record = new Record();
-            record.timestamp = Long.parseLong(fields[1]);
-            record.original = fields[2];
-            record.urlkey = UrlCanonicalizer.surtCanonicalize(record.original);
-            record.mimetype = fields[3];
-            record.status = Integer.parseInt(fields[4]);
-            record.digest = fields[5];
-            record.compressedoffset = Long.parseLong(fields[9]);
-            record.file = fields[10];
-            record.redirecturl = "";
-            index.put(record.encodeKey(), record.encodeValue());
-            added++;
+            if (line.startsWith(" CDX")) continue;
+            try {
+                String[] fields = line.split(" ");
+                Record record = new Record();
+                record.timestamp = Long.parseLong(fields[1]);
+                record.original = fields[2];
+                record.urlkey = UrlCanonicalizer.surtCanonicalize(record.original);
+                record.mimetype = fields[3];
+                record.status = Integer.parseInt(fields[4]);
+                record.digest = fields[5];
+                record.compressedoffset = Long.parseLong(fields[9]);
+                record.file = fields[10];
+                record.redirecturl = "";
+                index.put(record.encodeKey(), record.encodeValue());
+                added++;
+            } catch (Exception e) {
+                return new Response(Response.Status.BAD_REQUEST, "text/plain", e.toString() + "\nAt line: " + line);
+            }
         }
         return new Response(Response.Status.OK, "text/plain", "Added " + added + " records\n");
     }
