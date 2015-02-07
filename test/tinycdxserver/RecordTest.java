@@ -12,7 +12,7 @@ public class RecordTest {
         byte[] key = src.encodeKey();
         byte[] value = src.encodeValue();
 
-        assertEquals(0, value[0]);
+        assertEquals(1, value[0]);
         assertEquals(8, value[1]);
         assertEquals('o', value[2]);
         assertEquals('r', value[3]);
@@ -37,7 +37,7 @@ public class RecordTest {
     static Record dummyRecord() {
         Record src = new Record();
         src.compressedoffset = 1234;
-        src.digest = "digest";
+        src.digest = "2HQQSVUDLU4NZ67TN2KS3NG5AIVBVNFB";
         src.file = "file";
         src.length = 12345;
         src.mimetype = "mimetype";

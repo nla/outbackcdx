@@ -1,5 +1,7 @@
 package tinycdxserver;
 
+import org.apache.commons.codec.binary.Base32;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -23,8 +25,9 @@ import java.util.Map;
  * value is a schema version number to allow fields to be added or removed in later versions.
  */
 public class Record {
-    private static int CURRENT_VERSION = 0;
+    private static int CURRENT_VERSION = 1;
     static final DateTimeFormatter arcTimeFormat = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    static final Base32 base32 = new Base32();
 
     public String urlkey;
     public long timestamp;
@@ -73,6 +76,7 @@ public class Record {
         int version = (int)VarInt.decode(bb);
         switch (version) {
             case 0: decodeValueV0(bb); break;
+            case 1: decodeValueV1(bb); break;
             default:
                 throw new IllegalArgumentException("CDX encoding is too new (v" + version + ") only versions up to v"
                         + CURRENT_VERSION + " are supported");
@@ -90,13 +94,24 @@ public class Record {
         redirecturl = VarInt.decodeAscii(bb);
     }
 
+    private void decodeValueV1(ByteBuffer bb) {
+        original = VarInt.decodeAscii(bb);
+        status = (int) VarInt.decode(bb);
+        mimetype = VarInt.decodeAscii(bb);
+        length = VarInt.decode(bb);
+        digest = base32.encodeAsString(VarInt.decodeBytes(bb));
+        file = VarInt.decodeAscii(bb);
+        compressedoffset = VarInt.decode(bb);
+        redirecturl = VarInt.decodeAscii(bb);
+    }
+
     public int sizeValue() {
         return VarInt.size(CURRENT_VERSION) +
                 VarInt.sizeAscii(original) +
                 VarInt.size(status) +
                 VarInt.sizeAscii(mimetype) +
                 VarInt.size(length) +
-                VarInt.sizeAscii(digest) +
+                VarInt.sizeBytes(base32.decode(digest)) +
                 VarInt.sizeAscii(file) +
                 VarInt.size(compressedoffset) +
                 VarInt.sizeAscii(redirecturl);
@@ -108,7 +123,7 @@ public class Record {
         VarInt.encode(bb, status);
         VarInt.encodeAscii(bb, mimetype);
         VarInt.encode(bb, length);
-        VarInt.encodeAscii(bb, digest);
+        VarInt.encodeBytes(bb, base32.decode(digest));
         VarInt.encodeAscii(bb, file);
         VarInt.encode(bb, compressedoffset);
         VarInt.encodeAscii(bb, redirecturl);
