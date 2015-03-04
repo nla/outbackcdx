@@ -3,8 +3,8 @@ package tinycdxserver;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
-import org.iq80.leveldb.DB;
-import org.iq80.leveldb.DBIterator;
+
+import org.rocksdb.*;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -48,7 +48,8 @@ public class Server extends NanoHTTPD {
 
     Response post(IHTTPSession session) throws IOException {
         String collection = session.getUri().substring(1);
-        final DB index = manager.getIndex(collection, true);
+        final RocksDB index = manager.getIndex(collection, true);
+        WriteBatch batch = new WriteBatch();
         BufferedReader in = new BufferedReader(new InputStreamReader(session.getInputStream()));
         long added = 0;
         for (;;) {
@@ -70,18 +71,26 @@ public class Server extends NanoHTTPD {
                 record.compressedoffset = Long.parseLong(fields[9]);
                 record.file = fields[10];
                 record.redirecturl = "";
-                index.put(record.encodeKey(), record.encodeValue());
+                batch.put(record.encodeKey(), record.encodeValue());
                 added++;
             } catch (Exception e) {
                 return new Response(Response.Status.BAD_REQUEST, "text/plain", e.toString() + "\nAt line: " + line);
             }
+        }
+        WriteOptions options = new WriteOptions();
+        options.setSync(true);
+        try {
+            index.write(options, batch);
+        } catch (RocksDBException e) {
+            e.printStackTrace();
+            return new Response(Response.Status.INTERNAL_ERROR, "text/plain", e.toString());
         }
         return new Response(Response.Status.OK, "text/plain", "Added " + added + " records\n");
     }
 
     Response query(IHTTPSession session) throws IOException {
         String collection = session.getUri().substring(1);
-        final DB index = manager.getIndex(collection);
+        final RocksDB index = manager.getIndex(collection);
         if (index == null) {
             return new Response(Response.Status.NOT_FOUND, "text/plain", "Collection does not exist\n");
         }
@@ -96,17 +105,17 @@ public class Server extends NanoHTTPD {
             @Override
             public void stream(OutputStream outputStream) throws IOException {
                 Writer out = new BufferedWriter(new OutputStreamWriter(outputStream));
-                DBIterator it = index.iterator();
+                RocksIterator it = index.newIterator();
                 try {
                     it.seek(Record.encodeKey(url, 0));
-                    while (it.hasNext()) {
-                        Record record = new Record(it.next());
+                    for (; it.isValid(); it.next()) {
+                        Record record = new Record(it.key(), it.value());
                         if (!record.urlkey.equals(url)) break;
                         out.append(record.toString()).append('\n');
                     }
                     out.flush();
                 } finally {
-                    it.close();
+                    it.dispose();
                 }
             }
         });

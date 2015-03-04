@@ -1,7 +1,7 @@
 package tinycdxserver;
 
-import org.iq80.leveldb.DB;
-import org.iq80.leveldb.DBIterator;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksIterator;
 
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -27,7 +27,7 @@ public class XmlQuery {
             }
 
             @Override
-            void perform(XMLStreamWriter out, String queryUrl, DBIterator it, Record record) throws XMLStreamException {
+            void perform(XMLStreamWriter out, String queryUrl, RocksIterator it, Record record) throws XMLStreamException {
                 do {
                     out.writeStartElement("result");
                     writeElement(out, "compressedoffset", record.compressedoffset);
@@ -41,8 +41,9 @@ public class XmlQuery {
                     writeElement(out, "url", record.original);
                     writeElement(out, "capturedate", record.timestamp);
                     out.writeEndElement(); // </result>
-                    if (!it.hasNext()) break;
-                    record = new Record(it.next());;
+                    it.next();
+                    if (!it.isValid()) break;
+                    record = new Record(it.key(), it.value());
                 } while (inScope(record, queryUrl));
             }
 
@@ -58,7 +59,7 @@ public class XmlQuery {
             }
 
             @Override
-            void perform(XMLStreamWriter out, String queryUrl, DBIterator it, Record record) throws XMLStreamException {
+            void perform(XMLStreamWriter out, String queryUrl, RocksIterator it, Record record) throws XMLStreamException {
                 do {
                     long captures = 0, versions = 0;
                     Record firstCapture = record;
@@ -71,11 +72,12 @@ public class XmlQuery {
                         }
                         captures++;
                         lastCapture = record;
-                        if (!it.hasNext()) {
+                        it.next();
+                        if (!it.isValid()) {
                             record = null;
                             break;
                         }
-                        record = new Record(it.next());
+                        record = new Record(it.key(), it.value());
                     }
                     out.writeStartElement("result");
                     writeElement(out, "urlkey", lastCapture.urlkey);
@@ -95,7 +97,7 @@ public class XmlQuery {
         };
 
         abstract boolean inScope(Record record, String queryUrl);
-        abstract void perform(XMLStreamWriter out, String queryUrl, DBIterator it, Record record) throws XMLStreamException;
+        abstract void perform(XMLStreamWriter out, String queryUrl, RocksIterator it, Record record) throws XMLStreamException;
         abstract String resultsType();
 
         static QueryType byName(String typeName) {
@@ -125,7 +127,7 @@ public class XmlQuery {
         out.writeEndElement();
     }
 
-    public static NanoHTTPD.Response query(NanoHTTPD.IHTTPSession session, final DB index) {
+    public static NanoHTTPD.Response query(NanoHTTPD.IHTTPSession session, final RocksDB index) {
         Map<String,String> params = session.getParms();
         Map<String,String> query = decodeQueryString(params.get("q"));
 
@@ -139,7 +141,7 @@ public class XmlQuery {
         return new NanoHTTPD.Response(NanoHTTPD.Response.Status.OK, "application/xml;charset=" + DEFAULT_ENCODING, new NanoHTTPD.IStreamer() {
             @Override
             public void stream(OutputStream outputStream) throws IOException {
-                DBIterator it = index.iterator();
+                RocksIterator it = index.newIterator();
                 try {
                     it.seek(Record.encodeKey(queryUrl, 0));
                     XMLOutputFactory factory = XMLOutputFactory.newInstance();
@@ -148,8 +150,9 @@ public class XmlQuery {
                     out.writeStartElement("wayback");
 
                     Record record = null;
-                    if (it.hasNext()) {
-                        record = new Record(it.next());
+                    if (it.isValid()) {
+                        record = new Record(it.key(), it.value());
+                        it.next();
                     }
                     if (record != null && queryType.inScope(record, queryUrl)) {
                         out.writeStartElement("request");
@@ -177,7 +180,7 @@ public class XmlQuery {
                 } catch (XMLStreamException e) {
                     throw new RuntimeException(e);
                 } finally {
-                    it.close();
+                    it.dispose();
                 }
             }
         });
