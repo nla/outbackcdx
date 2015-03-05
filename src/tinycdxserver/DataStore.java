@@ -1,9 +1,6 @@
 package tinycdxserver;
 
-import org.rocksdb.CompactionStyle;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
+import org.rocksdb.*;
 
 import java.io.Closeable;
 import java.io.File;
@@ -52,6 +49,7 @@ public class DataStore implements Closeable {
         options.setLevelZeroStopWritesTrigger(40);
         options.setTargetFileSizeBase(64 * 1024 * 1024);
         options.setMaxBytesForLevelBase(512 * 1024 * 1024);
+        options.setCompressionType(CompressionType.LZ4_COMPRESSION);
         try {
             options.setWriteBufferSize(64 * 1024 * 1024);
             index = RocksDB.open(options, path.toString());
