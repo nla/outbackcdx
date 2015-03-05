@@ -1,5 +1,6 @@
 package tinycdxserver;
 
+import org.rocksdb.CompactionStyle;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -44,6 +45,7 @@ public class DataStore implements Closeable {
         }
         Options options = new Options();
         options.setCreateIfMissing(true);
+        options.setMaxBytesForLevelBase(32 * 1024 * 1024);
         try {
             index = RocksDB.open(options, path.toString());
         } catch (RocksDBException e) {
