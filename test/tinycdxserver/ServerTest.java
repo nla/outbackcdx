@@ -4,14 +4,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public class ServerTest {
 
@@ -23,8 +24,14 @@ public class ServerTest {
         File root = folder.newFolder();
         DataStore manager = new DataStore(root);
         Server server = new Server(manager, "127.0.0.1", -1);
-        server.post(new DummySession("/test").data("- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n"));
-
+        server.post(new DummySession("/test").data("- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20050614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n"));
+        NanoHTTPD.Response response = server.query(new DummySession("/test").parm("url", "nla.gov.au"));
+        assertEquals(NanoHTTPD.Response.Status.OK, response.getStatus());
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        response.send(out);
+        String data = out.toString("UTF-8");
+        assertTrue(data.indexOf("au,gov,nla)/ 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX 0") != -1);
+        assertTrue(data.indexOf("example") == -1);
     }
 
     private static class DummySession implements NanoHTTPD.IHTTPSession {
@@ -38,6 +45,11 @@ public class ServerTest {
 
         public DummySession data(String data) {
             stream = new ByteArrayInputStream(data.getBytes(Charset.forName("UTF-8")));
+            return this;
+        }
+
+        public DummySession parm(String key, String value) {
+            parms.put(key, value);
             return this;
         }
 
