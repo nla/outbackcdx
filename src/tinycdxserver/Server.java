@@ -68,10 +68,12 @@ public class Server extends NanoHTTPD {
                 record.mimetype = fields[3];
                 record.status = fields[4].equals("-") ? 0 : Integer.parseInt(fields[4]);
                 record.digest = fields[5];
+                record.redirecturl = fields[6];
+                // TODO robots = fields[7]
+                record.length = fields[8].equals("-") ? 0 : Long.parseLong(fields[8]);
                 record.compressedoffset = Long.parseLong(fields[9]);
                 record.file = fields[10];
-                record.redirecturl = "";
-                batch.put(record.encodeKey(), record.encodeValue());
+                index.put(record.encodeKey(), record.encodeValue());
                 added++;
             } catch (Exception e) {
                 return new Response(Response.Status.BAD_REQUEST, "text/plain", e.toString() + "\nAt line: " + line);
