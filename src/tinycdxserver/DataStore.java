@@ -42,25 +42,14 @@ public class DataStore implements Closeable {
         }
 
         try {
-            BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
-            tableOptions.setBlockCacheSize(64 * 1024 * 1024)
-                    .setCacheNumShardBits(6)
-                    .setBlockSizeDeviation(5)
-                    .setBlockRestartInterval(10)
-                    .setCacheIndexAndFilterBlocks(true)
-                    .setHashIndexAllowCollision(false)
-                    .setBlockCacheCompressedSize(64 * 1024 * 1024)
-                    .setBlockCacheCompressedNumShardBits(10);
-
 
             Options options = new Options();
-            options.setTableFormatConfig(tableOptions);
             options.createStatistics();
             options.setCreateIfMissing(true);
             options.setCompactionStyle(CompactionStyle.LEVEL);
             options.setWriteBufferSize(64 * 1024 * 1024);
-            options.setTargetFileSizeBase(2 * 1024 * 1024);
-            options.setMaxBytesForLevelBase(8 * 1024 * 1024);
+            options.setTargetFileSizeBase(64 * 1024 * 1024);
+            options.setMaxBytesForLevelBase(512 * 1024 * 1024);
             options.setTargetFileSizeMultiplier(2);
             options.setCompressionType(CompressionType.SNAPPY_COMPRESSION);
             index = RocksDB.open(options, path.toString());
