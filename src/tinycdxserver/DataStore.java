@@ -42,7 +42,19 @@ public class DataStore implements Closeable {
         }
 
         try {
+            BlockBasedTableConfig tableOptions = new BlockBasedTableConfig();
+            tableOptions.setBlockCacheSize(64 * 1024 * 1024)
+                    .setCacheNumShardBits(6)
+                    .setBlockSizeDeviation(5)
+                    .setBlockRestartInterval(10)
+                    .setCacheIndexAndFilterBlocks(true)
+                    .setHashIndexAllowCollision(false)
+                    .setBlockCacheCompressedSize(64 * 1024 * 1024)
+                    .setBlockCacheCompressedNumShardBits(10);
+
+
             Options options = new Options();
+            options.setTableFormatConfig(tableOptions);
             options.createStatistics();
             options.setCreateIfMissing(true);
             options.setCompactionStyle(CompactionStyle.LEVEL);
