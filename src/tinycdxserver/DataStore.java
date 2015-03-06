@@ -42,6 +42,8 @@ public class DataStore implements Closeable {
         }
 
         try {
+            BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
+            tableConfig.setBlockSize(22 * 1024); // approximately compresses to < 8 kB
 
             Options options = new Options();
             options.createStatistics();
@@ -52,6 +54,7 @@ public class DataStore implements Closeable {
             options.setMaxBytesForLevelBase(512 * 1024 * 1024);
             options.setTargetFileSizeMultiplier(2);
             options.setCompressionType(CompressionType.SNAPPY_COMPRESSION);
+            options.setTableFormatConfig(tableConfig);
             index = RocksDB.open(options, path.toString());
         } catch (RocksDBException e) {
             throw new IOException(e);
