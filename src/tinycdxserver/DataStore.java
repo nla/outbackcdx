@@ -49,7 +49,6 @@ public class DataStore implements Closeable {
         options.setLevelZeroStopWritesTrigger(40);
         options.setTargetFileSizeBase(64 * 1024 * 1024);
         options.setMaxBytesForLevelBase(512 * 1024 * 1024);
-        options.setCompressionType(CompressionType.LZ4_COMPRESSION);
         options.setTargetFileSizeMultiplier(4);
         try {
             options.setWriteBufferSize(64 * 1024 * 1024);
