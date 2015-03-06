@@ -40,18 +40,17 @@ public class DataStore implements Closeable {
         if (!createAllowed && !path.isDirectory()) {
             return null;
         }
-        Options options = new Options();
-        options.setCreateIfMissing(true);
-        options.setMaxBytesForLevelBase(32 * 1024 * 1024);
-        options.setCompactionStyle(CompactionStyle.LEVEL);
-        options.setLevelZeroFileNumCompactionTrigger(10);
-        options.setLevelZeroSlowdownWritesTrigger(20);
-        options.setLevelZeroStopWritesTrigger(40);
-        options.setTargetFileSizeBase(64 * 1024 * 1024);
-        options.setMaxBytesForLevelBase(512 * 1024 * 1024);
-        options.setTargetFileSizeMultiplier(4);
+
         try {
+            Options options = new Options();
+            options.createStatistics();
+            options.setCreateIfMissing(true);
+            options.setCompactionStyle(CompactionStyle.LEVEL);
             options.setWriteBufferSize(64 * 1024 * 1024);
+            options.setTargetFileSizeBase(64 * 1024 * 1024);
+            options.setMaxBytesForLevelBase(512 * 1024 * 1024);
+            options.setTargetFileSizeMultiplier(2);
+            options.setCompressionType(CompressionType.SNAPPY_COMPRESSION);
             index = RocksDB.open(options, path.toString());
         } catch (RocksDBException e) {
             throw new IOException(e);
