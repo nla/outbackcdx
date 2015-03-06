@@ -49,43 +49,49 @@ public class Server extends NanoHTTPD {
     Response post(IHTTPSession session) throws IOException {
         String collection = session.getUri().substring(1);
         final RocksDB index = manager.getIndex(collection, true);
-        WriteBatch batch = new WriteBatch();
         BufferedReader in = new BufferedReader(new InputStreamReader(session.getInputStream()));
         long added = 0;
-        for (;;) {
-            String line = in.readLine();
-            if (verbose) {
-                System.out.println(line);
-            }
-            if (line == null) break;
-            if (line.startsWith(" CDX")) continue;
-            try {
-                String[] fields = line.split(" ");
-                Record record = new Record();
-                record.timestamp = Long.parseLong(fields[1]);
-                record.original = fields[2];
-                record.urlkey = UrlCanonicalizer.surtCanonicalize(record.original);
-                record.mimetype = fields[3];
-                record.status = fields[4].equals("-") ? 0 : Integer.parseInt(fields[4]);
-                record.digest = fields[5];
-                record.redirecturl = fields[6];
-                // TODO robots = fields[7]
-                record.length = fields[8].equals("-") ? 0 : Long.parseLong(fields[8]);
-                record.compressedoffset = Long.parseLong(fields[9]);
-                record.file = fields[10];
-                index.put(record.encodeKey(), record.encodeValue());
-                added++;
-            } catch (Exception e) {
-                return new Response(Response.Status.BAD_REQUEST, "text/plain", e.toString() + "\nAt line: " + line);
-            }
-        }
-        WriteOptions options = new WriteOptions();
-        options.setSync(true);
+        WriteBatch batch = new WriteBatch();
         try {
-            index.write(options, batch);
-        } catch (RocksDBException e) {
-            e.printStackTrace();
-            return new Response(Response.Status.INTERNAL_ERROR, "text/plain", e.toString());
+            for (; ; ) {
+                String line = in.readLine();
+                if (verbose) {
+                    System.out.println(line);
+                }
+                if (line == null) break;
+                if (line.startsWith(" CDX")) continue;
+                try {
+                    String[] fields = line.split(" ");
+                    Record record = new Record();
+                    record.timestamp = Long.parseLong(fields[1]);
+                    record.original = fields[2];
+                    record.urlkey = UrlCanonicalizer.surtCanonicalize(record.original);
+                    record.mimetype = fields[3];
+                    record.status = fields[4].equals("-") ? 0 : Integer.parseInt(fields[4]);
+                    record.digest = fields[5];
+                    record.redirecturl = fields[6];
+                    // TODO robots = fields[7]
+                    record.length = fields[8].equals("-") ? 0 : Long.parseLong(fields[8]);
+                    record.compressedoffset = Long.parseLong(fields[9]);
+                    record.file = fields[10];
+                    batch.put(record.encodeKey(), record.encodeValue());
+                    added++;
+                } catch (Exception e) {
+                    return new Response(Response.Status.BAD_REQUEST, "text/plain", e.toString() + "\nAt line: " + line);
+                }
+            }
+            WriteOptions options = new WriteOptions();
+            try {
+                options.setSync(true);
+                index.write(options, batch);
+            } catch (RocksDBException e) {
+                e.printStackTrace();
+                return new Response(Response.Status.INTERNAL_ERROR, "text/plain", e.toString());
+            } finally {
+                options.dispose();
+            }
+        } finally {
+            batch.dispose();
         }
         return new Response(Response.Status.OK, "text/plain", "Added " + added + " records\n");
     }
