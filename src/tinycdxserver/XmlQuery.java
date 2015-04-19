@@ -6,6 +6,7 @@ import org.rocksdb.RocksIterator;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.LocalDateTime;
@@ -145,7 +146,8 @@ public class XmlQuery {
                 try {
                     it.seek(Record.encodeKey(queryUrl, 0));
                     XMLOutputFactory factory = XMLOutputFactory.newInstance();
-                    XMLStreamWriter out = factory.createXMLStreamWriter(outputStream, DEFAULT_ENCODING);
+                    BufferedOutputStream bos = new BufferedOutputStream(outputStream);
+                    XMLStreamWriter out = factory.createXMLStreamWriter(bos, DEFAULT_ENCODING);
                     out.writeStartDocument(DEFAULT_ENCODING, "1.0");
                     out.writeStartElement("wayback");
 
