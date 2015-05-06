@@ -138,7 +138,6 @@ public class XmlQuery {
         final long offset = 0; // TODO
         final long limit = 10000; // TODO
 
-        System.out.println("xmlquery " + query.get("url") + " canon " + queryUrl);
         return new NanoHTTPD.Response(NanoHTTPD.Response.Status.OK, "application/xml;charset=" + DEFAULT_ENCODING, new NanoHTTPD.IStreamer() {
             @Override
             public void stream(OutputStream outputStream) throws IOException {
@@ -154,7 +153,6 @@ public class XmlQuery {
                     Record record = null;
                     if (it.isValid()) {
                         record = new Record(it.key(), it.value());
-                        it.next();
                     }
                     if (record != null && queryType.inScope(record, queryUrl)) {
                         out.writeStartElement("request");
