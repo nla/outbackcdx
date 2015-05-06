@@ -5,6 +5,8 @@ import org.rocksdb.*;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -73,5 +75,15 @@ public class DataStore implements Closeable {
             index.close();
         }
         indexes.clear();
+    }
+
+    public List<String> listCollections() {
+        List<String> collections = new ArrayList<String>();
+        for (File f : dataDir.listFiles()) {
+            if (f.isDirectory() && isValidCollectionName(f.getName())) {
+                collections.add(f.getName());
+            }
+        }
+        return collections;
     }
 }

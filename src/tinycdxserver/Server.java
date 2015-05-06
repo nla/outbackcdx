@@ -1,18 +1,12 @@
 package tinycdxserver;
 
-import javax.xml.stream.XMLOutputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamWriter;
-
 import org.rocksdb.*;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.nio.channels.Channel;
 import java.nio.channels.ServerSocketChannel;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class Server extends NanoHTTPD {
@@ -33,7 +27,7 @@ public class Server extends NanoHTTPD {
     public Response serve(IHTTPSession session) {
         try {
             if (session.getUri().equals("/")) {
-                return new Response("tinycdxserver running\n");
+                return collectionList();
             } else if (session.getMethod().equals(Method.GET)) {
                 return query(session);
             } else if (session.getMethod().equals(Method.POST)) {
@@ -106,19 +100,72 @@ public class Server extends NanoHTTPD {
         Map<String,String> params = session.getParms();
         if (params.containsKey("q")) {
             return XmlQuery.query(session, index);
+        } else if (params.containsKey("url")) {
+            return textQuery(index, params.get("url"));
+        } else {
+            return collectionDetails(index);
         }
-        final String url = UrlCanonicalizer.surtCanonicalize(params.get("url"));
 
+    }
+
+    private String slurp(InputStream stream) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        char buf[] = new char[8192];
+        InputStreamReader reader = new InputStreamReader(stream);
+        try {
+            for (;;) {
+                int n = reader.read(buf);
+                if (n < 0) break;
+                sb.append(buf, 0, n);
+            }
+        } finally {
+            reader.close();
+        }
+        return sb.toString();
+    }
+
+    private Response collectionList() throws IOException {
+        String page = "<!doctype html><h1>tinycdxserver</h1>";
+
+        List<String> collections = manager.listCollections();
+
+        if (collections.isEmpty()) {
+            page += "No collections.";
+        } else {
+            page += "<ul>";
+            for (String collection : manager.listCollections()) {
+                page += "<li><a href=" + collection + ">" + collection + "</a>";
+            }
+            page += "</ul>";
+        }
+        page += slurp(Server.class.getClassLoader().getResourceAsStream("tinycdxserver/usage.html"));
+        return new Response(Response.Status.OK, "text/html", page);
+    }
+
+    private Response collectionDetails(RocksDB index) {
+        String page = "<form>URL: <input name=url type=url><button type=submit>Query</button></form>\n<pre>";
+        try {
+            page += index.getProperty("rocksdb.stats");
+            page += "\nEstimated number of records: " + index.getLongProperty("rocksdb.estimate-num-keys");
+        } catch (RocksDBException e) {
+            page += e.toString();
+            e.printStackTrace();
+        }
+        return new Response(Response.Status.OK, "text/html", page);
+    }
+
+    private Response textQuery(final RocksDB index, String url) {
+        final String canonUrl = UrlCanonicalizer.surtCanonicalize(url);
         return new Response(Response.Status.OK, "text/plain", new IStreamer() {
             @Override
             public void stream(OutputStream outputStream) throws IOException {
                 Writer out = new BufferedWriter(new OutputStreamWriter(outputStream));
                 RocksIterator it = index.newIterator();
                 try {
-                    it.seek(Record.encodeKey(url, 0));
+                    it.seek(Record.encodeKey(canonUrl, 0));
                     for (; it.isValid(); it.next()) {
                         Record record = new Record(it.key(), it.value());
-                        if (!record.urlkey.equals(url)) break;
+                        if (!record.urlkey.equals(canonUrl)) break;
                         out.append(record.toString()).append('\n');
                     }
                     out.flush();
