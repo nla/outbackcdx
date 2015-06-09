@@ -16,19 +16,19 @@ public class DataStore implements Closeable {
         this.dataDir = dataDir;
     }
 
-    public RocksDB getIndex(String collection) throws IOException {
+    public Index getIndex(String collection) throws IOException {
         return getIndex(collection, false);
     }
 
-    public RocksDB getIndex(String collection, boolean createAllowed) throws IOException {
-        RocksDB index = indexes.get(collection);
-        if (index != null) {
-            return index;
+    public Index getIndex(String collection, boolean createAllowed) throws IOException {
+        RocksDB db = indexes.get(collection);
+        if (db != null) {
+            return new Index(db);
         }
-        return openIndex(collection, createAllowed);
+        return new Index(openDb(collection, createAllowed));
     }
 
-    private synchronized RocksDB openIndex(String collection, boolean createAllowed) throws IOException {
+    private synchronized RocksDB openDb(String collection, boolean createAllowed) throws IOException {
         if (!isValidCollectionName(collection)) {
             throw new IllegalArgumentException("Invalid collection name");
         }
@@ -64,7 +64,6 @@ public class DataStore implements Closeable {
         return collection.matches("^[A-Za-z0-9_-]+$");
     }
 
-    @Override
     public void close() {
         for (RocksDB index : indexes.values()) {
             index.close();

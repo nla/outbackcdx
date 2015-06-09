@@ -1,13 +1,8 @@
 package tinycdxserver;
 
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksIterator;
-
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
@@ -19,99 +14,28 @@ import java.util.Map;
 public class XmlQuery {
     final static String DEFAULT_ENCODING = "UTF-8";
 
-    public enum QueryType {
-        URLQUERY {
-            @Override
-            boolean inScope(Record record, String queryUrl) {
-                return record.urlkey.equals(queryUrl);
-            }
+    final Index index;
+    final String queryUrl;
+    final long offset;
+    final long limit;
+    final String queryType;
 
-            @Override
-            void perform(XMLStreamWriter out, String queryUrl, RocksIterator it, Record record) throws XMLStreamException {
-                do {
-                    out.writeStartElement("result");
-                    writeElement(out, "compressedoffset", record.compressedoffset);
-                    writeElement(out, "mimetype", record.mimetype);
-                    writeElement(out, "file", record.file);
-                    writeElement(out, "redirecturl", record.redirecturl);
-                    writeElement(out, "urlkey", record.urlkey);
-                    writeElement(out, "digest", record.digest);
-                    writeElement(out, "httpresponsecode", record.status);
-                    writeElement(out, "robotflags", "-"); // TODO
-                    writeElement(out, "url", record.original);
-                    writeElement(out, "capturedate", record.timestamp);
-                    out.writeEndElement(); // </result>
-                    it.next();
-                    if (!it.isValid()) break;
-                    record = new Record(it.key(), it.value());
-                } while (inScope(record, queryUrl));
-            }
+    public XmlQuery(NanoHTTPD.IHTTPSession session, final Index index) {
+        this.index = index;
 
-            @Override
-            String resultsType() {
-                return "resultstypecapture";
-            }
-        },
-        PREFIXQUERY {
-            @Override
-            boolean inScope(Record record, String queryUrl) {
-                return record.urlkey.startsWith(queryUrl);
-            }
+        Map<String, String> params = session.getParms();
+        Map<String, String> query = decodeQueryString(params.get("q"));
 
-            @Override
-            void perform(XMLStreamWriter out, String queryUrl, RocksIterator it, Record record) throws XMLStreamException {
-                do {
-                    long captures = 0, versions = 0;
-                    Record firstCapture = record;
-                    Record lastCapture = record;
-                    String lastDigest = null;
-                    while (record.urlkey.equals(firstCapture.urlkey)) {
-                        if (!record.digest.equals(lastDigest)) {
-                            versions++;
-                            lastDigest = record.digest;
-                        }
-                        captures++;
-                        lastCapture = record;
-                        it.next();
-                        if (!it.isValid()) {
-                            record = null;
-                            break;
-                        }
-                        record = new Record(it.key(), it.value());
-                    }
-                    out.writeStartElement("result");
-                    writeElement(out, "urlkey", lastCapture.urlkey);
-                    writeElement(out, "originalurl", lastCapture.original);
-                    writeElement(out, "numversions", versions);
-                    writeElement(out, "numcaptures", captures);
-                    writeElement(out, "firstcapturets", firstCapture.timestamp);
-                    writeElement(out, "lastcapturets", lastCapture.timestamp);
-                    out.writeEndElement(); // </result>
-                } while (record != null && inScope(record, queryUrl));
-            }
+        queryType = query.get("type").toLowerCase();
+        queryUrl = UrlCanonicalizer.surtCanonicalize(query.get("url"));
 
-            @Override
-            String resultsType() {
-                return "resultstypeurl";
-            }
-        };
-
-        abstract boolean inScope(Record record, String queryUrl);
-        abstract void perform(XMLStreamWriter out, String queryUrl, RocksIterator it, Record record) throws XMLStreamException;
-        abstract String resultsType();
-
-        static QueryType byName(String typeName) {
-            if (typeName == null) {
-                return QueryType.URLQUERY;
-            } else {
-                return QueryType.valueOf(typeName.toUpperCase());
-            }
-        }
+        offset = 0; // TODO
+        limit = 10000; // TODO
     }
 
     private static Map<String,String> decodeQueryString(String q) {
 
-        Map<String,String> m = new HashMap<String, String>();
+        Map<String,String> m = new HashMap<>();
         for (String entry : q.split(" ")) {
             String[] fields = entry.split(":", 2);
             String key = UrlCanonicalizer.urlDecode(fields[0]);
@@ -127,62 +51,112 @@ public class XmlQuery {
         out.writeEndElement();
     }
 
-    public static NanoHTTPD.Response query(NanoHTTPD.IHTTPSession session, final RocksDB index) {
-        Map<String,String> params = session.getParms();
-        Map<String,String> query = decodeQueryString(params.get("q"));
+    public NanoHTTPD.Response streamResults() {
+        return new NanoHTTPD.Response(NanoHTTPD.Response.Status.OK, "application/xml;charset=" + DEFAULT_ENCODING, outputStream -> {
+            try {
+                XMLOutputFactory factory = XMLOutputFactory.newInstance();
+                XMLStreamWriter out = factory.createXMLStreamWriter(outputStream, DEFAULT_ENCODING);
+                out.writeStartDocument(DEFAULT_ENCODING, "1.0");
+                out.writeStartElement("wayback");
 
-        final QueryType queryType = QueryType.byName(query.get("type"));
-        final String queryUrl = UrlCanonicalizer.surtCanonicalize(query.get("url"));
-
-        final long offset = 0; // TODO
-        final long limit = 10000; // TODO
-
-        System.out.println("xmlquery " + query.get("url") + " canon " + queryUrl);
-        return new NanoHTTPD.Response(NanoHTTPD.Response.Status.OK, "application/xml;charset=" + DEFAULT_ENCODING, new NanoHTTPD.IStreamer() {
-            @Override
-            public void stream(OutputStream outputStream) throws IOException {
-                RocksIterator it = index.newIterator();
-                try {
-                    it.seek(Record.encodeKey(queryUrl, 0));
-                    XMLOutputFactory factory = XMLOutputFactory.newInstance();
-                    XMLStreamWriter out = factory.createXMLStreamWriter(outputStream, DEFAULT_ENCODING);
-                    out.writeStartDocument(DEFAULT_ENCODING, "1.0");
-                    out.writeStartElement("wayback");
-
-                    Record record = null;
-                    if (it.isValid()) {
-                        record = new Record(it.key(), it.value());
-                        it.next();
-                    }
-                    if (record != null && queryType.inScope(record, queryUrl)) {
-                        out.writeStartElement("request");
-                        writeElement(out, "startdate", "19960101000000");
-                        writeElement(out, "enddate", Record.arcTimeFormat.format(LocalDateTime.now(ZoneOffset.UTC)));
-                        writeElement(out, "type", queryType.name().toLowerCase());
-                        writeElement(out, "firstreturned", offset);
-                        writeElement(out, "url", queryUrl);
-                        writeElement(out, "resultsrequested", limit);
-                        writeElement(out, "resultstype", queryType.resultsType());
-                        out.writeEndElement(); // </request>
-
-                        out.writeStartElement("results");
-                        queryType.perform(out, queryUrl, it, record);
-                        out.writeEndElement(); // </results>
-                    } else {
+                switch (queryType) {
+                    case "urlquery":
+                        urlQuery(out);
+                        break;
+                    case "prefixquery":
+                        prefixQuery(out);
+                        break;
+                    default:
                         out.writeStartElement("error");
-                        writeElement(out, "title", "Resource Not In Archive");
-                        writeElement(out, "message", "The Resource you requested is not in this archive.");
+                        writeElement(out, "title", "Unsupported query type");
+                        writeElement(out, "message", "The requested query type is unknown to the index.");
                         out.writeEndElement();
-                    }
-                    out.writeEndElement(); // </wayback>
-                    out.writeEndDocument();
-                    out.flush();
-                } catch (XMLStreamException e) {
-                    throw new RuntimeException(e);
-                } finally {
-                    it.dispose();
+                        break;
                 }
+
+                out.writeEndElement(); // </wayback>
+                out.writeEndDocument();
+                out.flush();
+            } catch (XMLStreamException e) {
+                throw new RuntimeException(e);
             }
         });
+    }
+
+    private void urlQuery(XMLStreamWriter out) throws XMLStreamException {
+        boolean wroteHeader = false;
+        for (Capture capture : index.query(queryUrl)) {
+            if (!wroteHeader) {
+                writeHeader(out, "resultstypeurl");
+                out.writeStartElement("results");
+                wroteHeader = true;
+            }
+            out.writeStartElement("result");
+            writeElement(out, "compressedoffset", capture.compressedoffset);
+            writeElement(out, "mimetype", capture.mimetype);
+            writeElement(out, "file", capture.file);
+            writeElement(out, "redirecturl", capture.redirecturl);
+            writeElement(out, "urlkey", capture.urlkey);
+            writeElement(out, "digest", capture.digest);
+            writeElement(out, "httpresponsecode", capture.status);
+            writeElement(out, "robotflags", "-"); // TODO
+            writeElement(out, "url", capture.original);
+            writeElement(out, "capturedate", capture.timestamp);
+            out.writeEndElement(); // </result>
+        }
+
+        if (wroteHeader) {
+            out.writeEndElement(); // </results>
+        } else {
+            writeNotFoundError(out);
+        }
+    }
+
+    private void prefixQuery(XMLStreamWriter out) throws XMLStreamException {
+        boolean wroteHeader = false;
+        for (Resource resource : index.prefixQuery(queryUrl)) {
+            if (!wroteHeader) {
+                writeHeader(out, "resultstypecapture");
+                out.writeStartElement("results");
+                wroteHeader = true;
+            }
+            out.writeStartElement("result");
+            writeElement(out, "urlkey", resource.lastCapture.urlkey);
+            writeElement(out, "originalurl", resource.lastCapture.original);
+            writeElement(out, "numversions", resource.versions);
+            writeElement(out, "numcaptures", resource.captures);
+            writeElement(out, "firstcapturets", resource.firstCapture.timestamp);
+            writeElement(out, "lastcapturets", resource.lastCapture.timestamp);
+            out.writeEndElement(); // </result>
+        }
+
+        if (wroteHeader) {
+            out.writeEndElement(); // </results>
+        } else {
+            writeNotFoundError(out);
+        }
+    }
+
+    private void writeHeader(XMLStreamWriter out, String resultsType) throws XMLStreamException {
+        out.writeStartElement("request");
+        writeElement(out, "startdate", "19960101000000");
+        writeElement(out, "enddate", Capture.arcTimeFormat.format(LocalDateTime.now(ZoneOffset.UTC)));
+        writeElement(out, "type", queryType);
+        writeElement(out, "firstreturned", offset);
+        writeElement(out, "url", queryUrl);
+        writeElement(out, "resultsrequested", limit);
+        writeElement(out, "resultstype", resultsType);
+        out.writeEndElement(); // </request>
+    }
+
+    private static void writeNotFoundError(XMLStreamWriter out) throws XMLStreamException {
+        out.writeStartElement("error");
+        writeElement(out, "title", "Resource Not In Archive");
+        writeElement(out, "message", "The Resource you requested is not in this archive.");
+        out.writeEndElement();
+    }
+
+    public static NanoHTTPD.Response query(NanoHTTPD.IHTTPSession session, Index index) {
+        return new XmlQuery(session, index).streamResults();
     }
 }

@@ -24,7 +24,7 @@ import java.util.Map;
  * The record's consists of a static list fields packed using {@link tinycdxserver.VarInt}.  The first field in the
  * value is a schema version number to allow fields to be added or removed in later versions.
  */
-public class Record {
+public class Capture {
     private static int CURRENT_VERSION = 1;
     static final DateTimeFormatter arcTimeFormat = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     static final Base32 base32 = new Base32();
@@ -40,16 +40,16 @@ public class Record {
     public long compressedoffset;
     public String redirecturl;
 
-    public Record(Map.Entry<byte[], byte[]> entry) {
+    public Capture(Map.Entry<byte[], byte[]> entry) {
         this(entry.getKey(), entry.getValue());
     }
 
-    public Record(byte[] key, byte[] value) {
+    public Capture(byte[] key, byte[] value) {
         decodeKey(key);
         decodeValue(ByteBuffer.wrap(value));
     }
 
-    public Record() {
+    public Capture() {
     }
 
     public void decodeKey(byte[] key) {

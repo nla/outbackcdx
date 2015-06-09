@@ -4,10 +4,10 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class RecordTest {
+public class CaptureTest {
     @Test
     public void testRecordsCanBeEncodedAndDecoded() {
-        Record src = dummyRecord();
+        Capture src = dummyRecord();
 
         byte[] key = src.encodeKey();
         byte[] value = src.encodeValue();
@@ -17,11 +17,11 @@ public class RecordTest {
         assertEquals('o', value[2]);
         assertEquals('r', value[3]);
 
-        Record dst = new Record(key, value);
+        Capture dst = new Capture(key, value);
         assertFieldsEqual(src, dst);
     }
 
-    static void assertFieldsEqual(Record src, Record dst) {
+    static void assertFieldsEqual(Capture src, Capture dst) {
         assertEquals(src.compressedoffset, dst.compressedoffset);
         assertEquals(src.digest, dst.digest);
         assertEquals(src.file, dst.file);
@@ -34,8 +34,8 @@ public class RecordTest {
         assertEquals(src.urlkey, dst.urlkey);
     }
 
-    static Record dummyRecord() {
-        Record src = new Record();
+    static Capture dummyRecord() {
+        Capture src = new Capture();
         src.compressedoffset = 1234;
         src.digest = "2HQQSVUDLU4NZ67TN2KS3NG5AIVBVNFB";
         src.file = "file";
