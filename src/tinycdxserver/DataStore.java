@@ -5,6 +5,8 @@ import org.rocksdb.*;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -42,6 +44,8 @@ public class DataStore implements Closeable {
         }
 
         try {
+            BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
+            tableConfig.setBlockSize(22 * 1024); // approximately compresses to < 8 kB
 
             Options options = new Options();
             options.createStatistics();
@@ -52,6 +56,7 @@ public class DataStore implements Closeable {
             options.setMaxBytesForLevelBase(512 * 1024 * 1024);
             options.setTargetFileSizeMultiplier(2);
             options.setCompressionType(CompressionType.SNAPPY_COMPRESSION);
+            options.setTableFormatConfig(tableConfig);
             index = RocksDB.open(options, path.toString());
         } catch (RocksDBException e) {
             throw new IOException(e);
@@ -69,5 +74,15 @@ public class DataStore implements Closeable {
             index.close();
         }
         indexes.clear();
+    }
+
+    public List<String> listCollections() {
+        List<String> collections = new ArrayList<String>();
+        for (File f : dataDir.listFiles()) {
+            if (f.isDirectory() && isValidCollectionName(f.getName())) {
+                collections.add(f.getName());
+            }
+        }
+        return collections;
     }
 }

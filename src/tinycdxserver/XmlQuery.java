@@ -3,6 +3,7 @@ package tinycdxserver;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
+import java.io.BufferedOutputStream;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
@@ -55,7 +56,7 @@ public class XmlQuery {
         return new NanoHTTPD.Response(NanoHTTPD.Response.Status.OK, "application/xml;charset=" + DEFAULT_ENCODING, outputStream -> {
             try {
                 XMLOutputFactory factory = XMLOutputFactory.newInstance();
-                XMLStreamWriter out = factory.createXMLStreamWriter(outputStream, DEFAULT_ENCODING);
+                XMLStreamWriter out = factory.createXMLStreamWriter(new BufferedOutputStream(outputStream), DEFAULT_ENCODING);
                 out.writeStartDocument(DEFAULT_ENCODING, "1.0");
                 out.writeStartElement("wayback");
 
