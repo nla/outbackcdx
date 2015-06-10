@@ -9,13 +9,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 
 public class DataStore implements Closeable {
     private final File dataDir;
     private final Map<String, RocksDB> indexes = new ConcurrentHashMap<String, RocksDB>();
+    private final Predicate<Capture> filter;
 
-    public DataStore(File dataDir) {
+    public DataStore(File dataDir, Predicate<Capture> filter) {
         this.dataDir = dataDir;
+        this.filter = filter;
     }
 
     public Index getIndex(String collection) throws IOException {
@@ -25,9 +28,9 @@ public class DataStore implements Closeable {
     public Index getIndex(String collection, boolean createAllowed) throws IOException {
         RocksDB db = indexes.get(collection);
         if (db != null) {
-            return new Index(db);
+            return new Index(db, filter);
         }
-        return new Index(openDb(collection, createAllowed));
+        return new Index(openDb(collection, createAllowed), filter);
     }
 
     private synchronized RocksDB openDb(String collection, boolean createAllowed) throws IOException {

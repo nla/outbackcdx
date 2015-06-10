@@ -1,18 +1,22 @@
 package tinycdxserver;
 
 
-
-import org.rocksdb.*;
-
+import org.archive.accesscontrol.AccessControlClient;
+import org.archive.accesscontrol.RobotsUnavailableException;
+import org.archive.accesscontrol.RuleOracleUnavailableException;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
+import org.rocksdb.WriteBatch;
+import org.rocksdb.WriteOptions;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.nio.channels.Channel;
 import java.nio.channels.ServerSocketChannel;
-
-
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 public class Server extends NanoHTTPD {
     private final DataStore manager;
@@ -157,7 +161,6 @@ public class Server extends NanoHTTPD {
         return new Response(Response.Status.OK, "text/html", page);
     }
 
-
     private Response textQuery(final Index index, String url) {
         final String canonUrl = UrlCanonicalizer.surtCanonicalize(url);
         return new Response(Response.Status.OK, "text/plain", outputStream -> {
@@ -173,6 +176,7 @@ public class Server extends NanoHTTPD {
     public static void usage() {
         System.err.println("Usage: java " + Server.class.getName() + " [options...]");
         System.err.println("");
+        System.err.println("  -a url        Use a wayback access control oracle");
         System.err.println("  -b bindaddr   Bind to a particular IP address");
         System.err.println("  -d datadir    Directory to store index data under");
         System.err.println("  -i            Inherit the server socket via STDIN (for use with systemd, inetd etc)");
@@ -187,9 +191,13 @@ public class Server extends NanoHTTPD {
         boolean inheritSocket = false;
         File dataPath = new File("data");
         boolean verbose = false;
+        Predicate<Capture> filter = null;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
+                case "-a":
+                    filter = accessControlFilter(args[++i]);
+                    break;
                 case "-p":
                     port = Integer.parseInt(args[++i]);
                     break;
@@ -211,7 +219,7 @@ public class Server extends NanoHTTPD {
             }
         }
 
-        try (DataStore dataStore = new DataStore(dataPath)) {
+        try (DataStore dataStore = new DataStore(dataPath, filter)) {
             final Server server;
             Channel channel = System.inheritedChannel();
             if (inheritSocket && channel != null && channel instanceof ServerSocketChannel) {
@@ -229,5 +237,16 @@ public class Server extends NanoHTTPD {
         } catch (InterruptedException | IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private static Predicate<Capture> accessControlFilter(String oracleUrl) {
+        AccessControlClient client = new AccessControlClient(oracleUrl);
+        return capture -> {
+            try {
+                return "allow".equals(client.getPolicy(capture.original, new Date(capture.timestamp), new Date(), "public"));
+            } catch (RobotsUnavailableException | RuleOracleUnavailableException e) {
+                throw new RuntimeException(e);
+            }
+        };
     }
 }

@@ -73,6 +73,11 @@
             <version>3.9.1</version>
             <classifier>linux64</classifier>
         </dependency>
+        <dependency>
+            <groupId>org.netpreserve.openwayback</groupId>
+            <artifactId>openwayback-access-control-core</artifactId>
+            <version>1.0.2</version>
+        </dependency>
     </dependencies>
 
 </project>

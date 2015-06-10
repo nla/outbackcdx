@@ -7,21 +7,47 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.function.Predicate;
 
+/**
+ * Wraps RocksDB with a higher-level query interface.
+ */
 public class Index {
     final RocksDB db;
+    final Predicate<Capture> filter;
 
     public Index(RocksDB db) {
+        this(db, null);
+    }
+
+    public Index(RocksDB db, Predicate<Capture> filter) {
         this.db = db;
+        this.filter = filter;
     }
 
-    public Iterable<Resource> prefixQuery(final String urlPrefix) {
-        return () -> new Resources(new Captures(db, urlPrefix, record -> record.urlkey.startsWith(urlPrefix)));
+    /**
+     * Returns all resources (URLs) that match the given prefix.
+     */
+    public Iterable<Resource> prefixQuery(String urlPrefix) {
+        return () -> new Resources(filteredCaptures(urlPrefix, record -> record.urlkey.startsWith(urlPrefix)));
     }
 
+    /**
+     * Returns all captures for the given url.
+     */
     public Iterable<Capture> query(String url) {
-        return () -> new Captures(db, url, record -> record.urlkey.equals(url));
+        return () -> filteredCaptures(url, record -> record.urlkey.equals(url));
     }
 
+    private Iterator<Capture> filteredCaptures(String queryUrl, Predicate<Capture> scope) {
+        Iterator<Capture> captures = new Captures(db, queryUrl, scope);
+        if (filter != null) {
+            captures = new FilteringIterator<>(captures, filter);
+        }
+        return captures;
+    }
+
+    /**
+     * Iterates capture records in RocksDb, starting from queryUrl and continuing until scope returns false.
+     */
     private static class Captures implements Iterator<Capture> {
         private final RocksIterator it;
         private final Predicate<Capture> scope;
@@ -34,9 +60,9 @@ public class Index {
             super.finalize();
         }
 
-        public Captures(RocksDB db, String url, Predicate<Capture> scope) {
+        public Captures(RocksDB db, String queryUrl, Predicate<Capture> scope) {
             final RocksIterator it = db.newIterator();
-            it.seek(Capture.encodeKey(url, 0));
+            it.seek(Capture.encodeKey(queryUrl, 0));
             this.scope = scope;
             this.it = it;
         }
@@ -68,6 +94,9 @@ public class Index {
         }
     }
 
+    /**
+     * Groups together all captures of the same URL.
+     */
     private static class Resources implements Iterator<Resource> {
         private final Iterator<Capture> captures;
         private Capture capture = null;
@@ -106,4 +135,44 @@ public class Index {
             return result;
         }
     }
+
+    /**
+     * Wraps another iterator and only returns elements that match the given predicate.
+     */
+    private static class FilteringIterator<T> implements Iterator<T> {
+        private final Iterator<T> iterator;
+        private final Predicate<T> predicate;
+        private T next;
+        private boolean holdingNext = false;
+
+        public FilteringIterator(Iterator<T> iterator, Predicate<T> predicate) {
+            this.iterator = iterator;
+            this.predicate = predicate;
+        }
+
+        @Override
+        public boolean hasNext() {
+            while (!holdingNext && iterator.hasNext()) {
+                T candidate = iterator.next();
+                if (predicate.test(candidate)) {
+                    next = candidate;
+                    holdingNext = true;
+                }
+            }
+            return holdingNext;
+        }
+
+        @Override
+        public T next() {
+            if (hasNext()) {
+                T result = next;
+                holdingNext = false;
+                next = null;
+                return result;
+            } else {
+                throw new NoSuchElementException();
+            }
+        }
+    }
+
 }
