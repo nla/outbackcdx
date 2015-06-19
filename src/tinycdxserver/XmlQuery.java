@@ -88,7 +88,7 @@ public class XmlQuery {
         boolean wroteHeader = false;
         for (Capture capture : index.query(queryUrl)) {
             if (!wroteHeader) {
-                writeHeader(out, "resultstypeurl");
+                writeHeader(out, "resultstypecapture");
                 out.writeStartElement("results");
                 wroteHeader = true;
             }
@@ -117,7 +117,7 @@ public class XmlQuery {
         boolean wroteHeader = false;
         for (Resource resource : index.prefixQuery(queryUrl)) {
             if (!wroteHeader) {
-                writeHeader(out, "resultstypecapture");
+                writeHeader(out, "resultstypeurl");
                 out.writeStartElement("results");
                 wroteHeader = true;
             }
