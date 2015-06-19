@@ -24,7 +24,7 @@ public class ServerTest {
     @Before
     public void setUp() throws IOException {
         File root = folder.newFolder();
-        DataStore manager = new DataStore(root);
+        DataStore manager = new DataStore(root, null);
         server = new Server(manager, "127.0.0.1", -1);
     }
 
