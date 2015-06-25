@@ -119,19 +119,21 @@ public class Index {
                 capture = captures.next();
             }
             result.firstCapture = capture;
+            result.lastCapture = capture;
             while (capture.urlkey.equals(result.firstCapture.urlkey)) {
                 if (previousDigest == null || !previousDigest.equals(capture.digest)) {
                     result.versions++;
                     previousDigest = capture.digest;
                 }
                 result.captures++;
+                result.lastCapture = capture;
                 if (!captures.hasNext()) {
                     capture = null;
                     break;
                 }
                 capture = captures.next();
             }
-            result.lastCapture = capture;
+
             return result;
         }
     }
