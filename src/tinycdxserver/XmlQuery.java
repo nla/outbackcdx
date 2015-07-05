@@ -123,7 +123,7 @@ public class XmlQuery {
             writeNotFoundError(out);
         }
 
-        log.info("[" + results + " results] " + queryUrl);
+        log.fine("[" + results + " results] " + queryUrl);
     }
 
     private void prefixQuery(XMLStreamWriter out) throws XMLStreamException {

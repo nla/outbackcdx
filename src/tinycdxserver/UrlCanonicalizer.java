@@ -87,9 +87,7 @@ public class UrlCanonicalizer {
 
     public static String canonicalize(String rawUrl) {
         try {
-            String result = canonicalize(makeUrl(rawUrl)).toString();
-            System.out.println(rawUrl + " -> " + result);
-            return result;
+            return canonicalize(makeUrl(rawUrl)).toString();
         } catch (MalformedURLException e) {
             return rawUrl;
         }
