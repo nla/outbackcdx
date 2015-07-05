@@ -8,11 +8,13 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 
 /**
  * Implements the Wayback RemoteCollection XmlQuery interface.
  */
 public class XmlQuery {
+    final static Logger log = Logger.getLogger(XmlQuery.class.getName());
     final static String DEFAULT_ENCODING = "UTF-8";
 
     final Index index;
@@ -86,6 +88,7 @@ public class XmlQuery {
 
     private void urlQuery(XMLStreamWriter out) throws XMLStreamException {
         boolean wroteHeader = false;
+        int results = 0;
         for (Capture capture : index.query(queryUrl)) {
             if (!wroteHeader) {
                 writeHeader(out, "resultstypecapture");
@@ -104,6 +107,7 @@ public class XmlQuery {
             writeElement(out, "url", capture.original);
             writeElement(out, "capturedate", capture.timestamp);
             out.writeEndElement(); // </result>
+            results++;
         }
 
         if (wroteHeader) {
@@ -111,6 +115,8 @@ public class XmlQuery {
         } else {
             writeNotFoundError(out);
         }
+
+        log.info("[" + results + " results] " + queryUrl);
     }
 
     private void prefixQuery(XMLStreamWriter out) throws XMLStreamException {
