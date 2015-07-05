@@ -34,8 +34,13 @@ public class UrlCanonicalizer {
     private static final Pattern TABS_OR_LINEFEEDS = Pattern.compile("[\t\r\n]");
     private static final Pattern UNDOTTED_IP = Pattern.compile("(?:0x)?[0-9]{1,12}");
     private static final Pattern DOTTED_IP = Pattern.compile("[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}");
+    private static final Pattern ESCAPED_SCHEME = Pattern.compile("(?i)[a-z][a-z0-9.-]*%3A%2F%2F.*");
 
     private static URL makeUrl(String rawUrl) throws MalformedURLException {
+        // detect doubly-escaped urls, wayback generates these when it itself gets an xmlquery
+        if (ESCAPED_SCHEME.matcher(rawUrl).matches()) {
+            rawUrl = urlDecode(rawUrl);
+        }
         rawUrl = TABS_OR_LINEFEEDS.matcher(rawUrl).replaceAll("");
         if (!hasScheme(rawUrl)) {
             rawUrl = "http://" + rawUrl;
