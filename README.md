@@ -17,7 +17,7 @@ relatively light traffic load.
 * No authentication (currently assumes you use a firewall)
 * No sharding (could be added relatively easily but we don't currently need it)
 * No replication (you could use a HTTP load balancer though)
-* Pagination is not yet implemented
+* Pagination and delete are not yet implemented
 * RemoteResourceIndex in OpenWayback is broken (in 2.1) and requires a [patch]
 
 [RocksDB]: http://rocksdb.org/
@@ -35,7 +35,7 @@ uncomment the official release.
     mvn package
     java -jar target/tinycdxserver.jar -d /data -p 8080
 
-The server supports multiple named indexes as subdirectories under /data.  You can
+The server supports multiple named indexes as subdirectories.  You can
 load records into the index by POSTing them in the CDX format Wayback uses:
 
     curl -X POST --data @records.cdx http://localhost:8080/myindex
@@ -43,12 +43,25 @@ load records into the index by POSTing them in the CDX format Wayback uses:
 The canonicalized URL (first field) is ignored, tinycdxserver performs its own
 canonicalization.
 
+Exclusions
+----------
+
+Wayback's RemoteResourceIndex currently bypasses some of its access control
+configuration.  For this reason tinycdxserver currently supports
+filtering query results using an [exclusions oracle].  Set the URL of
+exclusions oracle using the `-a` command-line option.
+
+Source IP address based filtering is not currently supported. It may be
+more preferable to fix RemoteResourceIndex.
+
+[exclusions oracle]: https://github.com/iipc/openwayback-access-control
+
 Future Work
 -----------
 
 Other than fixing the above limitations, index size could be further reduced by:
 
 * Representing WARC files using a numeric ID
-* Truncating or omitting the SHA1 digests (Wayback only them to asterisk changed records)
+* Truncating or omitting the SHA1 digests (Wayback only uses them to asterisk changed records)
 
 It may be handy to have a secondary index for looking up records by digest.
