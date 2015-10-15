@@ -55,6 +55,7 @@ public class Server extends NanoHTTPD {
         BufferedReader in = new BufferedReader(new InputStreamReader(session.getInputStream()));
         long added = 0;
         WriteBatch batch = new WriteBatch();
+
         try {
             for (; ; ) {
                 String line = in.readLine();
@@ -63,6 +64,7 @@ public class Server extends NanoHTTPD {
                 }
                 if (line == null) break;
                 if (line.startsWith(" CDX")) continue;
+
                 try {
                     String[] fields = line.split(" ");
                     Capture capture = new Capture();
@@ -73,19 +75,26 @@ public class Server extends NanoHTTPD {
                     capture.status = fields[4].equals("-") ? 0 : Integer.parseInt(fields[4]);
                     capture.digest = fields[5];
                     capture.redirecturl = fields[6];
-                    // TODO robots = fields[7]
-                    capture.length = fields[8].equals("-") ? 0 : Long.parseLong(fields[8]);
-                    capture.compressedoffset = Long.parseLong(fields[9]);
-                    capture.file = fields[10];
+
+                    if (fields.length >= 11) { // 11 fields: CDX N b a m s k r M S V g
+                        // TODO robots = fields[7]
+                        capture.length = fields[8].equals("-") ? 0 : Long.parseLong(fields[8]);
+                        capture.compressedoffset = Long.parseLong(fields[9]);
+                        capture.file = fields[10];
+                    } else { // 9 fields: CDX N b a m s k r V g
+                        capture.compressedoffset = Long.parseLong(fields[7]);
+                        capture.file = fields[8];
+                    }
+
                     batch.put(capture.encodeKey(), capture.encodeValue());
                     added++;
                 } catch (Exception e) {
                     return new Response(Response.Status.BAD_REQUEST, "text/plain", e.toString() + "\nAt line: " + line);
                 }
             }
+
             WriteOptions options = new WriteOptions();
             try {
-
                 options.setSync(true);
                 index.db.write(options, batch);
             } catch (RocksDBException e) {
