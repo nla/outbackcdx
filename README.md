@@ -36,7 +36,7 @@ uncomment the official release.
     java -jar target/tinycdxserver.jar -d /data -p 8080
 
 The server supports multiple named indexes as subdirectories.  You can
-load records into the index by POSTing them in the CDX format Wayback uses:
+load records into the index by POSTing them in the (11-field) CDX format Wayback uses:
 
     curl -X POST --data-binary @records.cdx http://localhost:8080/myindex
 
