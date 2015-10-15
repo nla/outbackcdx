@@ -38,7 +38,7 @@ uncomment the official release.
 The server supports multiple named indexes as subdirectories.  You can
 load records into the index by POSTing them in the CDX format Wayback uses:
 
-    curl -X POST --data @records.cdx http://localhost:8080/myindex
+    curl -X POST --data-binary @records.cdx http://localhost:8080/myindex
 
 The canonicalized URL (first field) is ignored, tinycdxserver performs its own
 canonicalization.
