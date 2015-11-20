@@ -82,18 +82,20 @@
         <!--
         The official java release on Maven central appears to be missing compression support
         (it just silently doesn't compress). So we have to use our own build of rocksdb. :(
+        -->
         <dependency>
             <groupId>org.rocksdb</groupId>
             <artifactId>rocksdbjni</artifactId>
             <version>3.9.1</version>
         </dependency>
-        -->
+        <!--
         <dependency>
             <groupId>au.gov.nla.rocksdb</groupId>
             <artifactId>rocksdbjni</artifactId>
             <version>3.9.1</version>
             <classifier>linux64</classifier>
         </dependency>
+        -->
         <dependency>
             <groupId>org.netpreserve.openwayback</groupId>
             <artifactId>openwayback-access-control-core</artifactId>
