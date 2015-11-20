@@ -146,4 +146,27 @@ public class Capture {
         out.append(Long.toString(length));
         return out.toString();
     }
+
+    public static Capture fromCdxLine(String line) {
+        String[] fields = line.split(" ");
+        Capture capture = new Capture();
+        capture.timestamp = Long.parseLong(fields[1]);
+        capture.original = fields[2];
+        capture.urlkey = UrlCanonicalizer.surtCanonicalize(capture.original);
+        capture.mimetype = fields[3];
+        capture.status = fields[4].equals("-") ? 0 : Integer.parseInt(fields[4]);
+        capture.digest = fields[5];
+        capture.redirecturl = fields[6];
+
+        if (fields.length >= 11) { // 11 fields: CDX N b a m s k r M S V g
+            // TODO robots = fields[7]
+            capture.length = fields[8].equals("-") ? 0 : Long.parseLong(fields[8]);
+            capture.compressedoffset = Long.parseLong(fields[9]);
+            capture.file = fields[10];
+        } else { // 9 fields: CDX N b a m s k r V g
+            capture.compressedoffset = Long.parseLong(fields[7]);
+            capture.file = fields[8];
+        }
+        return capture;
+    }
 }

@@ -56,6 +56,16 @@ more preferable to fix RemoteResourceIndex.
 
 [exclusions oracle]: https://github.com/iipc/openwayback-access-control
 
+Canonicalisation Aliases
+------------------------
+
+Alias records allow the grouping of URLs so they will deliver as if they are different snapshots of the same page.
+
+    @alias http://legacy.example.org/page-one http://www.example.org/page1
+
+Aliases do not currently work with url prefix queries. Aliases are resolved after normal canonicalisation rules
+are applied.
+
 Future Work
 -----------
 

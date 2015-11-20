@@ -6,8 +6,6 @@ import org.archive.accesscontrol.RobotsUnavailableException;
 import org.archive.accesscontrol.RuleOracleUnavailableException;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.WriteBatch;
-import org.rocksdb.WriteOptions;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -54,10 +52,9 @@ public class Server extends NanoHTTPD {
         final Index index = manager.getIndex(collection, true);
         BufferedReader in = new BufferedReader(new InputStreamReader(session.getInputStream()));
         long added = 0;
-        WriteBatch batch = new WriteBatch();
 
-        try {
-            for (; ; ) {
+        try (Index.Batch batch = index.beginUpdate()) {
+            while (true) {
                 String line = in.readLine();
                 if (verbose) {
                     System.out.println(line);
@@ -66,45 +63,21 @@ public class Server extends NanoHTTPD {
                 if (line.startsWith(" CDX")) continue;
 
                 try {
-                    String[] fields = line.split(" ");
-                    Capture capture = new Capture();
-                    capture.timestamp = Long.parseLong(fields[1]);
-                    capture.original = fields[2];
-                    capture.urlkey = UrlCanonicalizer.surtCanonicalize(capture.original);
-                    capture.mimetype = fields[3];
-                    capture.status = fields[4].equals("-") ? 0 : Integer.parseInt(fields[4]);
-                    capture.digest = fields[5];
-                    capture.redirecturl = fields[6];
-
-                    if (fields.length >= 11) { // 11 fields: CDX N b a m s k r M S V g
-                        // TODO robots = fields[7]
-                        capture.length = fields[8].equals("-") ? 0 : Long.parseLong(fields[8]);
-                        capture.compressedoffset = Long.parseLong(fields[9]);
-                        capture.file = fields[10];
-                    } else { // 9 fields: CDX N b a m s k r V g
-                        capture.compressedoffset = Long.parseLong(fields[7]);
-                        capture.file = fields[8];
+                    if (line.startsWith("@alias ")) {
+                        String[] fields = line.split(" ");
+                        String aliasSurt = UrlCanonicalizer.surtCanonicalize(fields[1]);
+                        String targetSurt = UrlCanonicalizer.surtCanonicalize(fields[2]);
+                        batch.putAlias(aliasSurt, targetSurt);
+                    } else {
+                        batch.putCapture(Capture.fromCdxLine(line));
                     }
-
-                    batch.put(capture.encodeKey(), capture.encodeValue());
                     added++;
                 } catch (Exception e) {
                     return new Response(Response.Status.BAD_REQUEST, "text/plain", e.toString() + "\nAt line: " + line);
                 }
             }
 
-            WriteOptions options = new WriteOptions();
-            try {
-                options.setSync(true);
-                index.db.write(options, batch);
-            } catch (RocksDBException e) {
-                e.printStackTrace();
-                return new Response(Response.Status.INTERNAL_ERROR, "text/plain", e.toString());
-            } finally {
-                options.dispose();
-            }
-        } finally {
-            batch.dispose();
+            batch.commit();
         }
         return new Response(Response.Status.OK, "text/plain", "Added " + added + " records\n");
     }
