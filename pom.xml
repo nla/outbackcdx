@@ -36,7 +36,7 @@
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>tinycdxserver.Server</mainClass>
+                                    <mainClass>tinycdxserver.Main</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>
@@ -96,6 +96,11 @@
             <classifier>linux64</classifier>
         </dependency>
         -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.4</version>
+        </dependency>
         <dependency>
             <groupId>org.netpreserve.openwayback</groupId>
             <artifactId>openwayback-access-control-core</artifactId>

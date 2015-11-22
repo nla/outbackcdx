@@ -10,6 +10,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 public class DataStore implements Closeable {
+    public static final String COLLECTION_PATTERN = "[A-Za-z0-9_-]+";
+
     private final File dataDir;
     private final Map<String, Index> indexes = new ConcurrentHashMap<String, Index>();
     private final Predicate<Capture> filter;
@@ -87,7 +89,17 @@ public class DataStore implements Closeable {
     }
 
     private void createColumnFamiliesIfNotExists(Options options, String path, List<ColumnFamilyDescriptor> cfDescriptors) throws RocksDBException {
-        RocksDB db = RocksDB.open(options, path);
+        RocksDB db;
+        try {
+            db = RocksDB.open(options, path);
+        } catch (RocksDBException e) {
+            if (e.getMessage().contains("You have to open all column families")) {
+                // TODO
+                return;
+            } else {
+                throw e;
+            }
+        }
         try {
             for (ColumnFamilyDescriptor descriptor : cfDescriptors) {
                 try {
@@ -104,7 +116,7 @@ public class DataStore implements Closeable {
     }
 
     private static boolean isValidCollectionName(String collection) {
-        return collection.matches("^[A-Za-z0-9_-]+$");
+        return collection.matches("^" + COLLECTION_PATTERN + "$");
     }
 
     public synchronized void close() {

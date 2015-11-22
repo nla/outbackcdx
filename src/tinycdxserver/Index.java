@@ -48,6 +48,10 @@ public class Index {
         return () -> filteredCaptures(surt, record -> record.urlkey.equals(surt));
     }
 
+    Iterable<Capture> listCaptures(String start) {
+        return () -> filteredCaptures(start, record -> true);
+    }
+
     public String resolveAlias(String surt) {
         try {
             byte[] resolved = db.get(aliasCF, surt.getBytes(StandardCharsets.US_ASCII));
