@@ -74,6 +74,7 @@ public class Server extends NanoHTTPD {
 
 
     private static final Pattern CAPTURES_ROUTE = Pattern.compile("/api/collections/(" + DataStore.COLLECTION_PATTERN + ")/captures");
+    private static final Pattern ALIASES_ROUTE = Pattern.compile("/api/collections/(" + DataStore.COLLECTION_PATTERN + ")/aliases");
 
     @Override
     public Response serve(IHTTPSession session) {
@@ -90,16 +91,32 @@ public class Server extends NanoHTTPD {
                 return jsonResponse(dataStore.listCollections());
             }
 
-            Matcher m = CAPTURES_ROUTE.matcher(uri);
-            if (method == GET && m.matches()) {
-                String collection = m.group(1);
-                String key = session.getParms().getOrDefault("key", "");
-                long limit = Long.parseLong(session.getParms().getOrDefault("limit", "1000"));
-                Index index = dataStore.getIndex(collection);
-                List<Capture> results = StreamSupport.stream(index.listCaptures(key).spliterator(), false)
-                        .limit(limit)
-                        .collect(Collectors.<Capture>toList());
-                return jsonResponse(results);
+            {
+                Matcher m = CAPTURES_ROUTE.matcher(uri);
+                if (method == GET && m.matches()) {
+                    String collection = m.group(1);
+                    String key = session.getParms().getOrDefault("key", "");
+                    long limit = Long.parseLong(session.getParms().getOrDefault("limit", "1000"));
+                    Index index = dataStore.getIndex(collection);
+                    List<Capture> results = StreamSupport.stream(index.listCaptures(key).spliterator(), false)
+                            .limit(limit)
+                            .collect(Collectors.<Capture>toList());
+                    return jsonResponse(results);
+                }
+            }
+
+            {
+                Matcher m = ALIASES_ROUTE.matcher(uri);
+                if (method == GET && m.matches()) {
+                    String collection = m.group(1);
+                    String key = session.getParms().getOrDefault("key", "");
+                    long limit = Long.parseLong(session.getParms().getOrDefault("limit", "1000"));
+                    Index index = dataStore.getIndex(collection);
+                    List<Alias> results = StreamSupport.stream(index.listAliases(key).spliterator(), false)
+                            .limit(limit)
+                            .collect(Collectors.<Alias>toList());
+                    return jsonResponse(results);
+                }
             }
 
             if (method == GET && uri.startsWith("/static/")) {

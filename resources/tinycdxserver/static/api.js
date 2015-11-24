@@ -26,3 +26,8 @@ function getCaptures(collection, key, limit, success) {
     var qs = encodeQueryString({key: key, limit: limit});
     getJson('api/collections/' +  encodeURIComponent(collection) + '/captures?' + qs, success);
 }
+
+function getAliases(collection, key, limit, success) {
+    var qs = encodeQueryString({key: key, limit: limit});
+    getJson('api/collections/' +  encodeURIComponent(collection) + '/aliases?' + qs, success);
+}

@@ -3,10 +3,7 @@ package tinycdxserver;
 import org.rocksdb.*;
 
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.*;
 import java.util.function.Predicate;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
@@ -66,20 +63,31 @@ public class Index {
     }
 
     private Iterator<Capture> filteredCaptures(String queryUrl, Predicate<Capture> scope) {
-        Iterator<Capture> captures = new Captures(db, queryUrl, scope);
+        byte[] key = Capture.encodeKey(queryUrl, 0);
+        Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope);
         if (filter != null) {
             captures = new FilteringIterator<>(captures, filter);
         }
         return captures;
     }
 
+    public Iterable<Alias> listAliases(String start) {
+        byte[] key = start.getBytes(US_ASCII);
+        return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true);
+    }
+
+    private interface RecordConstructor<T> {
+        public T construct(byte[] key, byte[] value);
+    }
+
     /**
      * Iterates capture records in RocksDb, starting from queryUrl and continuing until scope returns false.
      */
-    private static class Captures implements Iterator<Capture> {
+    private static class Records<T> implements Iterator<T> {
         private final RocksIterator it;
-        private final Predicate<Capture> scope;
-        private Capture capture = null;
+        private final Predicate<T> scope;
+        private final RecordConstructor<T> constructor;
+        private T record = null;
         private boolean exhausted = false;
 
         @Override
@@ -88,9 +96,10 @@ public class Index {
             super.finalize();
         }
 
-        public Captures(RocksDB db, String queryUrl, Predicate<Capture> scope) {
-            final RocksIterator it = db.newIterator();
-            it.seek(Capture.encodeKey(queryUrl, 0));
+        public Records(RocksDB db, ColumnFamilyHandle columnFamilyHandle, byte[] startKey, RecordConstructor<T> constructor, Predicate<T> scope) {
+            final RocksIterator it = db.newIterator(columnFamilyHandle);
+            it.seek(startKey);
+            this.constructor = constructor;
             this.scope = scope;
             this.it = it;
         }
@@ -99,11 +108,11 @@ public class Index {
             if (exhausted) {
                 return false;
             }
-            if (capture == null && it.isValid()) {
-                capture = new Capture(it.key(), it.value());
+            if (record == null && it.isValid()) {
+                record = constructor.construct(it.key(), it.value());
             }
-            if (capture == null || !scope.test(capture)) {
-                capture = null;
+            if (record == null || !scope.test(record)) {
+                record = null;
                 exhausted = true;
                 it.dispose();
                 return false;
@@ -111,14 +120,14 @@ public class Index {
             return true;
         }
 
-        public Capture next() {
+        public T next() {
             if (!hasNext()) {
                 throw new NoSuchElementException();
             }
-            Capture capture = this.capture;
-            this.capture = null;
+            T record = this.record;
+            this.record = null;
             it.next();
-            return capture;
+            return record;
         }
     }
 
