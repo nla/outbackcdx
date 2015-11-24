@@ -107,7 +107,7 @@
 <sidebar>
     <ul>
         <li each="{ name, i in collections }" class="{active: (name == parent.opts.active) }">
-            <a href="#collections/{name}/{parent.tab}">{ name }</a>
+            <a href="#collections/{name}/{parent.tab || 'captures'}">{ name }</a>
         </li>
     </ul>
 
