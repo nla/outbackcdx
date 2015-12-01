@@ -34,8 +34,8 @@ public class XmlQuery {
         queryType = query.get("type").toLowerCase();
         queryUrl = UrlCanonicalizer.surtCanonicalize(query.get("url"));
 
-        offset = 0; // TODO
-        limit = 10000; // TODO
+        offset = Long.parseLong(query.getOrDefault("offset", "0"));
+        limit = Long.parseLong(query.getOrDefault("limit", "10000"));
     }
 
     private static Map<String,String> decodeQueryString(String q) {
@@ -96,7 +96,16 @@ public class XmlQuery {
     private void urlQuery(XMLStreamWriter out) throws XMLStreamException {
         boolean wroteHeader = false;
         int results = 0;
+        int i = 0;
         for (Capture capture : index.query(queryUrl)) {
+            if (i < offset) {
+                i++;
+                continue;
+            } else if (i >= offset + limit) {
+                break;
+            }
+            i++;
+
             if (!wroteHeader) {
                 writeHeader(out, "resultstypecapture");
                 out.writeStartElement("results");
@@ -128,7 +137,16 @@ public class XmlQuery {
 
     private void prefixQuery(XMLStreamWriter out) throws XMLStreamException {
         boolean wroteHeader = false;
+        int i = 0;
         for (Resource resource : index.prefixQuery(queryUrl)) {
+            if (i < offset) {
+                i++;
+                continue;
+            } else if (i >= offset + limit) {
+                break;
+            }
+            i++;
+
             if (!wroteHeader) {
                 writeHeader(out, "resultstypeurl");
                 out.writeStartElement("results");

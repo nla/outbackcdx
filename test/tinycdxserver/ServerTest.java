@@ -1,5 +1,6 @@
 package tinycdxserver;
 
+import org.apache.commons.lang.StringUtils;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -62,6 +63,13 @@ public class ServerTest {
             assertTrue(data.indexOf("20060614070159") != -1);
             assertTrue(data.indexOf("20100614070159") != -1);
             assertTrue(data.indexOf("20030614070159") != -1);
+        }
+
+
+        {
+            NanoHTTPD.Response response = server.query(new DummySession("/test").parm("q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F limit:2 offset:0"));
+            String data = readOutput(response);
+            assertEquals(2, StringUtils.countMatches(data, "<result>"));
         }
     }
 
