@@ -6,5 +6,5 @@ after_success:
 - mvn jacoco:report coveralls:report
 addons:
   apt:
-    sources:
+    packages:
     - libsnappy-dev
