@@ -45,7 +45,10 @@ public class Index {
         return () -> filteredCaptures(surt, record -> record.urlkey.equals(surt));
     }
 
-    Iterable<Capture> listCaptures(String start) {
+    /**
+     * Returns all captures starting from the given key.
+     */
+    Iterable<Capture> capturesAfter(String start) {
         return () -> filteredCaptures(start, record -> true);
     }
 

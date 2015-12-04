@@ -98,7 +98,7 @@ public class Server extends NanoHTTPD {
                     String key = session.getParms().getOrDefault("key", "");
                     long limit = Long.parseLong(session.getParms().getOrDefault("limit", "1000"));
                     Index index = dataStore.getIndex(collection);
-                    List<Capture> results = StreamSupport.stream(index.listCaptures(key).spliterator(), false)
+                    List<Capture> results = StreamSupport.stream(index.capturesAfter(key).spliterator(), false)
                             .limit(limit)
                             .collect(Collectors.<Capture>toList());
                     return jsonResponse(results);
