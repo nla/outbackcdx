@@ -70,13 +70,24 @@ public class UrlCanonicalizer {
         return result.toString();
     }
 
+    private static boolean shouldStripQueryString(URL url) {
+        /*
+         * This is a hack for compatibility with the NLA's legacy PANDORA web archive. URLs were link rewritten
+         * to unique filenames but the query string needs to be ignored.
+         *
+         * For example: "style.php?ver=1.2" was rewritten to "style62ea.css" but the HTML links to
+         * "style62ea.css?ver=1.2".
+         */
+        return url.getHost().equalsIgnoreCase("pandora.nla.gov.au") && url.getPath().startsWith("/pan/");
+    }
+
     public static URL canonicalize(URL url) throws MalformedURLException {
         String scheme = canonicalizeScheme(url.getProtocol());
         String host = canonicalizeHost(url.getHost());
         int port = canonicalizePort(scheme, url.getPort());
         String path = canonicalizePath(url.getPath());
         String query = canonicalizeQuery(url.getQuery());
-        String pathAndQuery = query == null ? path : path + "?" + query;
+        String pathAndQuery = query == null || shouldStripQueryString(url) ? path : path + "?" + query;
         return new URL(scheme, host, port, pathAndQuery);
     }
 
