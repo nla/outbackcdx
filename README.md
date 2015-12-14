@@ -17,7 +17,7 @@ relatively light traffic load.
 * No authentication (currently assumes you use a firewall)
 * No sharding (could be added relatively easily but we don't currently need it)
 * No replication (you could use a HTTP load balancer though)
-* Pagination and delete are not yet implemented
+* Delete not yet implemented
 * RemoteResourceIndex in OpenWayback is broken (in 2.1) and requires a [patch]
 
 [RocksDB]: http://rocksdb.org/
