@@ -18,7 +18,7 @@ relatively light traffic load.
 * No sharding (could be added relatively easily but we don't currently need it)
 * No replication (you could use a HTTP load balancer though)
 * Delete not yet implemented
-* RemoteResourceIndex in OpenWayback is broken (in 2.1) and requires a [patch]
+* RemoteResourceIndex in OpenWayback is broken in 2.1 and 2.2 and requires a [patch]. The patch will be included in OpenWayback 2.3.
 
 [RocksDB]: http://rocksdb.org/
 [patch]: https://github.com/iipc/openwayback/pull/239
