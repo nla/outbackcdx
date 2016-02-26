@@ -6,7 +6,7 @@
 
     <groupId>au.gov.nla</groupId>
     <artifactId>tinycdxserver</artifactId>
-    <version>0.1-SNAPSHOT</version>
+    <version>0.3.1</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -36,10 +36,31 @@
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>tinycdxserver.Server</mainClass>
+                                    <mainClass>tinycdxserver.Main</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.eluder.coveralls</groupId>
+                <artifactId>coveralls-maven-plugin</artifactId>
+                <version>4.0.0</version>
+                <configuration>
+                    <repoToken>${env.coveralls_repo_token}</repoToken>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.7.5.201505241946</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>
@@ -75,6 +96,11 @@
             <classifier>linux64</classifier>
         </dependency>
 -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.4</version>
+        </dependency>
         <dependency>
             <groupId>org.netpreserve.openwayback</groupId>
             <artifactId>openwayback-access-control-core</artifactId>

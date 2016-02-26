@@ -1,11 +1,12 @@
 package tinycdxserver;
 
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksIterator;
+import org.rocksdb.*;
 
-import java.util.Iterator;
-import java.util.NoSuchElementException;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 import java.util.function.Predicate;
+
+import static java.nio.charset.StandardCharsets.US_ASCII;
 
 /**
  * Wraps RocksDB with a higher-level query interface.
@@ -13,45 +14,83 @@ import java.util.function.Predicate;
 public class Index {
     final RocksDB db;
     final Predicate<Capture> filter;
+    final ColumnFamilyHandle defaultCF;
+    final ColumnFamilyHandle aliasCF;
 
-    public Index(RocksDB db) {
-        this(db, null);
-    }
-
-    public Index(RocksDB db, Predicate<Capture> filter) {
+    public Index(RocksDB db, Predicate<Capture> filter, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF) {
         this.db = db;
         this.filter = filter;
+        this.defaultCF = defaultCF;
+        this.aliasCF = aliasCF;
     }
 
     /**
      * Returns all resources (URLs) that match the given prefix.
      */
-    public Iterable<Resource> prefixQuery(String urlPrefix) {
-        return () -> new Resources(filteredCaptures(urlPrefix, record -> record.urlkey.startsWith(urlPrefix)));
+    public Iterable<Resource> prefixQuery(String surtPrefix) {
+        return () -> new Resources(filteredCaptures(surtPrefix, record -> record.urlkey.startsWith(surtPrefix)));
     }
 
     /**
      * Returns all captures for the given url.
      */
-    public Iterable<Capture> query(String url) {
-        return () -> filteredCaptures(url, record -> record.urlkey.equals(url));
+    public Iterable<Capture> query(String surt) {
+        return rawQuery(resolveAlias(surt));
+    }
+
+    /**
+     * Perform a query without first resolving aliases.
+     */
+    private Iterable<Capture> rawQuery(String surt) {
+        return () -> filteredCaptures(surt, record -> record.urlkey.equals(surt));
+    }
+
+    /**
+     * Returns all captures starting from the given key.
+     */
+    Iterable<Capture> capturesAfter(String start) {
+        return () -> filteredCaptures(start, record -> true);
+    }
+
+    public String resolveAlias(String surt) {
+        try {
+            byte[] resolved = db.get(aliasCF, surt.getBytes(StandardCharsets.US_ASCII));
+            if (resolved != null) {
+                return new String(resolved, StandardCharsets.US_ASCII);
+            } else {
+                return surt;
+            }
+        } catch (RocksDBException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private Iterator<Capture> filteredCaptures(String queryUrl, Predicate<Capture> scope) {
-        Iterator<Capture> captures = new Captures(db, queryUrl, scope);
+        byte[] key = Capture.encodeKey(queryUrl, 0);
+        Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope);
         if (filter != null) {
             captures = new FilteringIterator<>(captures, filter);
         }
         return captures;
     }
 
+    public Iterable<Alias> listAliases(String start) {
+        byte[] key = start.getBytes(US_ASCII);
+        return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true);
+    }
+
+    private interface RecordConstructor<T> {
+        public T construct(byte[] key, byte[] value);
+    }
+
     /**
      * Iterates capture records in RocksDb, starting from queryUrl and continuing until scope returns false.
      */
-    private static class Captures implements Iterator<Capture> {
+    private static class Records<T> implements Iterator<T> {
         private final RocksIterator it;
-        private final Predicate<Capture> scope;
-        private Capture capture = null;
+        private final Predicate<T> scope;
+        private final RecordConstructor<T> constructor;
+        private T record = null;
         private boolean exhausted = false;
 
         @Override
@@ -60,9 +99,10 @@ public class Index {
             super.finalize();
         }
 
-        public Captures(RocksDB db, String queryUrl, Predicate<Capture> scope) {
-            final RocksIterator it = db.newIterator();
-            it.seek(Capture.encodeKey(queryUrl, 0));
+        public Records(RocksDB db, ColumnFamilyHandle columnFamilyHandle, byte[] startKey, RecordConstructor<T> constructor, Predicate<T> scope) {
+            final RocksIterator it = db.newIterator(columnFamilyHandle);
+            it.seek(startKey);
+            this.constructor = constructor;
             this.scope = scope;
             this.it = it;
         }
@@ -71,11 +111,11 @@ public class Index {
             if (exhausted) {
                 return false;
             }
-            if (capture == null && it.isValid()) {
-                capture = new Capture(it.key(), it.value());
+            if (record == null && it.isValid()) {
+                record = constructor.construct(it.key(), it.value());
             }
-            if (capture == null || !scope.test(capture)) {
-                capture = null;
+            if (record == null || !scope.test(record)) {
+                record = null;
                 exhausted = true;
                 it.dispose();
                 return false;
@@ -83,14 +123,14 @@ public class Index {
             return true;
         }
 
-        public Capture next() {
+        public T next() {
             if (!hasNext()) {
                 throw new NoSuchElementException();
             }
-            Capture capture = this.capture;
-            this.capture = null;
+            T record = this.record;
+            this.record = null;
             it.next();
-            return capture;
+            return record;
         }
     }
 
@@ -177,4 +217,90 @@ public class Index {
         }
     }
 
+    public Batch beginUpdate() {
+        return new Batch();
+    }
+
+    private void commitBatch(WriteBatch writeBatch) {
+        WriteOptions options = new WriteOptions();
+        try {
+            options.setSync(true);
+            db.write(options, writeBatch);
+        } catch (RocksDBException e) {
+            throw new RuntimeException(e);
+        } finally {
+            options.dispose();
+        }
+    }
+
+    public class Batch implements AutoCloseable {
+        private WriteBatch dbBatch = new WriteBatch();
+        private final Map<String, String> newAliases = new HashMap<>();
+
+        private Batch() {
+        }
+
+        /**
+         * Add a new capture to the index.  Existing captures with the same urlkey and timestamp will be overwritten.
+         */
+        public void putCapture(Capture capture) {
+            String resolved = newAliases.get(capture.urlkey);
+            if (resolved != null) {
+                capture.urlkey = resolved;
+            } else {
+                capture.urlkey = resolveAlias(capture.urlkey);
+            }
+            dbBatch.put(capture.encodeKey(), capture.encodeValue());
+        }
+
+        /**
+         * Adds a new alias to the index.  Updates existing captures affected by the new alias.
+         */
+        public void putAlias(String aliasSurt, String targetSurt) {
+            if (aliasSurt.equals(targetSurt)) {
+                return; // a self-referential alias is equivalent to no alias so don't bother storing it
+            }
+            dbBatch.put(aliasCF, aliasSurt.getBytes(US_ASCII), targetSurt.getBytes(US_ASCII));
+            newAliases.put(aliasSurt, targetSurt);
+            updateExistingRecordsWithNewAlias(dbBatch, aliasSurt, targetSurt);
+        }
+
+        public void commit() {
+            commitBatch(dbBatch);
+
+            /*
+             * Most of the time this will do nothing as we've already updated existing captures in putAlias, but there's
+             * a data race as another batch could have inserted some captures in bewtween putAlias() and commit().
+             *
+             * Rather than serializing updates let's just do a second pass after committing to catch any captures that
+             * were added in the meantime.
+             */
+            updateExistingRecordsWithNewAliases();
+        }
+
+        private void updateExistingRecordsWithNewAliases() {
+            WriteBatch wb = new WriteBatch();
+            try {
+                for (Map.Entry<String, String> entry : newAliases.entrySet()) {
+                    updateExistingRecordsWithNewAlias(wb, entry.getKey(), entry.getValue());
+                }
+                commitBatch(wb);
+            } finally {
+                wb.dispose();
+            }
+        }
+
+        private void updateExistingRecordsWithNewAlias(WriteBatch wb, String aliasSurt, String targetSurt) {
+            for (Capture capture : rawQuery(aliasSurt)) {
+                wb.remove(capture.encodeKey());
+                capture.urlkey = targetSurt;
+                wb.put(capture.encodeKey(), capture.encodeValue());
+            }
+        }
+
+        @Override
+        public void close() {
+            dbBatch.dispose();
+        }
+    }
 }

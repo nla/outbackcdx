@@ -17,8 +17,8 @@ relatively light traffic load.
 * No authentication (currently assumes you use a firewall)
 * No sharding (could be added relatively easily but we don't currently need it)
 * No replication (you could use a HTTP load balancer though)
-* Pagination and delete are not yet implemented
-* RemoteResourceIndex in OpenWayback is broken (in 2.1) and requires a [patch]
+* Delete not yet implemented
+* RemoteResourceIndex in OpenWayback is broken in 2.1 and 2.2 and requires a [patch]. The patch will be included in OpenWayback 2.3.
 
 [RocksDB]: http://rocksdb.org/
 [patch]: https://github.com/iipc/openwayback/pull/239
@@ -36,9 +36,9 @@ uncomment the official release.
     java -jar target/tinycdxserver.jar -d /data -p 8080
 
 The server supports multiple named indexes as subdirectories.  You can
-load records into the index by POSTing them in the CDX format Wayback uses:
+load records into the index by POSTing them in the (11-field) CDX format Wayback uses:
 
-    curl -X POST --data @records.cdx http://localhost:8080/myindex
+    curl -X POST --data-binary @records.cdx http://localhost:8080/myindex
 
 The canonicalized URL (first field) is ignored, tinycdxserver performs its own
 canonicalization.
@@ -55,6 +55,16 @@ Source IP address based filtering is not currently supported. It may be
 more preferable to fix RemoteResourceIndex.
 
 [exclusions oracle]: https://github.com/iipc/openwayback-access-control
+
+Canonicalisation Aliases
+------------------------
+
+Alias records allow the grouping of URLs so they will deliver as if they are different snapshots of the same page.
+
+    @alias http://legacy.example.org/page-one http://www.example.org/page1
+
+Aliases do not currently work with url prefix queries. Aliases are resolved after normal canonicalisation rules
+are applied.
 
 Future Work
 -----------
