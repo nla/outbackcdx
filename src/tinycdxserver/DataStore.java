@@ -1,13 +1,26 @@
 package tinycdxserver;
 
-import org.rocksdb.*;
-
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
+
+import org.rocksdb.BlockBasedTableConfig;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.ColumnFamilyOptions;
+import org.rocksdb.ColumnFamilyOptionsInterface;
+import org.rocksdb.CompactionStyle;
+import org.rocksdb.CompressionType;
+import org.rocksdb.DBOptions;
+import org.rocksdb.Options;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 
 public class DataStore implements Closeable {
     public static final String COLLECTION_PATTERN = "[A-Za-z0-9_-]+";
@@ -59,7 +72,7 @@ public class DataStore implements Closeable {
 
             List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
                     new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions),
-                    new ColumnFamilyDescriptor("alias", cfOptions)
+                    new ColumnFamilyDescriptor("alias".getBytes(), cfOptions)
             );
 
             createColumnFamiliesIfNotExists(options, path.toString(), cfDescriptors);
