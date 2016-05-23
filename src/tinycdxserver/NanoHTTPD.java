@@ -1,6 +1,15 @@
 package tinycdxserver;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.PushbackInputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -9,15 +18,12 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.URLDecoder;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -213,6 +219,7 @@ public abstract class NanoHTTPD {
                             }
                         });
                     } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 } while (!myServerSocket.isClosed());
             }
@@ -542,6 +549,7 @@ public abstract class NanoHTTPD {
                 safeClose(data);
             } catch (IOException ioe) {
                 // Couldn't write? No can do.
+                ioe.printStackTrace();
             }
         }
 
