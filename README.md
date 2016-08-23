@@ -61,10 +61,17 @@ Canonicalisation Aliases
 
 Alias records allow the grouping of URLs so they will deliver as if they are different snapshots of the same page.
 
+    @alias <source-url> <target-url>
+    
+For example:
+
     @alias http://legacy.example.org/page-one http://www.example.org/page1
+    @alias http://legacy.example.org/page-two http://www.example.org/page2
 
 Aliases do not currently work with url prefix queries. Aliases are resolved after normal canonicalisation rules
 are applied.
+
+Aliases can be mixed with regular CDX lines either in the same file or separate files and in any order. Any existing records that the alias rule affects the canonicalised URL for will be updated when the alias is added to the index.
 
 Future Work
 -----------
