@@ -82,7 +82,7 @@ public class Main {
         AccessControlClient client = new AccessControlClient(oracleUrl);
         return capture -> {
             try {
-                return "allow".equals(client.getPolicy(capture.original, new Date(capture.timestamp), new Date(), "public"));
+                return "allow".equals(client.getPolicy(capture.original, capture.date(), new Date(), "public"));
             } catch (RobotsUnavailableException | RuleOracleUnavailableException e) {
                 throw new RuntimeException(e);
             }

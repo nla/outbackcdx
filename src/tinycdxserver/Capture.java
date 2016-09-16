@@ -5,6 +5,9 @@ import org.apache.commons.codec.binary.Base32;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
@@ -168,5 +171,9 @@ public class Capture {
             capture.file = fields[8];
         }
         return capture;
+    }
+
+    public Date date() {
+        return Date.from(LocalDateTime.parse(Long.toString(timestamp), arcTimeFormat).toInstant(ZoneOffset.UTC));
     }
 }
