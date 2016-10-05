@@ -67,7 +67,8 @@ public class WbCdxApi {
     }
 
     /**
-     * Returns this capture a JSON string. Uses pywb's format.
+     * Formats a capture as a JSON array. Supports the field names used by both
+     * pywb and wayback-cdx-server.
      */
     public static String toJsonArray(Capture capture, String[] fields) {
         JsonStringWriter out = JsonWriter.string().array();
