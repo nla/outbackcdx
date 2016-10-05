@@ -27,8 +27,22 @@ public class Index {
     /**
      * Returns all resources (URLs) that match the given prefix.
      */
-    public Iterable<Resource> prefixQuery(String surtPrefix) {
-        return () -> new Resources(filteredCaptures(surtPrefix, record -> record.urlkey.startsWith(surtPrefix)));
+    public Iterable<Resource> prefixQueryAsResources(String surtPrefix) {
+        return () -> new Resources(prefixQuery(surtPrefix).iterator());
+    }
+
+    /**
+     * Returns all captures that match the given prefix.
+     */
+    public Iterable<Capture> prefixQuery(String surtPrefix) {
+        return () -> filteredCaptures(surtPrefix, record -> record.urlkey.startsWith(surtPrefix));
+    }
+
+    /**
+     * Returns all captures with keys in the given range.
+     */
+    public Iterable<Capture> rangeQuery(String startSurt, String endSurt) {
+        return () -> filteredCaptures(startSurt, record -> record.urlkey.compareTo(endSurt) < 0);
     }
 
     /**

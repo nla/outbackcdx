@@ -138,7 +138,7 @@ public class XmlQuery {
     private void prefixQuery(XMLStreamWriter out) throws XMLStreamException {
         boolean wroteHeader = false;
         int i = 0;
-        for (Resource resource : index.prefixQuery(queryUrl)) {
+        for (Resource resource : index.prefixQueryAsResources(queryUrl)) {
             if (i < offset) {
                 i++;
                 continue;

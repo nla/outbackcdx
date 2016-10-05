@@ -97,9 +97,9 @@
             <classifier>linux64</classifier>
         </dependency>
         <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-            <version>2.4</version>
+            <groupId>com.grack</groupId>
+            <artifactId>nanojson</artifactId>
+            <version>1.0</version>
         </dependency>
         <dependency>
             <groupId>org.netpreserve.openwayback</groupId>

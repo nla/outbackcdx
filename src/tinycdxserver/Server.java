@@ -1,11 +1,14 @@
 package tinycdxserver;
 
 
-import com.google.gson.Gson;
+import com.grack.nanojson.JsonWriter;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.URL;
 import java.util.List;
@@ -20,7 +23,6 @@ import static tinycdxserver.NanoHTTPD.Method.POST;
 import static tinycdxserver.NanoHTTPD.Response.Status.*;
 
 public class Server extends NanoHTTPD {
-    private static final Gson gson = new Gson();
     private final DataStore dataStore;
     boolean verbose = false;
 
@@ -69,7 +71,7 @@ public class Server extends NanoHTTPD {
     }
 
     Response jsonResponse(Object data) {
-        return new Response(OK, "application/json", gson.toJson(data));
+        return new Response(OK, "application/json", JsonWriter.string(data));
     }
 
 
@@ -181,7 +183,7 @@ public class Server extends NanoHTTPD {
         if (params.containsKey("q")) {
             return XmlQuery.query(session, index);
         } else if (params.containsKey("url")) {
-            return textQuery(index, params.get("url"));
+            return WbCdxApi.query(session, index);
         } else {
             return collectionDetails(index.db);
         }
@@ -229,18 +231,6 @@ public class Server extends NanoHTTPD {
             e.printStackTrace();
         }
         return new Response(OK, "text/html", page);
-    }
-
-    private Response textQuery(final Index index, String url) {
-        final String canonUrl = UrlCanonicalizer.surtCanonicalize(url);
-        return new Response(OK, "text/plain", outputStream -> {
-            Writer out = new BufferedWriter(new OutputStreamWriter(outputStream));
-            for (Capture capture : index.query(canonUrl)) {
-                if (!capture.urlkey.equals(canonUrl)) break;
-                out.append(capture.toString()).append('\n');
-            }
-            out.flush();
-        });
     }
 
 }
