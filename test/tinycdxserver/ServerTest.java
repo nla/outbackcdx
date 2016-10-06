@@ -43,7 +43,7 @@ public class ServerTest {
             NanoHTTPD.Response response = server.query(new DummySession("/test").parm("url", "nla.gov.au"));
             assertEquals(NanoHTTPD.Response.Status.OK, response.getStatus());
             String data = readOutput(response);
-            assertTrue(data.indexOf("au,gov,nla)/ 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX 0") != -1);
+            assertTrue(data.indexOf("au,gov,nla)/ 20050614070159") != -1);
             assertTrue(data.indexOf("example") == -1);
         }
 
