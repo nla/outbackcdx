@@ -1,10 +1,11 @@
 package tinycdxserver;
 
-import com.grack.nanojson.JsonStringWriter;
+import com.grack.nanojson.JsonAppendableWriter;
 import com.grack.nanojson.JsonWriter;
 import tinycdxserver.NanoHTTPD.Response;
 
 import java.io.BufferedWriter;
+import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.Arrays;
@@ -32,83 +33,111 @@ public class WbCdxApi {
         }
         String[] fields = fl.split(",");
         long limit = limitParam == null ? Long.MAX_VALUE : Long.parseLong(limitParam);
-        boolean outputJson = "json".equals(session.getParms().get("output"));
-        return new Response(OK, outputJson ? "application/json" : "text/plain", outputStream -> {
-            Writer out = new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8));
 
-            if (outputJson) {
-                out.append('[');
-                JsonWriter.on(out).array(Arrays.asList(fields)).done();
-                out.append(",\n");
-            }
+        boolean outputJson = "json".equals(session.getParms().get("output"));
+        Response response = new Response(OK, outputJson ? "application/json" : "text/plain", outputStream -> {
+            Writer out = new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8));
+            OutputFormat outf = outputJson ? new JsonFormat(out, fields) : new TextFormat(out, fields);
 
             long row = 0;
             for (Capture capture : queryForMatchType(index, matchType, url)) {
                 if (row >= limit) {
                     break;
                 }
-                if (outputJson) {
-                    if (row > 0) {
-                        out.append(",\n");
-                    }
-                    out.append(toJsonArray(capture, fields));
-                } else {
-                    out.append(capture.toString()).append('\n');
-                }
+                outf.writeCapture(capture);
                 row++;
             }
 
-            if (outputJson) {
-                out.append("]\n");
-            }
-
+            outf.close();
             out.flush();
         });
+        response.addHeader("Access-Control-Allow-Origin", "*");
+        return response;
+    }
+
+    interface OutputFormat {
+        void writeCapture(Capture capture) throws IOException;
+        void close();
     }
 
     /**
-     * Formats a capture as a JSON array. Supports the field names used by both
+     * Formats captures as a JSON array. Supports the field names used by both
      * pywb and wayback-cdx-server.
      */
-    public static String toJsonArray(Capture capture, String[] fields) {
-        JsonStringWriter out = JsonWriter.string().array();
-        for (String field : fields) {
-            switch (field) {
-                case "urlkey":
-                    out.value(capture.urlkey);
-                    break;
-                case "timestamp":
-                    out.value(capture.timestamp);
-                    break;
-                case "url":
-                case "original":
-                    out.value(capture.original);
-                    break;
-                case "mime":
-                case "mimetype":
-                    out.value(capture.mimetype);
-                    break;
-                case "statuscode":
-                case "status":
-                    out.value(capture.status);
-                    break;
-                case "digest":
-                    out.value(capture.digest);
-                    break;
-                case "redirecturl":
-                case "redirect":
-                    out.value(capture.redirecturl);
-                    break;
-                case "offset":
-                    out.value(capture.compressedoffset);
-                    break;
-                case "filename":
-                    out.value(capture.file);
-                    break;
-            }
+    static class JsonFormat implements OutputFormat {
+        private final JsonAppendableWriter out;
+        private final String[] fields;
+
+        JsonFormat(Writer out, String[] fields) {
+            this.fields = fields;
+            this.out = JsonWriter.on(out).array().array(Arrays.asList(fields));
         }
-        return out.end().done();
+
+        @Override
+        public void writeCapture(Capture capture) {
+            out.array();
+            for (String field : fields) {
+                switch (field) {
+                    case "urlkey":
+                        out.value(capture.urlkey);
+                        break;
+                    case "timestamp":
+                        out.value(capture.timestamp);
+                        break;
+                    case "url":
+                    case "original":
+                        out.value(capture.original);
+                        break;
+                    case "mime":
+                    case "mimetype":
+                        out.value(capture.mimetype);
+                        break;
+                    case "statuscode":
+                    case "status":
+                        out.value(capture.status);
+                        break;
+                    case "digest":
+                        out.value(capture.digest);
+                        break;
+                    case "redirecturl":
+                    case "redirect":
+                        out.value(capture.redirecturl);
+                        break;
+                    case "offset":
+                        out.value(capture.compressedoffset);
+                        break;
+                    case "filename":
+                        out.value(capture.file);
+                        break;
+                }
+            }
+            out.end();
+        }
+
+        @Override
+        public void close() {
+            out.end().done();
+        }
     }
+
+    static class TextFormat implements OutputFormat {
+        private final Writer out;
+
+        TextFormat(Writer out, String[] fields) {
+            this.out = out;
+        }
+
+        @Override
+        public void writeCapture(Capture capture) throws IOException {
+            out.write(capture.toString());
+        }
+
+        @Override
+        public void close() {
+
+        }
+    }
+
 
     private static Iterable<Capture> queryForMatchType(Index index, String matchType, String url) {
         String surt = UrlCanonicalizer.surtCanonicalize(url);
@@ -145,4 +174,6 @@ public class WbCdxApi {
         int i = surtPrefix.indexOf(")/");
         return i < 0 ? surtPrefix : surtPrefix.substring(0, i);
     }
+
+
 }

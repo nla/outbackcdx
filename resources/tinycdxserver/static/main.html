@@ -22,6 +22,7 @@
             color: #268bd2;
             text-decoration: none;
         }
+
         .sidebar h1 {
             color: #d33682;
             text-align: center;
@@ -70,9 +71,11 @@
             float: left;
             list-style: none;
         }
+
         .tabs li a:hover {
             background: #073642;
         }
+
         .tabs li a {
             padding: 22px;
             display: block;
@@ -110,10 +113,28 @@
             border-radius: 10px;
         }
 
-        input.query {
+        input.searchbox {
             width: 100%;
         }
+
+        #query th {
+            font-variant: all-small-caps;
+            color: #999;
+        }
+
+        .status-ok {
+            color: darkgreen;
+        }
+
+        .status-redirect {
+            color: darkblue;
+        }
+
+        .status-error {
+            color: darkred;
+        }
     </style>
+    <script src="https://unpkg.com/vue@2.0.1/dist/vue.js"></script>
 </head>
 <body>
 <nav class="sidebar">
@@ -131,9 +152,71 @@
     </div>
 </header>
 <main>
-    <input placeholder="URL" class="query">
+    <div id="query">
+        <input placeholder="URL query" class="searchbox" v-model="query"
+               v-on:input="onQueryInput">
+        <table>
+            <tr>
+                <th v-for="field in fields">{{ field }}</th>
+            </tr>
+            <tr v-for="row in rows">
+                <td v-for="(val, i) in row"
+                    v-bind:class="classForField(i, val)">{{ val }}
+                </td>
+            </tr>
+        </table>
+
+    </div>
 
 </main>
+<script>
 
+    function getJson(uri, success) {
+        var request = new XMLHttpRequest();
+        request.responseType = 'json';
+        request.addEventListener('load', function () {
+            if (request.status == 200) {
+                success(request.response);
+            }
+        });
+        request.open('GET', uri);
+        request.send();
+    }
+    var app = new Vue({
+        el: "#query",
+        data: {
+            query: "",
+            fields: ["status", "url", "timestamp"],
+            rows: []
+        },
+        methods: {
+            onQueryInput: function (event) {
+                var self = this;
+                var fl = this.fields.join(",");
+                getJson("http://127.0.0.1:8080/agwa?url=" + encodeURIComponent(this.query) +
+                        "&output=json&limit=100&fl=" + encodeURIComponent(fl),
+                        function (data) {
+                            if (data) {
+                                self.rows = data.slice(1);
+                            } else {
+                                self.rows = [];
+                            }
+                        });
+            },
+            classForField: function (i, value) {
+                if (this.fields[i] == "status") {
+                    if (value < 300) {
+                        return "status-ok";
+                    } else if (value < 400) {
+                        return "status-redirect";
+                    } else {
+                        return "status-error";
+                    }
+                }
+            }
+        }
+    })
+    ;
+</script>
 </body>
 </html>
