@@ -1,21 +1,139 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>tinycdxserver</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #ffffff;
+            margin: 0;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200px;
+            bottom: 0;
+            background: #fdf6e3;
+        }
+
+        a {
+            color: #268bd2;
+            text-decoration: none;
+        }
+        .sidebar h1 {
+            color: #d33682;
+            text-align: center;
+            font-variant: small-caps;
+            height: 50px;
+        }
+
+        .sidebar ul {
+            padding: 0;
+        }
+
+        .sidebar li a {
+            display: block;
+            padding: 15px 22px;
+            font-weight: bold;
+            text-align: center;
+
+        }
+
+        .sidebar li a:hover {
+            background: #eee8d5;
+        }
+
+        .sidebar li {
+            line-height: 20px;
+            list-style: none;
+            display: block;
+        }
+
+        main {
+            margin-left: 200px;
+            padding: 20px;
+            margin-right: 20px;
+        }
+
+        .topbar {
+        }
+
+        .tabs ul {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .tabs li {
+            float: left;
+            list-style: none;
+        }
+        .tabs li a:hover {
+            background: #073642;
+        }
+        .tabs li a {
+            padding: 22px;
+            display: block;
+            width: 150px;
+            text-align: center;
+            font-variant: all-small-caps;
+            font-size: 22px;
+        }
+
+        .topbar {
+            margin-left: 200px;
+            border-bottom: 1px solid #dddddd;
+            height: 60px;
+            padding-left: 20px;
+
+        }
+
+        .topbar h2 {
+            padding-top: 10px;
+            padding-bottom: 5px;
+            font-size: 20px;
+            line-height: 20px;
+            font-weight: 900;
+            margin: 0;
+        }
+
+        .topbar .stats {
+            font-size: 12px;
+            color: #999;
+        }
+
+        input {
+            border: 1px solid #dddddd;
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        input.query {
+            width: 100%;
+        }
+    </style>
 </head>
 <body>
+<nav class="sidebar">
+    <h1>tinycdx</h1>
+    <ul>
+        <li><a href="/agwa">agwa</a></li>
+        <li><a href="/pandas">pandas</a></li>
+    </ul>
 
-<webapp></webapp>
+</nav>
+<header class="topbar">
+    <h2>agwa</h2>
+    <div class="stats">
+        ~272,213,123 records
+    </div>
+</header>
+<main>
+    <input placeholder="URL" class="query">
 
-<script src="static/api.js"></script>
-<script src="static/riot-2.3.1.min.js"></script>
-<script src="static/main.tag" type="riot/tag"></script>
-<script>
-    riot.compile(function() {
-        riot.mount("webapp");
-        riot.route.start(true);
-    });
-</script>
+</main>
+
 </body>
 </html>
