@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Comparator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
@@ -137,6 +138,7 @@ public class DataStore implements Closeable {
                 collections.add(f.getName());
             }
         }
+        collections.sort(Comparator.naturalOrder());
         return collections;
     }
 }

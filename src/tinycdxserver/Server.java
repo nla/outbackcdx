@@ -71,12 +71,15 @@ public class Server extends NanoHTTPD {
     }
 
     Response jsonResponse(Object data) {
-        return new Response(OK, "application/json", JsonWriter.string(data));
+        Response response =  new Response(OK, "application/json", JsonWriter.string(data));
+        response.addHeader("Access-Control-Allow-Origin", "*");
+        return response;
     }
 
 
     private static final Pattern CAPTURES_ROUTE = Pattern.compile("/api/collections/(" + DataStore.COLLECTION_PATTERN + ")/captures");
     private static final Pattern ALIASES_ROUTE = Pattern.compile("/api/collections/(" + DataStore.COLLECTION_PATTERN + ")/aliases");
+    private static final Pattern STATS_ROUTE = Pattern.compile("/(" + DataStore.COLLECTION_PATTERN + ")/stats");
 
     @Override
     public Response serve(IHTTPSession session) {
@@ -118,6 +121,20 @@ public class Server extends NanoHTTPD {
                             .limit(limit)
                             .collect(Collectors.<Alias>toList());
                     return jsonResponse(results);
+                }
+            }
+
+            {
+                Matcher m = STATS_ROUTE.matcher(uri);
+                if (method == GET && m.matches()) {
+                    String collection = m.group(1);
+                    Index index = dataStore.getIndex(collection);
+                    Response response = new Response(Response.Status.OK, "application/json",
+                            JsonWriter.string().object()
+                            .value("estimatedRecordCount", index.estimatedRecordCount())
+                            .end().done());
+                    response.addHeader("Access-Control-Allow-Origin", "*");
+                    return response;
                 }
             }
 

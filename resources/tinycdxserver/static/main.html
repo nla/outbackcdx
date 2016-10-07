@@ -42,7 +42,7 @@
 
         }
 
-        .sidebar li a:hover {
+        .sidebar li a:hover, .sidebar li a.active {
             background: #eee8d5;
         }
 
@@ -135,73 +135,77 @@
         }
     </style>
     <script src="https://unpkg.com/vue@2.0.1/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/lodash/4.16.4/lodash.js"></script>
+    <script src="api.js"></script>
 </head>
 <body>
-<nav class="sidebar">
-    <h1>tinycdx</h1>
-    <ul>
-        <li><a href="/agwa">agwa</a></li>
-        <li><a href="/pandas">pandas</a></li>
-    </ul>
 
-</nav>
-<header class="topbar">
-    <h2>agwa</h2>
-    <div class="stats">
-        ~272,213,123 records
-    </div>
-</header>
-<main>
+
+<!-----------------------------------------------------------------------
+   Siderbar component
+------------------------------------------------------------------------->
+
+<script>
+    Vue.component('cdx-sidebar', {
+        template: "#sidebar-template",
+        props: ["value"],
+        data: function() {
+            return {
+                collections: []
+            }
+        },
+
+
+    });
+</script>
+
+
+<!-----------------------------------------------------------------------
+   Query component
+------------------------------------------------------------------------->
+
+<script type="x-template" id="query-template">
     <div id="query">
         <input placeholder="URL query" class="searchbox" v-model="query"
-               v-on:input="onQueryInput">
+               @input="onQueryInput">
         <table>
             <tr>
                 <th v-for="field in fields">{{ field }}</th>
             </tr>
             <tr v-for="row in rows">
                 <td v-for="(val, i) in row"
-                    v-bind:class="classForField(i, val)">{{ val }}
+                    :class="classForField(i, val)">{{ val }}
                 </td>
             </tr>
         </table>
 
     </div>
+</script>
 
-</main>
 <script>
-
-    function getJson(uri, success) {
-        var request = new XMLHttpRequest();
-        request.responseType = 'json';
-        request.addEventListener('load', function () {
-            if (request.status == 200) {
-                success(request.response);
-            }
-        });
-        request.open('GET', uri);
-        request.send();
-    }
-    var app = new Vue({
-        el: "#query",
-        data: {
+    Vue.component('app-query', {
+        template: "#query-template",
+        props: ["collection"],
+        data: function() { return {
             query: "",
             fields: ["status", "url", "timestamp"],
             rows: []
+        }},
+        watch: {
+            collection: function() {
+                this.onQueryInput();
+            }
         },
         methods: {
-            onQueryInput: function (event) {
+            onQueryInput: function () {
                 var self = this;
-                var fl = this.fields.join(",");
-                getJson("http://127.0.0.1:8080/agwa?url=" + encodeURIComponent(this.query) +
-                        "&output=json&limit=100&fl=" + encodeURIComponent(fl),
-                        function (data) {
-                            if (data) {
-                                self.rows = data.slice(1);
-                            } else {
-                                self.rows = [];
-                            }
-                        });
+                this.collection.query({url: this.query, limit: 100, fl: this.fields.join(",")}, function(captures) {
+                    if (captures) {
+                        self.rows = captures.slice(1);
+                    } else {
+                        self.rows = [];
+                    }
+                });
             },
             classForField: function (i, value) {
                 if (this.fields[i] == "status") {
@@ -218,5 +222,62 @@
     })
     ;
 </script>
+
+
+<!-----------------------------------------------------------------------
+   Main app
+------------------------------------------------------------------------->
+<div id="app">
+    <nav class="sidebar">
+        <h1>tinycdx</h1>
+        <ul>
+            <li v-for="collection in collections">
+                <a :class="{active: collection == activeCollection}"
+                   @click="activeCollection = collection">{{ collection.name }}</a>
+            </li>
+        </ul>
+
+    </nav>
+    <header class="topbar">
+        <h2>agwa</h2>
+        <div class="stats" v-if="stats">
+            ~{{stats.estimatedRecordCount.toLocaleString()}} records
+        </div>
+    </header>
+    <main>
+        <app-query :collection="activeCollection"></app-query>
+
+    </main>
+</div>
+
+<script>
+    var cdxApi = new CdxApi("http://127.0.0.1:8080");
+    var app = new Vue({
+        el: "#app",
+        data: {
+            collections: [],
+            activeCollection: null,
+            stats: null,
+        },
+        watch: {
+            activeCollection: function(collection) {
+                var self = this;
+                collection.stats(function(stats) {
+                    self.stats = stats;
+                });
+            }
+        },
+        created: function() {
+            var self = this;
+            cdxApi.listCollections(function(collections) {
+                self.collections = collections;
+                if (collections && !self.activeCollection) {
+                    self.activeCollection = collections[0];
+                }
+            });
+        }
+    });
+</script>
+
 </body>
 </html>

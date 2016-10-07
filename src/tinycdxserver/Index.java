@@ -93,6 +93,14 @@ public class Index {
         return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true);
     }
 
+    public long estimatedRecordCount() {
+        try {
+            return db.getLongProperty("rocksdb.estimate-num-keys");
+        } catch (RocksDBException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private interface RecordConstructor<T> {
         public T construct(byte[] key, byte[] value);
     }

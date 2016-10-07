@@ -1,33 +1,70 @@
-function getJson(uri, success) {
-    var request = new XMLHttpRequest();
-    request.addEventListener('load', function() {
-        if (request.status == 200) {
-            success(JSON.parse(request.responseText));
-        }
-    });
-    request.open('GET', uri);
-    request.send();
+"use strict";
+
+function CdxApi(baseUrl) {
+    this.baseUrl = baseUrl;
 }
 
-function encodeQueryString(data) {
-    var qs = "";
-    for (var key in data) {
-        if (data.hasOwnProperty(key)) {
-            if (qs !== "") {
-                qs += "&";
+(function() {
+
+    function getJson(uri, success) {
+        var request = new XMLHttpRequest();
+        request.responseType = 'json';
+        request.addEventListener('load', function () {
+            if (request.status == 200) {
+                success(request.response);
             }
-            qs += encodeURIComponent(key) + "=" + encodeURIComponent(data[key]);
-        }
+        });
+        request.open('GET', uri);
+        request.send();
     }
-    return qs;
-}
 
-function getCaptures(collection, key, limit, success) {
-    var qs = encodeQueryString({key: key, limit: limit});
-    getJson('api/collections/' +  encodeURIComponent(collection) + '/captures?' + qs, success);
-}
+    function encodeQueryString(data) {
+        var qs = "";
+        for (var key in data) {
+            if (data.hasOwnProperty(key)) {
+                if (qs !== "") {
+                    qs += "&";
+                }
+                qs += encodeURIComponent(key) + "=" + encodeURIComponent(data[key]);
+            }
+        }
+        return qs;
+    }
 
-function getAliases(collection, key, limit, success) {
-    var qs = encodeQueryString({key: key, limit: limit});
-    getJson('api/collections/' +  encodeURIComponent(collection) + '/aliases?' + qs, success);
-}
+
+    CdxApi.prototype.listCollections = function(success) {
+        var baseUrl = this.baseUrl;
+        getJson(baseUrl + "/api/collections", function (names) {
+            success(names.map(function(name) {
+                return new CdxCollection(baseUrl + "/" + name, name);
+            }));
+        });
+    };
+
+    function CdxCollection(baseUrl, name) {
+        this.baseUrl = baseUrl;
+        this.name = name;
+    }
+
+    CdxCollection.prototype.query = function(options, success) {
+        options.output = "json";
+        getJson(this.baseUrl + "?" + encodeQueryString(options), success);
+    };
+
+
+    CdxCollection.prototype.stats = function(success) {
+        getJson(this.baseUrl + "/stats", success);
+    };
+
+
+    function getCaptures(collection, key, limit, success) {
+        var qs = encodeQueryString({key: key, limit: limit});
+        getJson('api/collections/' + encodeURIComponent(collection) + '/captures?' + qs, success);
+    }
+
+    function getAliases(collection, key, limit, success) {
+        var qs = encodeQueryString({key: key, limit: limit});
+        getJson('api/collections/' + encodeURIComponent(collection) + '/aliases?' + qs, success);
+    }
+
+})();
