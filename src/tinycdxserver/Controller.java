@@ -9,7 +9,6 @@ import tinycdxserver.NanoHTTPD.Response;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.List;
 import java.util.Map;
@@ -21,14 +20,15 @@ import static tinycdxserver.NanoHTTPD.Method.POST;
 import static tinycdxserver.NanoHTTPD.Response.Status.NOT_FOUND;
 import static tinycdxserver.NanoHTTPD.Response.Status.OK;
 import static tinycdxserver.Web.jsonResponse;
+import static tinycdxserver.Web.serve;
 
 class Controller {
     private final boolean verbose;
     private final DataStore dataStore;
     final Web.Router router = new Web.Router()
-            .on(GET, "/", this::home)
+            .on(GET, "/", serve("dashboard.html", "text/html"))
+            .on(GET, "/tinycdx.js", serve("tinycdx.js", "application/javascript"))
             .on(GET, "/api/collections", this::listCollections)
-            .on(GET, "/static/<path:.*>", req -> Web.serveResource(req.getParms().get("path")))
             .on(GET, "/<collection>", this::query)
             .on(POST, "/<collection>", this::post)
             .on(GET, "/<collection>/stats", this::stats)
@@ -129,35 +129,8 @@ class Controller {
 
     }
 
-    private String slurp(InputStream stream) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        char buf[] = new char[8192];
-        try (InputStreamReader reader = new InputStreamReader(stream)) {
-            for (; ; ) {
-                int n = reader.read(buf);
-                if (n < 0) break;
-                sb.append(buf, 0, n);
-            }
-        }
-        return sb.toString();
-    }
-
-    private Response home(IHTTPSession request) throws IOException {
-        String page = "<!doctype html><h1>tinycdxserver</h1>";
-
-        List<String> collections = dataStore.listCollections();
-
-        if (collections.isEmpty()) {
-            page += "No collections.";
-        } else {
-            page += "<ul>";
-            for (String collection : dataStore.listCollections()) {
-                page += "<li><a href=" + collection + ">" + collection + "</a>";
-            }
-            page += "</ul>";
-        }
-        page += slurp(Controller.class.getClassLoader().getResourceAsStream("tinycdxserver/usage.html"));
-        return new Response(OK, "text/html", page);
+    private Response dashboard(IHTTPSession request) throws IOException {
+        return new Response(OK, "text/html", getClass().getResourceAsStream("dashboard.html"));
     }
 
     private Response collectionDetails(RocksDB db) {

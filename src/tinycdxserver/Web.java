@@ -13,9 +13,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static tinycdxserver.NanoHTTPD.Response.Status.INTERNAL_ERROR;
-import static tinycdxserver.NanoHTTPD.Response.Status.NOT_FOUND;
-import static tinycdxserver.NanoHTTPD.Response.Status.OK;
+import static tinycdxserver.NanoHTTPD.Response.Status.*;
 
 class Web {
 
@@ -57,17 +55,12 @@ class Web {
         }
     }
 
-    static Response serveResource(String uri) throws IOException {
-        if (uri.contains("..")) {
-            return notFound();
+    static Handler serve(String file, String type) {
+        URL url = Response.class.getResource(file);
+        if (url == null) {
+            throw new IllegalArgumentException("No such resource: " + file);
         }
-
-        URL resource = Web.class.getResource(uri.substring(1));
-        if (resource == null) {
-            return notFound();
-        }
-
-        return new Response(OK, guessContentType(uri), resource.openStream());
+        return req -> new Response(OK, type, url.openStream());
     }
 
     static Response jsonResponse(Object data) {
