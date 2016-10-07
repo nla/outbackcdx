@@ -6,6 +6,8 @@ import org.archive.accesscontrol.RuleOracleUnavailableException;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.nio.channels.Channel;
 import java.nio.channels.ServerSocketChannel;
 import java.util.Date;
@@ -13,7 +15,7 @@ import java.util.function.Predicate;
 
 public class Main {
     public static void usage() {
-        System.err.println("Usage: java " + Server.class.getName() + " [options...]");
+        System.err.println("Usage: java " + Controller.class.getName() + " [options...]");
         System.err.println("");
         System.err.println("  -a url        Use a wayback access control oracle");
         System.err.println("  -b bindaddr   Bind to a particular IP address");
@@ -59,14 +61,9 @@ public class Main {
         }
 
         try (DataStore dataStore = new DataStore(dataPath, filter)) {
-            final Server server;
-            Channel channel = System.inheritedChannel();
-            if (inheritSocket && channel != null && channel instanceof ServerSocketChannel) {
-                server = new Server(dataStore, ((ServerSocketChannel) channel).socket());
-            } else {
-                server = new Server(dataStore, host, port);
-            }
-            server.verbose = verbose;
+            Controller controller = new Controller(dataStore, verbose);
+            ServerSocket socket = openSocket(host, port, inheritSocket);
+            Web.Server server = new Web.Server(socket, controller.router);
             server.start();
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 server.stop();
@@ -76,6 +73,16 @@ public class Main {
         } catch (InterruptedException | IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private static ServerSocket openSocket(String host, int port, boolean inheritSocket) throws IOException {
+        ServerSocket socket;Channel channel = System.inheritedChannel();
+        if (inheritSocket && channel != null && channel instanceof ServerSocketChannel) {
+            socket = ((ServerSocketChannel) channel).socket();
+        } else {
+            socket = new ServerSocket(port, -1, InetAddress.getByName(host));
+        }
+        return socket;
     }
 
     private static Predicate<Capture> accessControlFilter(String oracleUrl) {

@@ -15,18 +15,18 @@ import java.util.Map;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-public class ServerTest {
+public class ControllerTest {
 
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
 
-    private Server server;
+    private Controller controller;
 
     @Before
     public void setUp() throws IOException {
         File root = folder.newFolder();
         DataStore manager = new DataStore(root, null);
-        server = new Server(manager, "127.0.0.1", -1);
+        controller = new Controller(manager, false);
     }
 
     private String readOutput(NanoHTTPD.Response response) throws UnsupportedEncodingException {
@@ -37,10 +37,10 @@ public class ServerTest {
 
     @Test
     public void test() throws IOException {
-        server.post(new DummySession("/test").data("- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n"));
-        server.post(new DummySession("/test").data("- 20060614070159 http://nla.gov.au/ text/html 200 XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n"));
+        controller.post(new DummySession("/test").data("- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n"));
+        controller.post(new DummySession("/test").data("- 20060614070159 http://nla.gov.au/ text/html 200 XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n"));
         {
-            NanoHTTPD.Response response = server.query(new DummySession("/test").parm("url", "nla.gov.au"));
+            NanoHTTPD.Response response = controller.query(new DummySession("/test").parm("url", "nla.gov.au"));
             assertEquals(NanoHTTPD.Response.Status.OK, response.getStatus());
             String data = readOutput(response);
             assertTrue(data.indexOf("au,gov,nla)/ 20050614070159") != -1);
@@ -49,15 +49,15 @@ public class ServerTest {
 
 
         {
-            NanoHTTPD.Response response = server.query(new DummySession("/test").parm("q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F"));
+            NanoHTTPD.Response response = controller.query(new DummySession("/test").parm("q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F"));
             String data = readOutput(response);
             assertTrue(data.indexOf("20050614070159") != -1);
             assertTrue(data.indexOf("20060614070159") != -1);
         }
 
-        server.post(new DummySession("/test").data("@alias http://example.com/ http://www.nla.gov.au/\n- 20100614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20100614070144-00003-crawling016.archive.org\n"));
+        controller.post(new DummySession("/test").data("@alias http://example.com/ http://www.nla.gov.au/\n- 20100614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20100614070144-00003-crawling016.archive.org\n"));
         {
-            NanoHTTPD.Response response = server.query(new DummySession("/test").parm("q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F"));
+            NanoHTTPD.Response response = controller.query(new DummySession("/test").parm("q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F"));
             String data = readOutput(response);
             assertTrue(data.indexOf("20050614070159") != -1);
             assertTrue(data.indexOf("20060614070159") != -1);
@@ -67,7 +67,7 @@ public class ServerTest {
 
 
         {
-            NanoHTTPD.Response response = server.query(new DummySession("/test").parm("q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F limit:2 offset:0"));
+            NanoHTTPD.Response response = controller.query(new DummySession("/test").parm("q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F limit:2 offset:0"));
             String data = readOutput(response);
             assertEquals(2, StringUtils.countMatches(data, "<result>"));
         }
