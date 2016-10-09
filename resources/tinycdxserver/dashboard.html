@@ -2,162 +2,224 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <title>OutbackCDX</title>
+    <link href='https://fonts.googleapis.com/css?family=Roboto:300,500' rel='stylesheet' type='text/css'>
     <style>
+        /*
+
+        .color-primary-0 { color: #FE7119 }
+        .color-primary-1 { color: #FFA770 }
+        .color-primary-2 { color: #FF8D46 }
+        .color-primary-3 { color: #D15000 }
+        .color-primary-4 { color: #A53F00 }
+
+        .color-secondary-1-0 { color: #FEBC19 }
+        .color-secondary-1-1 { color: #FFD670 }
+        .color-secondary-1-2 { color: #FFCA46 }
+        .color-secondary-1-3 { color: #D19500 }
+        .color-secondary-1-4 { color: #A57600 }
+
+        .color-secondary-2-0 { color: #253BAE }
+        .color-secondary-2-1 { color: #6776CA }
+        .color-secondary-2-2 { color: #4356B7 }
+        .color-secondary-2-3 { color: #12268F }
+        .color-secondary-2-4 { color: #0C1C71 }
+
+        .color-complement-0 { color: #10A483 }
+        .color-complement-1 { color: #56C3AB }
+        .color-complement-2 { color: #30AE92 }
+        .color-complement-3 { color: #008769 }
+        .color-complement-4 { color: #006A53 }
+        */
+        * {
+            box-sizing: border-box;
+        }
         body {
-            font-family: sans-serif;
-            background: #ffffff;
             margin: 0;
+            font-family: 'Roboto', 'Noto', 'Helvetica', sans-serif;
+            height: 100%;
         }
 
-        .sidebar {
-            position: fixed;
+        .status-bar {
+            background: #D15000;
+            position: absolute;
             top: 0;
             left: 0;
-            width: 200px;
-            bottom: 0;
-            background: #fdf6e3;
+            right: 0;
+            height: 24px;
+        }
+        .bg-top{
+            height: 96px;
+            background: #FE7119;
+            position: absolute;
+            top: 24px;
+            left: 0;
+            right: 0;
+            z-index: -1;
         }
 
-        a {
-            color: #268bd2;
-            text-decoration: none;
+        h1 {
+            color: #A53F00;
+            margin: 16px;
+            margin-top: 0px;
+            margin-left: 16px;
+            line-height: 24px;
+            font-size: 34px;
+            font-weight: 300;
         }
 
-        .sidebar h1 {
-            color: #d33682;
-            text-align: center;
-            font-variant: small-caps;
-            height: 50px;
-        }
-
-        .sidebar ul {
-            padding: 0;
-        }
-
-        .sidebar li a {
+        .logo {
             display: block;
-            padding: 15px 22px;
-            font-weight: bold;
-            text-align: center;
-
+            margin-left: 80px;
+            margin-top: 8px;
+            margin-bottom: -6px;
         }
 
-        .sidebar li a:hover, .sidebar li a.active {
-            background: #eee8d5;
-        }
 
-        .sidebar li {
-            line-height: 20px;
-            list-style: none;
-            display: block;
+        .app-bar {
+            position: absolute;
+            top: 24px;
+            left: 232px;
+            right: 56px;
+            height: 48px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
         }
 
         main {
-            margin-left: 200px;
-            padding: 20px;
-            margin-right: 20px;
+            position: absolute;
+            top: 72px;
+            left: 232px;
+            right: 56px;
+            background: white;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+            border-radius: 2px;
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+
         }
 
-        .topbar {
+        .left-nav {
+            margin-top: 120px;
+            width: 232px;
+            border-radius: 2px;
+        }
+
+        .searchbox {
+            display: block;
+            width: 100%;
+            padding-left: 12px;
+            height: 48px;
+            font-size: 20px;
+            font-weight: 500;
+            border: none;
+            border-bottom: 1px solid #ccc;
+            border-radius: 2px;
+        }
+
+        aside h2 {
+            display: block;
+            font-size: 16px;
+            font-weight: 500;
+            padding: 16px;
+            margin: 0;
+            color: #909090;
+        }
+
+        aside ul {
+            list-style: none;
+            font-size: 16px;
+            line-height: 16px;
+            font-weight: 500;
+            margin: 0;
+            padding: 0;
+        }
+
+        aside ul li a {
+            display: block;
+            height: 48px;
+            text-decoration: none;
+            color: #000;
+
+        }
+        aside ul li a.active {
+            background: #eeeeee;
+        }
+
+        .icon {
+            vertical-align: middle;
+            margin: 16px;
         }
 
         .tabs ul {
+            list-style: none;
             margin: 0;
             padding: 0;
-            overflow: hidden;
-        }
-
-        .tabs li {
-            float: left;
-            list-style: none;
-        }
-
-        .tabs li a:hover {
-            background: #073642;
+            display: flex;
+            flex-direction: row;
         }
 
         .tabs li a {
-            padding: 22px;
             display: block;
-            width: 150px;
+            color: #fff;
+            opacity: 0.7;
+            text-transform: uppercase;
+            font-size: 13px;
+            font-weight: 500;
+            min-width: 160px;
+            padding-left: 12px;
+            padding-right: 12px;
             text-align: center;
-            font-variant: all-small-caps;
-            font-size: 22px;
+            height: 48px;
+            line-height: 48px;
+            text-decoration: none;
         }
 
-        .topbar {
-            margin-left: 200px;
-            border-bottom: 1px solid #dddddd;
-            height: 60px;
-            padding-left: 20px;
-
+        .tabs li a.active {
+            opacity: 1;
+            border-bottom: 3px solid #FFE3D2;
         }
-
-        .topbar h2 {
-            padding-top: 10px;
-            padding-bottom: 5px;
-            font-size: 20px;
-            line-height: 20px;
-            font-weight: 900;
-            margin: 0;
-        }
-
-        .topbar .stats {
-            font-size: 12px;
-            color: #999;
-        }
-
-        input {
-            border: 1px solid #dddddd;
-            padding: 10px;
-            border-radius: 10px;
-        }
-
-        input.searchbox {
-            width: 100%;
-        }
-
-        #query th {
-            font-variant: all-small-caps;
-            color: #999;
+        .tabs li a:hover {
+            opacity: 1;
         }
 
         .status-ok {
             color: darkgreen;
         }
-
+        .status-error {
+            color: darkred;
+        }
         .status-redirect {
             color: darkblue;
         }
 
-        .status-error {
-            color: darkred;
+        table {
+            color: #575757;
+            font-size: 13px;
+            margin: 16px;
+            border-collapse: collapse;
         }
+
+        table th {
+            color: #363636;
+            font-weight: 500;
+            text-align: left;
+            text-transform: uppercase;
+            margin-left: 56px;
+        }
+
+        table tr:hover {
+            background: #eeeeee;
+        }
+
+
     </style>
     <script src="https://unpkg.com/vue@2.0.1/dist/vue.js"></script>
-    <script src="https://cdn.jsdelivr.net/lodash/4.16.4/lodash.js"></script>
-    <script src="tinycdx.js"></script>
+    <script src="https://unpkg.com/vue-router@2.0.0/dist/vue-router.min.js"></script>
+    <script src="https://unpkg.com/lodash@4.16.4/lodash.min.js"></script>
+    <script src="api.js"></script>
 </head>
 <body>
-
-
-<!-----------------------------------------------------------------------
-   Siderbar component
-------------------------------------------------------------------------->
-
-<script>
-    Vue.component('cdx-sidebar', {
-        template: "#sidebar-template",
-        props: ["value"],
-        data: function() {
-            return {
-                collections: []
-            }
-        },
-
-
-    });
-</script>
 
 
 <!-----------------------------------------------------------------------
@@ -165,10 +227,10 @@
 ------------------------------------------------------------------------->
 
 <script type="x-template" id="query-template">
-    <div id="query">
+    <main id="query">
         <input placeholder="URL query" class="searchbox" v-model="query"
                @input="onQueryInput">
-        <table>
+        <table v-if="rows.length > 0">
             <tr>
                 <th v-for="field in fields">{{ field }}</th>
             </tr>
@@ -179,7 +241,7 @@
             </tr>
         </table>
 
-    </div>
+    </main>
 </script>
 
 <script>
@@ -197,7 +259,7 @@
             }
         },
         methods: {
-            onQueryInput: function () {
+            onQueryInput: _.throttle(function () {
                 var self = this;
                 this.collection.query({url: this.query, limit: 100, fl: this.fields.join(",")}, function(captures) {
                     if (captures) {
@@ -206,7 +268,7 @@
                         self.rows = [];
                     }
                 });
-            },
+            }, 250),
             classForField: function (i, value) {
                 if (this.fields[i] == "status") {
                     if (value < 300) {
@@ -228,26 +290,34 @@
    Main app
 ------------------------------------------------------------------------->
 <div id="app">
-    <nav class="sidebar">
-        <h1>tinycdx</h1>
+    <div class="status-bar">
+    </div>
+    <div class="bg-top">
+        <img src="outback.svg" width="55px" height="54px" class="logo">
+        <h1>OutbackCDX</h1>
+    </div>
+
+    <div class="app-bar">
+        <nav class="tabs w">
+            <ul>
+                <li><a href="#query" class="active">Query</a></li>
+                <li><a href="#takedowns">Takedowns</a></li>
+            </ul>
+        </nav>
+    </div>
+
+    <aside class="left-nav">
+        <h2>Collections</h2>
         <ul>
             <li v-for="collection in collections">
                 <a :class="{active: collection == activeCollection}"
-                   @click="activeCollection = collection">{{ collection.name }}</a>
+                   @click.prevent="activeCollection = collection" :href="collection.name">
+                    <img class="icon" src="database.svg" width="20px" height="20px">{{ collection.name }}
+                </a>
             </li>
         </ul>
-
-    </nav>
-    <header class="topbar">
-        <h2>agwa</h2>
-        <div class="stats" v-if="stats">
-            ~{{stats.estimatedRecordCount.toLocaleString()}} records
-        </div>
-    </header>
-    <main>
-        <app-query :collection="activeCollection"></app-query>
-
-    </main>
+    </aside>
+    <app-query :collection="activeCollection"></app-query>
 </div>
 
 <script>

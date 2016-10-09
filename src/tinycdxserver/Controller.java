@@ -27,7 +27,9 @@ class Controller {
     private final DataStore dataStore;
     final Web.Router router = new Web.Router()
             .on(GET, "/", serve("dashboard.html", "text/html"))
-            .on(GET, "/tinycdx.js", serve("tinycdx.js", "application/javascript"))
+            .on(GET, "/api.js", serve("api.js", "application/javascript"))
+            .on(GET, "/database.svg", serve("database.svg", "image/svg+xml"))
+            .on(GET, "/outback.svg",  serve("outback.svg", "image/svg+xml"))
             .on(GET, "/api/collections", this::listCollections)
             .on(GET, "/<collection>", this::query)
             .on(POST, "/<collection>", this::post)
