@@ -1,5 +1,5 @@
-tinycdxserver
-=============
+OutbackCDX (nee tinycdxserver)
+==============================
 
 A [RocksDB]-based web archive index server which can serve records using Wayback's
 RemoteResourceIndex (xmlquery) protocol.
