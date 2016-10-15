@@ -9,7 +9,9 @@ import java.net.URLDecoder;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.logging.Logger;
 
 /**
@@ -138,7 +140,9 @@ public class XmlQuery {
     private void prefixQuery(XMLStreamWriter out) throws XMLStreamException {
         boolean wroteHeader = false;
         int i = 0;
-        for (Resource resource : index.prefixQueryAsResources(queryUrl)) {
+        Resources it = new Resources(index.prefixQuery(queryUrl).iterator());
+        while (it.hasNext()) {
+            Resource resource = it.next();
             if (i < offset) {
                 i++;
                 continue;
@@ -190,5 +194,56 @@ public class XmlQuery {
 
     public static NanoHTTPD.Response query(NanoHTTPD.IHTTPSession session, Index index) {
         return new XmlQuery(session, index).streamResults();
+    }
+
+    /**
+     * Groups together all captures of the same URL.
+     */
+    private static class Resources implements Iterator<Resource> {
+        private final Iterator<Capture> captures;
+        private Capture capture = null;
+
+        Resources(Iterator<Capture> captures) {
+            this.captures = captures;
+        }
+
+        public boolean hasNext() {
+            return capture != null || captures.hasNext();
+        }
+
+        public Resource next() {
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
+            Resource result = new Resource();
+            String previousDigest = null;
+            if (capture == null) {
+                capture = captures.next();
+            }
+            result.firstCapture = capture;
+            result.lastCapture = capture;
+            while (capture.urlkey.equals(result.firstCapture.urlkey)) {
+                if (previousDigest == null || !previousDigest.equals(capture.digest)) {
+                    result.versions++;
+                    previousDigest = capture.digest;
+                }
+                result.captures++;
+                result.lastCapture = capture;
+                if (!captures.hasNext()) {
+                    capture = null;
+                    break;
+                }
+                capture = captures.next();
+            }
+
+            return result;
+        }
+    }
+
+    static class Resource {
+        long captures;
+        long versions;
+        Capture firstCapture;
+        Capture lastCapture;
     }
 }

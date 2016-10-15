@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <title>OutbackCDX</title>
     <link href='https://fonts.googleapis.com/css?family=Roboto:300,500' rel='stylesheet' type='text/css'>
+    <link href="https://unpkg.com/pikaday@1.4.0/css/pikaday.css" rel="stylesheet">
     <style>
         /*
 
@@ -193,30 +194,93 @@
             color: darkblue;
         }
 
-        table {
-            color: #575757;
+        .table {
+            color: #000000;
+            font-weight: 300;
             font-size: 13px;
-            margin: 16px;
             border-collapse: collapse;
         }
 
-        table th {
-            color: #363636;
+        .table th {
+            color: #575757;
             font-weight: 500;
             text-align: left;
             text-transform: uppercase;
             margin-left: 56px;
         }
 
-        table tr:hover {
+        .table tr:hover {
             background: #eeeeee;
+        }
+
+        .form label {
+            color: #363636;
+            font-size: 12px;
+        }
+
+        .form {
+            padding-left: 16px;
+            padding-right: 16px;
+            flex: 1 1;
+        }
+
+        .form .form-field {
+            width: 100%;
+        }
+
+        .column {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .row {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .period-field {
+            display: inline-flex;
+            flex-direction: row;
+        }
+
+        .period-field label {
+            display: flex;
+            flex-direction: column;
+            margin-right: 12px;
+        }
+
+        .period-field input {
+            width: 5em;
+            padding-left: 8px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+        }
+
+        .table ul {
+            padding: 0;
+            list-style: none;
+        }
+
+        .table tr td, .table tr th {
+            padding-left: 16px;
+            padding-right: 16px;
+        }
+
+        .big-table {
+            width: 100%;
+        }
+
+        .big-table tr {
+            border-bottom: solid 1px #eeeeee;
         }
 
 
     </style>
     <script src="https://unpkg.com/vue@2.0.1/dist/vue.js"></script>
-    <script src="https://unpkg.com/vue-router@2.0.0/dist/vue-router.min.js"></script>
+    <script src="https://unpkg.com/vue-router@2.0.0/dist/vue-router.js"></script>
     <script src="https://unpkg.com/lodash@4.16.4/lodash.min.js"></script>
+    <script src="https://unpkg.com/moment@2.15.1/min/moment.min.js"></script>
+    <script src="https://unpkg.com/pikaday@1.4.0"></script>
     <script src="api.js"></script>
 </head>
 <body>
@@ -228,9 +292,8 @@
 
 <script type="x-template" id="query-template">
     <main id="query">
-        <input placeholder="URL query" class="searchbox" v-model="query"
-               @input="onQueryInput">
-        <table v-if="rows.length > 0">
+        <input placeholder="URL query" class="searchbox" v-model="query">
+        <table v-if="rows.length > 0" class="table">
             <tr>
                 <th v-for="field in fields">{{ field }}</th>
             </tr>
@@ -245,23 +308,30 @@
 </script>
 
 <script>
-    Vue.component('app-query', {
+    var Query = {
         template: "#query-template",
-        props: ["collection"],
         data: function() { return {
             query: "",
             fields: ["status", "url", "timestamp"],
             rows: []
         }},
         watch: {
-            collection: function() {
-                this.onQueryInput();
+            '$route': 'onQueryInput',
+            query: function(value) {
+                this.$router.replace({
+                    name: 'query',
+                    params: this.$route.params,
+                    query: {
+                        url: value
+                    }
+                });
             }
         },
         methods: {
             onQueryInput: _.throttle(function () {
                 var self = this;
-                this.collection.query({url: this.query, limit: 100, fl: this.fields.join(",")}, function(captures) {
+                cdxApi.collection(this.$route.params.collection)
+                        .query({url: this.query, limit: 100, fl: this.fields.join(",")}, function(captures) {
                     if (captures) {
                         self.rows = captures.slice(1);
                     } else {
@@ -281,15 +351,260 @@
                 }
             }
         }
-    })
-    ;
+    };
 </script>
+
+<!-----------------------------------------------------------------------
+   Date Range component
+------------------------------------------------------------------------->
+
+<script type="x-template" id="date-range-template">
+    <div><input placeholder="Start date"> – <input placeholder="End date"></div>
+</script>
+
+<script>
+    Vue.component('date-range', {
+        template: '#date-range-template',
+        props: ['value'],
+        mounted: function() {
+            var startPicker = new Pikaday({
+                field: this.$el.getElementsByTagName('input')[0],
+                onSelect: function() {
+                    var startDate = startPicker.getDate();
+                    startPicker.setStartRange(startDate);
+                    endPicker.setStartRange(startDate);
+                    this.value.start = startPicker.toString();
+                    this.onInput();
+                }.bind(this)
+            }), endPicker = new Pikaday({
+                field: this.$el.getElementsByTagName('input')[1],
+                onSelect: function() {
+                    var endDate = endPicker.getDate();
+                    startPicker.setEndRange(endDate);
+                    endPicker.setEndRange(endDate);
+                    this.value.end = endPicker.toString();
+                    this.onInput();
+                }.bind(this)
+            });
+        },
+        methods: {
+            onInput: function(event) {
+                this.$emit('input', this.value)
+            }
+        }
+    });
+</script>
+
+<!-----------------------------------------------------------------------
+   Period Component
+------------------------------------------------------------------------->
+
+<script type="x-template" id="period-template">
+    <div class="period-field">
+        <label>For a period of</label>
+        <label>years <input type="number" min="0" v-model="value.years" @input="onInput"></label>
+        <label>months <input type="number" min="0" v-model="value.months" @input="onInput"></label>
+        <label>days <input type="number" min="0" v-model="value.days" @input="onInput"></label>
+        <label>after capture</label>
+    </div>
+</script>
+
+<script>
+    Vue.component('period', {
+        template: '#period-template',
+        props: ['value'],
+        methods: {
+            onInput: function(event) {
+                if (event.target.value == '0') {
+                    event.target.value = '';
+                }
+            }
+        }
+    });
+</script>
+
+<!-----------------------------------------------------------------------
+   Access Rule Editor
+------------------------------------------------------------------------->
+
+<script type="x-template" id="access-rule-template">
+    <main id="access-rules" class="row">
+        <div class="form">
+            <p>
+                <label>
+                    URLs matching any of these patterns
+                    <textarea class="form-field"></textarea>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Captured between
+                    <date-range v-model="rule.captured"></date-range>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Accessed between
+                    <date-range v-model="rule.accessed"></date-range>
+                </label>
+            </p>
+            <period v-model="rule.period"></period>
+        </div>
+        <div class="form">
+            <p>
+                <label>
+                    Access Policy
+                    <select class="form-field" v-model="rule.policy">
+                        <option>Public</option>
+                        <option>Public + No Search</option>
+                        <option>Staff Only</option>
+                        <option>No Access</option>
+                    </select>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Public Message
+                    <textarea v-model="rule.publicMessage" class="form-field"></textarea>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Private Comment
+                    <textarea v-model="rule.privateComment" class="form-field"></textarea>
+                </label>
+            </p>
+            <p>
+                <button @click="save">Save</button>
+                <button>Cancel</button>
+            </p>
+        </div>
+
+    </main>
+</script>
+
+<script>
+    var AccessRule = {
+        template: "#access-rule-template",
+        data: function() {
+            return {
+                rule: {
+                    privateComment: "comment",
+                    publicMessage: "msg",
+                    embargo: "4Y",
+                    period: {}
+                }
+            };
+        },
+        methods: {
+            save: function () {
+                var collection = cdxApi.collection(this.$route.params.collection);
+                collection.saveAccessRule(this.rule);
+            }
+        }
+    };
+</script>
+
+<!-----------------------------------------------------------------------
+   Access Rule List
+------------------------------------------------------------------------->
+
+<script type="x-template" id="access-rule-list-template">
+    <main id="access-rule-list">
+        <div class="row">
+            <input placeholder="URL" class="searchbox" :value="this.$route.query.url" @input="onQueryInput">
+
+            <router-link :to="{name: 'access-rule', params: { collection: $route.params.collection, ruleId: 'new' }}">New Rule</router-link>
+        </div>
+
+        <table class="table big-table">
+            <tr>
+                <th>URL</th>
+                <th>Date</th>
+                <th>Policy</th>
+                <th></th>
+            </tr>
+            <tr v-for="rule in rules">
+                <td>
+                    <ul v-for="pattern in rule.patterns">
+                        <li>{{pattern}}</li>
+                    </ul>
+                </td>
+                <td>
+                    <div  v-if="rule.captured && (rule.captured.start || rule.captured.end)">
+                        <strong>Captured:</strong> {{rule.captured.start}}–{{rule.captured.end}}
+                    </div>
+                    <div v-if="rule.accessed && (rule.accessed.start || rule.accessed.end)">
+                        <strong>Retrieved:</strong> {{rule.retrieved.start}}–{{rule.retrieved.end}}
+                    </div>
+                    <div v-if="rule.period && (rule.period.days || rule.period.months || rule.period.years)">
+                        <strong>Period:</strong>
+                        <span v-if="rule.period.years">{{rule.period.years}} years</span>
+                        <span v-if="rule.period.months">{{rule.period.months}} months</span>
+                        <span v-if="rule.period.days">{{rule.period.days}} days</span>
+                    </div>
+                </td>
+                <td>
+                    {{rule.policy}}
+                </td>
+                <td>
+                    <router-link :to="{name: 'access-rule', params: {collection: $route.params.collection, ruleId: rule.id}}">Edit</router-link>
+                </td>
+            </tr>
+        </table>
+    </main>
+</script>
+
+<script>
+    var AccessRuleList = {
+        template: "#access-rule-list-template",
+        data: function() {
+            return {
+                rules: [
+                    {id: 4, patterns: ["*.nla.gov.au", "*.pictureaustralia.org"],
+                    captured: {start: 'now', end: 'then'},
+                        period: {years: 4, months: 2},
+                        policy: "Staff Only"
+
+                    }
+                ]
+            };
+        },
+        created: function() {
+            this.fetchData();
+        },
+        watch: {
+            '$route': 'fetchData'
+        },
+        methods: {
+            onQueryInput: function(event) {
+                var url = event.target.value;
+                this.$router.replace({
+                    name: 'access-rule-list',
+                    params: {
+                        collection: this.$route.params.collection,
+                    },
+                    query: url ? {url} : null
+                });
+            },
+            fetchData: _.throttle(function() {
+                cdxApi.collection(this.$route.params.collection)
+                        .accessRules(this.$route.query.url,
+                    function(rules) {
+                        this.rules = rules;
+                    }.bind(this)
+                );
+            }, 250)
+        }
+    };
+</script>
+
 
 
 <!-----------------------------------------------------------------------
    Main app
 ------------------------------------------------------------------------->
-<div id="app">
+<div id="app" class="row">
     <div class="status-bar">
     </div>
     <div class="bg-top">
@@ -298,10 +613,10 @@
     </div>
 
     <div class="app-bar">
-        <nav class="tabs w">
+        <nav class="tabs" v-if="$route && $route.params.collection">
             <ul>
-                <li><a href="#query" class="active">Query</a></li>
-                <li><a href="#takedowns">Takedowns</a></li>
+                <li><router-link :to="'/' + $route.params.collection" exact>Query</router-link></li>
+                <li><router-link :to="'/' + $route.params.collection + '/access/rules'">Access Rules</router-link></li>
             </ul>
         </nav>
     </div>
@@ -309,33 +624,37 @@
     <aside class="left-nav">
         <h2>Collections</h2>
         <ul>
-            <li v-for="collection in collections">
-                <a :class="{active: collection == activeCollection}"
-                   @click.prevent="activeCollection = collection" :href="collection.name">
-                    <img class="icon" src="database.svg" width="20px" height="20px">{{ collection.name }}
-                </a>
+            <li v-for="col in collections">
+                <router-link :to="'/' + col.name">
+                    <img class="icon" src="database.svg" width="20px" height="20px">{{ col.name }}
+                </router-link>
             </li>
         </ul>
     </aside>
-    <app-query :collection="activeCollection"></app-query>
+    <router-view></router-view>
 </div>
 
 <script>
+
+    var routes = [
+    ];
+    var router = new VueRouter({
+        linkActiveClass: "active",
+        routes: [
+            {path: '/:collection', name: 'query', component: Query},
+            {path: '/:collection/access/rules', name: 'access-rule-list', component: AccessRuleList},
+            {path: '/:collection/access/rules/:ruleId', name: 'access-rule', component: AccessRule},
+        ]
+    });
+
     var cdxApi = new CdxApi("http://127.0.0.1:8080");
     var app = new Vue({
+        router,
         el: "#app",
         data: {
-            collections: [],
-            activeCollection: null,
-            stats: null,
-        },
-        watch: {
-            activeCollection: function(collection) {
-                var self = this;
-                collection.stats(function(stats) {
-                    self.stats = stats;
-                });
-            }
+            collection: null,
+            collections: {},
+            stats: null
         },
         created: function() {
             var self = this;

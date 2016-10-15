@@ -5,13 +5,11 @@ import org.rocksdb.*;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Comparator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -65,15 +63,17 @@ public class DataStore implements Closeable {
 
             List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
                     new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions),
-                    new ColumnFamilyDescriptor("alias".getBytes(UTF_8), cfOptions)
+                    new ColumnFamilyDescriptor("alias".getBytes(UTF_8), cfOptions),
+                    new ColumnFamilyDescriptor("access-rule".getBytes(UTF_8), cfOptions)
             );
 
-            createColumnFamiliesIfNotExists(options, path.toString(), cfDescriptors);
+            createColumnFamiliesIfNotExists(options, dbOptions, path.toString(), cfDescriptors);
 
             List<ColumnFamilyHandle> cfHandles = new ArrayList<>(cfDescriptors.size());
             RocksDB db = RocksDB.open(dbOptions, path.toString(), cfDescriptors, cfHandles);
 
-            index = new Index(db, filter, cfHandles.get(0), cfHandles.get(1));
+            AccessControl accessControl = new AccessControl(db, cfHandles.get(2));
+            index = new Index(db, filter, cfHandles.get(0), cfHandles.get(1), accessControl);
             indexes.put(collection, index);
             return index;
         } catch (RocksDBException e) {
@@ -94,29 +94,37 @@ public class DataStore implements Closeable {
         cfOptions.setTableFormatConfig(tableConfig);
     }
 
-    private void createColumnFamiliesIfNotExists(Options options, String path, List<ColumnFamilyDescriptor> cfDescriptors) throws RocksDBException {
-        RocksDB db;
-        try {
-            db = RocksDB.open(options, path);
-        } catch (RocksDBException e) {
-            if (e.getMessage().contains("You have to open all column families")) {
-                // TODO
-                return;
+    private void createColumnFamiliesIfNotExists(Options options, DBOptions dbOptions, String path, List<ColumnFamilyDescriptor> cfDescriptors) throws RocksDBException {
+        List<ColumnFamilyDescriptor> existing = new ArrayList<>();
+        List<ColumnFamilyDescriptor> toCreate = new ArrayList<>();
+        Set<String> cfNames = RocksDB.listColumnFamilies(options, path)
+                .stream().map(bytes -> new String(bytes, UTF_8))
+                .collect(Collectors.toSet());
+        for (ColumnFamilyDescriptor cfDesc : cfDescriptors) {
+            if (cfNames.remove(new String(cfDesc.columnFamilyName(), UTF_8))) {
+                existing.add(cfDesc);
             } else {
-                throw e;
+                toCreate.add(cfDesc);
             }
         }
-        try {
-            for (ColumnFamilyDescriptor descriptor : cfDescriptors) {
-                try (ColumnFamilyHandle h = db.createColumnFamily(descriptor)) {
-                } catch (RocksDBException e) {
-                    if (!e.getMessage().equals("Invalid argument: Column family already exists")) {
-                        throw e;
-                    }
+
+        if (!cfNames.isEmpty()) {
+            throw new RuntimeException("database may be too new: unexpected column family: " + cfNames.iterator().next());
+        }
+
+        // default CF is created automatically in empty db, exclude it
+        if (existing.isEmpty()) {
+            ColumnFamilyDescriptor defaultCf = cfDescriptors.get(0);
+            existing.add(defaultCf);
+            toCreate.remove(defaultCf);
+        }
+
+        List<ColumnFamilyHandle> handles = new ArrayList<>(existing.size());
+        try (RocksDB db = RocksDB.open(dbOptions, path, existing, handles);) {
+            for (ColumnFamilyDescriptor descriptor : toCreate) {
+                try (ColumnFamilyHandle cf = db.createColumnFamily(descriptor)) {
                 }
             }
-        } finally {
-            db.close();
         }
     }
 

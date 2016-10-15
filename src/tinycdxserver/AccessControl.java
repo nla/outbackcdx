@@ -1,66 +1,92 @@
 package tinycdxserver;
 
+import com.google.gson.Gson;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import com.googlecode.concurrenttrees.radixinverted.ConcurrentInvertedRadixTree;
 import com.googlecode.concurrenttrees.radixinverted.InvertedRadixTree;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
+import org.rocksdb.RocksIterator;
 
-import java.time.Period;
-import java.util.Date;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static java.nio.ByteOrder.BIG_ENDIAN;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class AccessControl {
-    public static class DateRange {
-        public Date from;
-        public Date until;
+    final static Gson gson = new Gson();
 
-        boolean contains(Date date) {
-            return (from == null || from.compareTo(date) < 0) &&
-                    (until == null || until.compareTo(date) > 0);
-        }
-    }
+    final InvertedRadixTree<List<AccessRule>> rulesBySurt = new ConcurrentInvertedRadixTree<List<AccessRule>>(new DefaultCharArrayNodeFactory());
+    private final RocksDB db;
+    private final ColumnFamilyHandle cf;
+    private final AtomicLong nextId;
 
-    public static class Rule {
-        Long id;
-        String surt;
-        boolean exactMatch;
-        boolean deliverable;
-        boolean discoverable;
-        DateRange captured;
-        DateRange retrieved;
-        Period embargo;
-        String who;
-        String privateComment;
-        String message;
-        boolean enabled;
-
-        boolean matches(Request request) {
-            return enabled &&
-                    (exactMatch ? request.surt.equals(surt) : request.surt.startsWith(surt)) &&
-                    (who == null || who.equals(request.who)) &&
-                    (captured == null || captured.contains(request.captureDate)) &&
-                    (retrieved == null || retrieved.contains(request.retrievalDate)) &&
-                    (embargo == null || request.retrievalDate.toInstant().isAfter(request.captureDate.toInstant().plus(embargo)));
-        }
-    }
-
-    public static class Request {
-        String surt;
-        String who;
-        Date captureDate;
-        Date retrievalDate;
-    }
-
-    public static class RuleSet {
-        InvertedRadixTree<Rule> rules = new ConcurrentInvertedRadixTree<Rule>(new DefaultCharArrayNodeFactory());
-
-        public Rule get(Request request) {
-            Rule result = null;
-            for (Rule rule: rules.getValuesForKeysPrefixing(request.surt)) {
-                if (rule.matches(request)) {
-                    result = rule;
-                }
+    public AccessControl(RocksDB db, ColumnFamilyHandle cf) {
+        this.db = db;
+        this.cf = cf;
+        try (RocksIterator it = db.newIterator(cf)) {
+            it.seekToLast();
+            if (it.isValid()) {
+                nextId = new AtomicLong(decodeKey(it.key()) + 1);
+            } else {
+                nextId = new AtomicLong(0);
             }
-            return result;
         }
+    }
+
+    public List<AccessRule> list() {
+        return flatten(rulesBySurt.getValuesForKeysStartingWith(""));
+    }
+
+    public long put(AccessRule rule) throws RocksDBException {
+        if (rule.id == null) {
+            rule.id = nextId.getAndIncrement();
+        }
+        byte[] value = gson.toJson(rule).getBytes(UTF_8);
+        db.put(cf, encodeKey(rule.id), value);
+
+        synchronized (this) {
+            for (String surt : rule.surts) {
+                List<AccessRule> list = rulesBySurt.getValueForExactKey(surt);
+                if (list == null) {
+                    list = Collections.synchronizedList(new ArrayList<>());
+                    rulesBySurt.put(surt, list);
+                }
+                list.add(rule);
+            }
+        }
+        return rule.id;
+    }
+
+    public List<AccessRule> query(String surt) {
+        return flatten(rulesBySurt.getValuesForKeysPrefixing(surt));
+    }
+
+    public AccessRule get(long ruleId) throws RocksDBException {
+        byte[] data = db.get(cf, encodeKey(ruleId));
+        if (data != null) {
+            return gson.fromJson(new String(data, UTF_8), AccessRule.class);
+        }
+        return null;
+    }
+
+    static long decodeKey(byte[] bytes) {
+        return ByteBuffer.wrap(bytes).order(BIG_ENDIAN).getLong(0);
+    }
+
+    static byte[] encodeKey(long ruleId) {
+        return ByteBuffer.allocate(8).order(BIG_ENDIAN).putLong(ruleId).array();
+    }
+
+    static List<AccessRule> flatten(Iterable<List<AccessRule>> listsOfRules) {
+        // XXX make lazy?
+        ArrayList<AccessRule> result = new ArrayList<>();
+        listsOfRules.forEach(result::addAll);
+        return result;
     }
 }
-

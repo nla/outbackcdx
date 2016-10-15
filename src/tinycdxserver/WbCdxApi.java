@@ -1,14 +1,13 @@
 package tinycdxserver;
 
-import com.grack.nanojson.JsonAppendableWriter;
-import com.grack.nanojson.JsonWriter;
+import com.google.gson.Gson;
+import com.google.gson.stream.JsonWriter;
 import tinycdxserver.NanoHTTPD.Response;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.util.Arrays;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static tinycdxserver.NanoHTTPD.Response.Status.OK;
@@ -57,7 +56,7 @@ public class WbCdxApi {
 
     interface OutputFormat {
         void writeCapture(Capture capture) throws IOException;
-        void close();
+        void close() throws IOException;
     }
 
     /**
@@ -65,17 +64,18 @@ public class WbCdxApi {
      * pywb and wayback-cdx-server.
      */
     static class JsonFormat implements OutputFormat {
-        private final JsonAppendableWriter out;
+        private final JsonWriter out;
         private final String[] fields;
 
-        JsonFormat(Writer out, String[] fields) {
+        JsonFormat(Writer out, String[] fields) throws IOException {
             this.fields = fields;
-            this.out = JsonWriter.on(out).array().array(Arrays.asList(fields));
+            this.out = new Gson().newJsonWriter(out);
+            this.out.beginArray();
         }
 
         @Override
-        public void writeCapture(Capture capture) {
-            out.array();
+        public void writeCapture(Capture capture) throws IOException {
+            out.beginArray();
             for (String field : fields) {
                 switch (field) {
                     case "urlkey":
@@ -111,12 +111,13 @@ public class WbCdxApi {
                         break;
                 }
             }
-            out.end();
+            out.endArray();
         }
 
         @Override
-        public void close() {
-            out.end().done();
+        public void close() throws IOException {
+            out.endArray();
+            out.close();
         }
     }
 

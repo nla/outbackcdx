@@ -3,7 +3,10 @@ package tinycdxserver;
 import org.rocksdb.*;
 
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.function.Predicate;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
@@ -16,19 +19,14 @@ public class Index {
     final Predicate<Capture> filter;
     final ColumnFamilyHandle defaultCF;
     final ColumnFamilyHandle aliasCF;
+    final AccessControl accessControl;
 
-    public Index(RocksDB db, Predicate<Capture> filter, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF) {
+    public Index(RocksDB db, Predicate<Capture> filter, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl) {
         this.db = db;
         this.filter = filter;
         this.defaultCF = defaultCF;
         this.aliasCF = aliasCF;
-    }
-
-    /**
-     * Returns all resources (URLs) that match the given prefix.
-     */
-    public Iterable<Resource> prefixQueryAsResources(String surtPrefix) {
-        return () -> new Resources(prefixQuery(surtPrefix).iterator());
+        this.accessControl = accessControl;
     }
 
     /**
@@ -153,50 +151,6 @@ public class Index {
             this.record = null;
             it.next();
             return record;
-        }
-    }
-
-    /**
-     * Groups together all captures of the same URL.
-     */
-    private static class Resources implements Iterator<Resource> {
-        private final Iterator<Capture> captures;
-        private Capture capture = null;
-
-        Resources(Iterator<Capture> captures) {
-            this.captures = captures;
-        }
-
-        public boolean hasNext() {
-            return capture != null || captures.hasNext();
-        }
-
-        public Resource next() {
-            if (!hasNext()) {
-                throw new NoSuchElementException();
-            }
-            Resource result = new Resource();
-            String previousDigest = null;
-            if (capture == null) {
-                capture = captures.next();
-            }
-            result.firstCapture = capture;
-            result.lastCapture = capture;
-            while (capture.urlkey.equals(result.firstCapture.urlkey)) {
-                if (previousDigest == null || !previousDigest.equals(capture.digest)) {
-                    result.versions++;
-                    previousDigest = capture.digest;
-                }
-                result.captures++;
-                result.lastCapture = capture;
-                if (!captures.hasNext()) {
-                    capture = null;
-                    break;
-                }
-                capture = captures.next();
-            }
-
-            return result;
         }
     }
 

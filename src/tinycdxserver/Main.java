@@ -63,7 +63,7 @@ public class Main {
         try (DataStore dataStore = new DataStore(dataPath, filter)) {
             Controller controller = new Controller(dataStore, verbose);
             ServerSocket socket = openSocket(host, port, inheritSocket);
-            Web.Server server = new Web.Server(socket, controller.router);
+            Web.Server server = new Web.Server(socket, controller);
             server.start();
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 server.stop();

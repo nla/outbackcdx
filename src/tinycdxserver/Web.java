@@ -1,6 +1,6 @@
 package tinycdxserver;
 
-import com.grack.nanojson.JsonWriter;
+import com.google.gson.Gson;
 import tinycdxserver.NanoHTTPD.IHTTPSession;
 import tinycdxserver.NanoHTTPD.Method;
 import tinycdxserver.NanoHTTPD.Response;
@@ -17,8 +17,10 @@ import static tinycdxserver.NanoHTTPD.Response.Status.*;
 
 class Web {
 
+    private static Gson gson = new Gson();
+
     interface Handler {
-        Response handle(IHTTPSession session) throws IOException;
+        Response handle(IHTTPSession session) throws IOException, Web.ResponseException;
     }
 
     static class Server extends NanoHTTPD {
@@ -33,10 +35,20 @@ class Web {
         public Response serve(IHTTPSession request) {
             try {
                 return handler.handle(request);
+            } catch (Web.ResponseException e) {
+                return e.response;
             } catch (Exception e) {
                 e.printStackTrace();
                 return new Response(INTERNAL_ERROR, "text/plain", e.toString() + "\n");
             }
+        }
+    }
+
+    public static class ResponseException extends Exception {
+        final Response response;
+
+        ResponseException(Response response) {
+            this.response = response;
         }
     }
 
@@ -64,7 +76,7 @@ class Web {
     }
 
     static Response jsonResponse(Object data) {
-        Response response =  new Response(OK, "application/json", JsonWriter.string(data));
+        Response response =  new Response(OK, "application/json", gson.toJson(data));
         response.addHeader("Access-Control-Allow-Origin", "*");
         return response;
     }
@@ -115,7 +127,7 @@ class Web {
         }
 
         @Override
-        public Response handle(IHTTPSession request) throws IOException {
+        public Response handle(IHTTPSession request) throws IOException, Web.ResponseException {
             if (method == null || method == request.getMethod()) {
                 Matcher m = re.matcher(request.getUri());
                 if (m.matches()) {
