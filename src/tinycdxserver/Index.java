@@ -109,7 +109,7 @@ public class Index {
 
         @Override
         protected void finalize() throws Throwable {
-            it.dispose();
+            it.close();
             super.finalize();
         }
 
@@ -131,7 +131,7 @@ public class Index {
             if (record == null || !scope.test(record)) {
                 record = null;
                 exhausted = true;
-                it.dispose();
+                it.close();
                 return false;
             }
             return true;
@@ -236,14 +236,11 @@ public class Index {
     }
 
     private void commitBatch(WriteBatch writeBatch) {
-        WriteOptions options = new WriteOptions();
-        try {
+        try (WriteOptions options = new WriteOptions()) {
             options.setSync(true);
             db.write(options, writeBatch);
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
-        } finally {
-            options.dispose();
         }
     }
 
@@ -293,14 +290,11 @@ public class Index {
         }
 
         private void updateExistingRecordsWithNewAliases() {
-            WriteBatch wb = new WriteBatch();
-            try {
+            try (WriteBatch wb = new WriteBatch()) {
                 for (Map.Entry<String, String> entry : newAliases.entrySet()) {
                     updateExistingRecordsWithNewAlias(wb, entry.getKey(), entry.getValue());
                 }
                 commitBatch(wb);
-            } finally {
-                wb.dispose();
             }
         }
 
@@ -314,7 +308,7 @@ public class Index {
 
         @Override
         public void close() {
-            dbBatch.dispose();
+            dbBatch.close();
         }
     }
 }

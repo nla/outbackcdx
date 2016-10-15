@@ -5,9 +5,14 @@ import org.rocksdb.*;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class DataStore implements Closeable {
     public static final String COLLECTION_PATTERN = "[A-Za-z0-9_-]+";
@@ -59,7 +64,7 @@ public class DataStore implements Closeable {
 
             List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
                     new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions),
-                    new ColumnFamilyDescriptor("alias", cfOptions)
+                    new ColumnFamilyDescriptor("alias".getBytes(UTF_8), cfOptions)
             );
 
             createColumnFamiliesIfNotExists(options, path.toString(), cfDescriptors);
@@ -102,8 +107,7 @@ public class DataStore implements Closeable {
         }
         try {
             for (ColumnFamilyDescriptor descriptor : cfDescriptors) {
-                try {
-                    db.createColumnFamily(descriptor).dispose();
+                try (ColumnFamilyHandle h = db.createColumnFamily(descriptor)) {
                 } catch (RocksDBException e) {
                     if (!e.getMessage().equals("Invalid argument: Column family already exists")) {
                         throw e;

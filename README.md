@@ -26,28 +26,20 @@ relatively light traffic load.
 Usage
 -----
 
-If you wish to use Snappy compression you will need to build RocksDB from source.
-The Maven central releases silently ignore the Snappy option.
-
-Edit pom.xml and change the rocksdb dependency to point at your build or
-uncomment the official release.
-
-    mvn package
-    java -jar target/tinycdxserver.jar -d /data -p 8080
-
 The server supports multiple named indexes as subdirectories.  You can
 load records into the index by POSTing them in the (11-field) CDX format Wayback uses:
 
     curl -X POST --data-binary @records.cdx http://localhost:8080/myindex
 
-The canonicalized URL (first field) is ignored, tinycdxserver performs its own
+The canonicalized URL (first field) is ignored, OutbackCDX performs its own
 canonicalization.
+
 
 Exclusions
 ----------
 
 Wayback's RemoteResourceIndex currently bypasses some of its access control
-configuration.  For this reason tinycdxserver currently supports
+configuration.  For this reason OutbackCDX currently supports
 filtering query results using an [exclusions oracle].  Set the URL of
 exclusions oracle using the `-a` command-line option.
 
