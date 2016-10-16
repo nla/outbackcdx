@@ -68,7 +68,7 @@ class Web {
     }
 
     static Handler serve(String file, String type) {
-        URL url = Response.class.getResource(file);
+        URL url = Web.class.getResource(file);
         if (url == null) {
             throw new IllegalArgumentException("No such resource: " + file);
         }

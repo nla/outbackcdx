@@ -39,6 +39,36 @@
                                     <mainClass>tinycdxserver.Main</mainClass>
                                 </transformer>
                             </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>org.webjars.npm:vue</artifact>
+                                    <includes>
+                                        <include>META-INF/resources/webjars/vue/2.0.1/dist/vue.js</include>
+                                        <include>META-INF/resources/webjars/vue/2.0.1/LICENSE</include>
+                                    </includes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.webjars.npm:pikaday</artifact>
+                                    <includes>
+                                        <include>META-INF/resources/webjars/pikaday/1.4.0/pikaday.js</include>
+                                        <include>META-INF/resources/webjars/pikaday/1.4.0/css/pikaday.css</include>
+                                        <include>META-INF/resources/webjars/pikaday/1.4.0/LICENSE</include>
+                                    </includes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.webjars.npm:moment</artifact>
+                                    <includes>
+                                        <include>META-INF/resources/webjars/moment/2.15.1/min/moment.min.js</include>
+                                        <include>META-INF/resources/webjars/moment/2.15.1/LICENSE</include>
+                                    </includes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.webjars:lodash</artifact>
+                                    <includes>
+                                        <include>META-INF/resources/webjars/lodash/4.15.0/lodash.min.js</include>
+                                    </includes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>
@@ -99,18 +129,25 @@
             <artifactId>concurrent-trees</artifactId>
             <version>2.4.0</version>
         </dependency>
+
+        <!--
+          JavaScript for dashboard
+        -->
+        <dependency>
+            <groupId>org.webjars.npm</groupId>
+            <artifactId>vue</artifactId>
+            <version>2.0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.webjars.npm</groupId>
+            <artifactId>pikaday</artifactId>
+            <version>1.4.0</version>
+        </dependency>
         <dependency>
             <groupId>org.webjars</groupId>
-            <artifactId>vue</artifactId>
-            <version>2.0.0</version>
+            <artifactId>lodash</artifactId>
+            <version>4.15.0</version>
         </dependency>
     </dependencies>
-
-    <repositories>
-        <repository>
-            <id>nla-public-releases</id>
-            <url>http://maven.nla.gov.au/releases</url>
-        </repository>
-    </repositories>
 
 </project>

@@ -31,8 +31,17 @@ class Controller implements Web.Handler {
     final Web.Router router = new Web.Router()
             .on(GET, "/", serve("dashboard.html", "text/html"))
             .on(GET, "/api.js", serve("api.js", "application/javascript"))
+            .on(GET, "/add.svg", serve("add.svg", "image/svg+xml"))
             .on(GET, "/database.svg", serve("database.svg", "image/svg+xml"))
             .on(GET, "/outback.svg",  serve("outback.svg", "image/svg+xml"))
+
+            .on(GET, "/lib/vue-router/2.0.0/vue-router.js", serve("lib/vue-router/2.0.0/vue-router.js", "application/javascript"))
+            .on(GET, "/lib/vue/2.0.1/vue.js", serve("/META-INF/resources/webjars/vue/2.0.1/dist/vue.js", "application/javascript"))
+            .on(GET, "/lib/lodash/4.15.0/lodash.min.js", serve("/META-INF/resources/webjars/lodash/4.15.0/lodash.min.js", "application/javascript"))
+            .on(GET, "/lib/moment/2.15.1/moment.min.js", serve("/META-INF/resources/webjars/moment/2.15.1/min/moment.min.js", "application/javascript"))
+            .on(GET, "/lib/pikaday/1.4.0/pikaday.js", serve("/META-INF/resources/webjars/pikaday/1.4.0/pikaday.js", "application/javascript"))
+            .on(GET, "/lib/pikaday/1.4.0/pikaday.css", serve("/META-INF/resources/webjars/pikaday/1.4.0/css/pikaday.css", "text/css"))
+
             .on(GET, "/api/collections", this::listCollections)
             .on(GET, "/<collection>", this::query)
             .on(POST, "/<collection>", this::post)

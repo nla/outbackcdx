@@ -3,8 +3,6 @@
 <head>
     <meta charset="utf-8">
     <title>OutbackCDX</title>
-    <link href='https://fonts.googleapis.com/css?family=Roboto:300,500' rel='stylesheet' type='text/css'>
-    <link href="https://unpkg.com/pikaday@1.4.0/css/pikaday.css" rel="stylesheet">
     <style>
         /*
 
@@ -273,14 +271,13 @@
         .big-table tr {
             border-bottom: solid 1px #eeeeee;
         }
-
-
     </style>
-    <script src="https://unpkg.com/vue@2.0.1/dist/vue.js"></script>
-    <script src="https://unpkg.com/vue-router@2.0.0/dist/vue-router.js"></script>
-    <script src="https://unpkg.com/lodash@4.16.4/lodash.min.js"></script>
-    <script src="https://unpkg.com/moment@2.15.1/min/moment.min.js"></script>
-    <script src="https://unpkg.com/pikaday@1.4.0"></script>
+    <link href="lib/pikaday/1.4.0/pikaday.css" rel="stylesheet">
+    <script src="lib/vue/2.0.1/vue.js"></script>
+    <script src="lib/vue-router/2.0.0/vue-router.js"></script>
+    <script src="lib/lodash/4.15.0/lodash.min.js"></script>
+    <script src="lib/moment/2.15.1/moment.min.js"></script>
+    <script src="lib/pikaday/1.4.0/pikaday.js"></script>
     <script src="api.js"></script>
 </head>
 <body>
@@ -622,7 +619,7 @@
     </div>
 
     <aside class="left-nav">
-        <h2>Collections</h2>
+        <h2>Collections <img src="add.svg" width="18px" height="18px" style="vertical-align: top" alt="Add"></h2>
         <ul>
             <li v-for="col in collections">
                 <router-link :to="'/' + col.name">
