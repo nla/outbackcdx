@@ -9,8 +9,11 @@ source common.sh
 
 mkdir -p deps
 [ -d deps/venv ] || virtualenv deps/venv
-PS1=dummy
+
+set +u
 source deps/venv/bin/activate
+set -u
+
 [ -f deps/venv/bin/wayback ] || pip install pywb
 
 #
