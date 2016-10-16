@@ -4,8 +4,8 @@ jdk:
 - oraclejdk8
 script:
 - mvn package
-- cd test-integration && ./test-openwayback.sh
-- cd test-integration && ./test-pywb.sh
+- (cd test-integration && ./test-openwayback.sh)
+- (cd test-integration && ./test-pywb.sh)
 after_success:
 - mvn jacoco:report coveralls:report
 addons:
