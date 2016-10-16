@@ -10,7 +10,7 @@ import java.util.function.Predicate;
 
 public class Main {
     public static void usage() {
-        System.err.println("Usage: java " + Controller.class.getName() + " [options...]");
+        System.err.println("Usage: java " + Main.class.getName() + " [options...]");
         System.err.println("");
         System.err.println("  -a url        Use a wayback access control oracle");
         System.err.println("  -b bindaddr   Bind to a particular IP address");
@@ -53,7 +53,7 @@ public class Main {
         }
 
         try (DataStore dataStore = new DataStore(dataPath, filter)) {
-            Controller controller = new Controller(dataStore, verbose);
+            Webapp controller = new Webapp(dataStore, verbose);
             ServerSocket socket = openSocket(host, port, inheritSocket);
             Web.Server server = new Web.Server(socket, controller);
             server.start();

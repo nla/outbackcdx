@@ -24,7 +24,7 @@ import static tinycdxserver.NanoHTTPD.Response.Status.OK;
 import static tinycdxserver.Web.jsonResponse;
 import static tinycdxserver.Web.serve;
 
-class Controller implements Web.Handler {
+class Webapp implements Web.Handler {
     private final Gson gson = new Gson();
     private final boolean verbose;
     private final DataStore dataStore;
@@ -50,7 +50,7 @@ class Controller implements Web.Handler {
             .on(GET, "/<collection>/aliases", this::aliases)
             .on(GET, "/<collection>/access/rules", this::listAccessRules);
 
-    Controller(DataStore dataStore, boolean verbose) {
+    Webapp(DataStore dataStore, boolean verbose) {
         this.dataStore = dataStore;
         this.verbose = verbose;
     }
