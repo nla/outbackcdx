@@ -12,3 +12,4 @@ addons:
   apt:
     packages:
     - libsnappy-dev
+    - python-virtualenv
