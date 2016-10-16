@@ -5,3 +5,6 @@
 /.idea
 /*.iml
 /dependency-reduced-pom.xml
+LOG
+/test-integration/deps
+/test-integration/target

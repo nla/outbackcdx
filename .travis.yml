@@ -2,6 +2,9 @@ language: java
 sudo: false
 jdk:
 - oraclejdk8
+script:
+- mvn package
+- (cd test-integration && ./test-openwayback.sh)
 after_success:
 - mvn jacoco:report coveralls:report
 addons:
