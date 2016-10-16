@@ -52,21 +52,6 @@ class Web {
         }
     }
 
-    private static String extension(String filename) {
-        int i = filename.lastIndexOf('.');
-        return i != -1 ? filename.substring(i + 1) : "";
-    }
-
-    private static String guessContentType(String filename) {
-        switch (extension(filename)) {
-            case "js": return "application/javascript";
-            case "css": return "text/css";
-            case "html": return "text/html";
-            case "tag": return "riot/tag";
-            default: return "application/octet-stream";
-        }
-    }
-
     static Handler serve(String file, String type) {
         URL url = Web.class.getResource(file);
         if (url == null) {

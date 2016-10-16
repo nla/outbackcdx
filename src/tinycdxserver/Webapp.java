@@ -146,10 +146,6 @@ class Webapp implements Web.Handler {
         return index;
     }
 
-    private Response dashboard(IHTTPSession request) throws IOException {
-        return new Response(OK, "text/html", getClass().getResourceAsStream("dashboard.html"));
-    }
-
     private Response collectionDetails(RocksDB db) {
         String page = "<form>URL: <input name=url type=url><button type=submit>Query</button></form>\n<pre>";
         try {
