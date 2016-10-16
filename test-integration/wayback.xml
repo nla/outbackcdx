@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+           http://www.springframework.org/schema/beans/spring-beans-3.0.xsd"
+       default-init-method="init">
+
+  <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+    <property name="properties">
+      <value>
+        <!-- Customize these basic placeholders. -->
+        wayback.basedir.default=/tmp/openwayback
+        wayback.url.scheme.default=http
+        wayback.url.host.default=localhost
+        wayback.url.port.default=8080
+
+        <!-- Environment variables (if present) override defaults. No need to customize these. -->
+        wayback.basedir=#{ systemEnvironment['WAYBACK_BASEDIR'] ?: '${wayback.basedir.default}' }
+        wayback.url.scheme=#{ systemEnvironment['WAYBACK_URL_SCHEME'] ?: '${wayback.url.scheme.default}' }
+        wayback.url.host=#{ systemEnvironment['WAYBACK_URL_HOST'] ?: '${wayback.url.host.default}' }
+        wayback.url.port=#{ systemEnvironment['WAYBACK_URL_PORT'] ?: '${wayback.url.port.default}' }
+
+        <!-- No need to edit this setting unless deploying in a non-ROOT context
+             or using a load balancer, in which case configure it with the frontend URL prefix. -->
+        wayback.url.prefix.default=${wayback.url.scheme}://${wayback.url.host}:${wayback.url.port}
+
+        <!-- Environment variable (if present) overrides default. No need to customize this. -->
+        wayback.url.prefix=#{ systemEnvironment['WAYBACK_URL_PREFIX'] ?: '${wayback.url.prefix.default}' }
+
+
+        wayback.cdx.url=#{ systemEnvironment['WAYBACK_CDX_URL'] }
+        wayback.warc.url=#{ systemEnvironment['WAYBACK_WARC_URL'] }
+
+      </value>
+    </property>
+  </bean>
+
+  <bean id="waybackCanonicalizer" class="org.archive.wayback.util.url.AggressiveUrlCanonicalizer">
+  </bean>
+
+
+  <!--
+  <bean id="resourcefilelocationdb" class="org.archive.wayback.resourcestore.locationdb.FlatFileResourceFileLocationDB">
+    <property name="path" value="${wayback.basedir}/path-index.txt" />
+  </bean>
+  -->
+
+  <bean id="remotecollection" class="org.archive.wayback.webapp.WaybackCollection">
+
+    <property name="resourceStore">
+      <bean class="org.archive.wayback.resourcestore.SimpleResourceStore">
+        <property name="prefix" value="${wayback.warc.url}" />
+      </bean>
+    </property>
+
+    <property name="resourceIndex">
+      <bean class="org.archive.wayback.resourceindex.RemoteResourceIndex">
+        <property name="searchUrlBase" value="${wayback.cdx.url}" />
+      </bean>
+    </property>
+  </bean>
+
+
+  <import resource="ArchivalUrlReplay.xml"/>
+
+  <bean name="+" class="org.archive.wayback.webapp.ServerRelativeArchivalRedirect">
+    <property name="matchPort" value="${wayback.url.port}" />
+    <property name="useCollection" value="true" />
+  </bean>
+
+  <bean name="standardaccesspoint" class="org.archive.wayback.webapp.AccessPoint">
+    <property name="accessPointPath" value="${wayback.url.prefix}/wayback/"/>
+    <property name="internalPort" value="${wayback.url.port}"/>
+    <property name="serveStatic" value="true" />
+    <property name="bounceToReplayPrefix" value="false" />
+    <property name="bounceToQueryPrefix" value="false" />
+    <property name="enableMemento" value="true" />
+    <property name="replayPrefix" value="${wayback.url.prefix}/wayback/" />
+    <property name="queryPrefix" value="${wayback.url.prefix}/wayback/" />
+    <property name="staticPrefix" value="${wayback.url.prefix}/wayback/" />
+    <property name="collection" ref="remotecollection" />
+
+    <property name="replay" ref="archivalurlreplay" />
+    <property name="query">
+      <bean class="org.archive.wayback.query.Renderer">
+        <property name="captureJsp" value="/WEB-INF/query/CalendarResults.jsp" />
+      </bean>
+    </property>
+
+    <property name="uriConverter">
+      <bean class="org.archive.wayback.archivalurl.ArchivalUrlResultURIConverter">
+        <property name="replayURIPrefix" value="${wayback.url.prefix}/wayback/"/>
+      </bean>
+    </property>
+
+    <property name="parser">
+      <bean class="org.archive.wayback.archivalurl.ArchivalUrlRequestParser">
+        <property name="maxRecords" value="10000" />
+      </bean>
+    </property>
+
+  </bean>
+
+</beans>
