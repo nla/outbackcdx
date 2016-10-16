@@ -1,16 +1,11 @@
 package tinycdxserver;
 
-import org.archive.accesscontrol.AccessControlClient;
-import org.archive.accesscontrol.RobotsUnavailableException;
-import org.archive.accesscontrol.RuleOracleUnavailableException;
-
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.nio.channels.Channel;
 import java.nio.channels.ServerSocketChannel;
-import java.util.Date;
 import java.util.function.Predicate;
 
 public class Main {
@@ -36,9 +31,6 @@ public class Main {
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
-                case "-a":
-                    filter = accessControlFilter(args[++i]);
-                    break;
                 case "-p":
                     port = Integer.parseInt(args[++i]);
                     break;
@@ -83,16 +75,5 @@ public class Main {
             socket = new ServerSocket(port, -1, InetAddress.getByName(host));
         }
         return socket;
-    }
-
-    private static Predicate<Capture> accessControlFilter(String oracleUrl) {
-        AccessControlClient client = new AccessControlClient(oracleUrl);
-        return capture -> {
-            try {
-                return "allow".equals(client.getPolicy(capture.original, capture.date(), new Date(), "public"));
-            } catch (RobotsUnavailableException | RuleOracleUnavailableException e) {
-                throw new RuntimeException(e);
-            }
-        };
     }
 }

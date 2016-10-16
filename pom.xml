@@ -99,12 +99,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.12</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>
             <version>1.10</version>
@@ -118,11 +112,6 @@
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.7</version>
-        </dependency>
-        <dependency>
-            <groupId>org.netpreserve.openwayback</groupId>
-            <artifactId>openwayback-access-control-core</artifactId>
-            <version>1.0.2</version>
         </dependency>
         <dependency>
             <groupId>com.googlecode.concurrent-trees</groupId>
@@ -147,6 +136,22 @@
             <groupId>org.webjars</groupId>
             <artifactId>lodash</artifactId>
             <version>4.15.0</version>
+        </dependency>
+
+        <!--
+          Test dependencies
+          -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.12</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>commons-lang</groupId>
+            <artifactId>commons-lang</artifactId>
+            <version>2.6</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
