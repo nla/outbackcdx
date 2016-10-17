@@ -26,6 +26,26 @@ relatively light traffic load.
 Usage
 -----
 
+Build:
+
+    mvn package
+
+Run:
+
+    java -jar target/tinycdxserver*.jar
+
+Command line options:
+
+    $ java -jar target/tinycdxserver-0.3.2.jar -h
+    Usage: java tinycdxserver.Server [options...]
+
+      -a url        Use a wayback access control oracle
+      -b bindaddr   Bind to a particular IP address
+      -d datadir    Directory to store index data under
+      -i            Inherit the server socket via STDIN (for use with systemd, inetd etc)
+      -p port       Local port to listen on
+      -v            Verbose logging
+
 The server supports multiple named indexes as subdirectories.  You can
 load records into the index by POSTing them in the (11-field) CDX format Wayback uses:
 
