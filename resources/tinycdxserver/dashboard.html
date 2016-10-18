@@ -425,59 +425,61 @@
 ------------------------------------------------------------------------->
 
 <script type="x-template" id="access-rule-template">
-    <main id="access-rules" class="row">
-        <div class="form">
-            <p>
-                <label>
-                    URLs matching any of these patterns
-                    <textarea class="form-field"></textarea>
-                </label>
-            </p>
-            <p>
-                <label>
-                    Captured between
-                    <date-range v-model="rule.captured"></date-range>
-                </label>
-            </p>
-            <p>
-                <label>
-                    Accessed between
-                    <date-range v-model="rule.accessed"></date-range>
-                </label>
-            </p>
-            <period v-model="rule.period"></period>
-        </div>
-        <div class="form">
-            <p>
-                <label>
-                    Access Policy
-                    <select class="form-field" v-model="rule.policy">
-                        <option>Public</option>
-                        <option>Public + No Search</option>
-                        <option>Staff Only</option>
-                        <option>No Access</option>
-                    </select>
-                </label>
-            </p>
-            <p>
-                <label>
-                    Public Message
-                    <textarea v-model="rule.publicMessage" class="form-field"></textarea>
-                </label>
-            </p>
-            <p>
-                <label>
-                    Private Comment
-                    <textarea v-model="rule.privateComment" class="form-field"></textarea>
-                </label>
-            </p>
-            <p>
-                <button @click="save">Save</button>
-                <button>Cancel</button>
-            </p>
-        </div>
+    <form>
+        <main id="access-rules" class="row">
+            <div class="form">
+                <p>
+                    <label>
+                        URLs matching any of these patterns
+                        <textarea class="form-field"></textarea>
+                    </label>
+                </p>
+                <p>
+                    <label>
+                        Captured between
+                        <date-range v-model="rule.captured"></date-range>
+                    </label>
+                </p>
+                <p>
+                    <label>
+                        Accessed between
+                        <date-range v-model="rule.accessed"></date-range>
+                    </label>
+                </p>
+                <period v-model="rule.period"></period>
+            </div>
+            <div class="form">
+                <p>
+                    <label>
+                        Access Policy
+                        <select class="form-field" v-model="rule.policy">
+                            <option>Public</option>
+                            <option>Public + No Search</option>
+                            <option>Staff Only</option>
+                            <option>No Access</option>
+                        </select>
+                    </label>
+                </p>
+                <p>
+                    <label>
+                        Public Message
+                        <textarea v-model="rule.publicMessage" class="form-field"></textarea>
+                    </label>
+                </p>
+                <p>
+                    <label>
+                        Private Comment
+                        <textarea v-model="rule.privateComment" class="form-field"></textarea>
+                    </label>
+                </p>
+                <p>
+                    <button type="submit">Save</button>
+                    <button>Cancel</button>
+                </p>
+            </div>
 
-    </main>
+        </main>
+    </form>
 </script>
 
 <script>
@@ -644,7 +646,7 @@
         ]
     });
 
-    var cdxApi = new CdxApi("http://127.0.0.1:8080");
+    var cdxApi = new CdxApi("");
     var app = new Vue({
         router,
         el: "#app",

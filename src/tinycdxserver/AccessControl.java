@@ -10,69 +10,155 @@ import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Predicate;
 
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-public class AccessControl {
-    final static Gson gson = new Gson();
+/**
+ * Manages a set of access control rules and policies. Rules are persisted
+ * in RocksDB but are also kept in-memory in a radix tree for fast filtering
+ * of results.
+ */
+class AccessControl {
+    private final static Gson gson = new Gson();
 
-    final InvertedRadixTree<List<AccessRule>> rulesBySurt = new ConcurrentInvertedRadixTree<List<AccessRule>>(new DefaultCharArrayNodeFactory());
+    private final Map<Long,AccessPolicy> policies;
+    private final Map<Long,AccessRule> rules;
+    private final RulesBySurt rulesBySurt;
     private final RocksDB db;
-    private final ColumnFamilyHandle cf;
-    private final AtomicLong nextId;
+    private final ColumnFamilyHandle ruleCf, policyCf;
+    private final AtomicLong nextRuleId, nextPolicyId;
 
-    public AccessControl(RocksDB db, ColumnFamilyHandle cf) {
+    public AccessControl(RocksDB db, ColumnFamilyHandle ruleCf, ColumnFamilyHandle policyCf) {
         this.db = db;
-        this.cf = cf;
+        this.ruleCf = ruleCf;
+        this.policyCf = policyCf;
+
+        rules = loadRules(db, ruleCf);
+        policies = loadPolicies(db, policyCf);
+
+        rulesBySurt = new RulesBySurt(rules.values());
+
+        nextRuleId = new AtomicLong(calculateNextId(db, ruleCf));
+        nextPolicyId = new AtomicLong(calculateNextId(db, policyCf));
+    }
+
+    private long calculateNextId(RocksDB db, ColumnFamilyHandle cf) {
         try (RocksIterator it = db.newIterator(cf)) {
             it.seekToLast();
-            if (it.isValid()) {
-                nextId = new AtomicLong(decodeKey(it.key()) + 1);
-            } else {
-                nextId = new AtomicLong(0);
-            }
+            return it.isValid() ? decodeKey(it.key()) + 1 : 0;
         }
     }
 
-    public List<AccessRule> list() {
-        return flatten(rulesBySurt.getValuesForKeysStartingWith(""));
+    private static Map<Long,AccessPolicy> loadPolicies(RocksDB db, ColumnFamilyHandle policyCf) {
+        Map<Long,AccessPolicy> map = new TreeMap<>();
+        try (RocksIterator it = db.newIterator(policyCf)) {
+            it.seekToFirst();
+            while (it.isValid()) {
+                AccessPolicy policy = gson.fromJson(new String(it.value(), UTF_8), AccessPolicy.class);
+                map.put(policy.id, policy);
+                it.next();
+            }
+        }
+        return map;
     }
 
+    private static Map<Long, AccessRule> loadRules(RocksDB db, ColumnFamilyHandle ruleCf) {
+        Map<Long,AccessRule> map = new TreeMap<>();
+        try (RocksIterator it = db.newIterator(ruleCf)) {
+            it.seekToFirst();
+            while (it.isValid()) {
+                AccessRule rule = gson.fromJson(new String(it.value(), UTF_8), AccessRule.class);
+                map.put(rule.id, rule);
+                it.next();
+            }
+        }
+        return map;
+    }
+
+    /**
+     * List all access control rules in the database.
+     */
+    public Collection<AccessRule> list() {
+        return rules.values();
+    }
+
+    /**
+     * Save an access control rule to the database.
+     */
     public long put(AccessRule rule) throws RocksDBException {
         if (rule.id == null) {
-            rule.id = nextId.getAndIncrement();
+            rule.id = nextRuleId.getAndIncrement();
         }
         byte[] value = gson.toJson(rule).getBytes(UTF_8);
-        db.put(cf, encodeKey(rule.id), value);
+        db.put(ruleCf, encodeKey(rule.id), value);
 
-        synchronized (this) {
-            for (String surt : rule.surts) {
-                List<AccessRule> list = rulesBySurt.getValueForExactKey(surt);
-                if (list == null) {
-                    list = Collections.synchronizedList(new ArrayList<>());
-                    rulesBySurt.put(surt, list);
-                }
-                list.add(rule);
-            }
+        AccessRule previous = rules.put(rule.id, rule);
+        if (previous != null) {
+            rulesBySurt.remove(previous);
         }
+        // XXX: race
+        rulesBySurt.put(rule);
+
         return rule.id;
     }
 
-    public List<AccessRule> query(String surt) {
-        return flatten(rulesBySurt.getValuesForKeysPrefixing(surt));
+    /**
+     * Save an access control policy to the database.
+     */
+    public long put(AccessPolicy policy) throws RocksDBException {
+        if (policy.id == null) {
+            policy.id = nextPolicyId.getAndIncrement();
+        }
+        byte[] value = gson.toJson(policy).getBytes(UTF_8);
+        db.put(ruleCf, encodeKey(policy.id), value);
+        return policy.id;
     }
 
-    public AccessRule get(long ruleId) throws RocksDBException {
-        byte[] data = db.get(cf, encodeKey(ruleId));
-        if (data != null) {
-            return gson.fromJson(new String(data, UTF_8), AccessRule.class);
+    /**
+     * Find the most specific rule which matches the given capture and access
+     * time.
+     */
+    private AccessRule ruleForCapture(Capture capture, Date accessTime) {
+        AccessRule matching = null;
+        for (AccessRule rule : rulesForSurt(capture.urlkey)) {
+            if (rule.matchesDates(capture.date(), accessTime)) {
+                matching = rule;
+            }
         }
-        return null;
+        return matching;
+    }
+
+    /**
+     * Find all rules that may apply to the given SURT.
+     */
+    public List<AccessRule> rulesForSurt(String surt) {
+        return rulesBySurt.prefixing(surt);
+    }
+
+    /**
+     * Returns a predicate which can be used to filter a list of captures.
+     */
+    public Predicate<Capture> filter(String accessPoint, Date accessTime) {
+        return capture -> {
+            AccessRule rule = ruleForCapture(capture, accessTime);
+            if (rule != null) {
+                if (!rule.policy.permittedAccessPoints.contains(accessPoint)) {
+                    return false;
+                }
+            }
+            return true;
+        };
+    }
+
+    /**
+     * Lookup an access rule by id.
+     */
+    public AccessRule rule(long ruleId) throws RocksDBException {
+        return rules.get(ruleId);
     }
 
     static long decodeKey(byte[] bytes) {
@@ -83,10 +169,51 @@ public class AccessControl {
         return ByteBuffer.allocate(8).order(BIG_ENDIAN).putLong(ruleId).array();
     }
 
-    static List<AccessRule> flatten(Iterable<List<AccessRule>> listsOfRules) {
-        // XXX make lazy?
-        ArrayList<AccessRule> result = new ArrayList<>();
-        listsOfRules.forEach(result::addAll);
-        return result;
+    /**
+     * A secondary index for looking up access control URLs which prefix a
+     * given SURT.
+     */
+    static class RulesBySurt {
+        private final InvertedRadixTree<List<AccessRule>> tree;
+
+        RulesBySurt(Collection<AccessRule> rules) {
+            tree = new ConcurrentInvertedRadixTree<>(new DefaultCharArrayNodeFactory());
+            for (AccessRule rule: rules) {
+                put(rule);
+            }
+        }
+
+        /**
+         * Add an AccessRule to the radix tree. The rule will be added multiple times,
+         * once for each SURT prefix.
+         */
+        void put(AccessRule rule) {
+            for (String surt: rule.surts) {
+                List<AccessRule> list = tree.getValueForExactKey(surt);
+                if (list == null) {
+                    list = Collections.synchronizedList(new ArrayList<>());
+                    tree.put(surt, list);
+                }
+                list.add(rule);
+            }
+        }
+
+        void remove(AccessRule rule) {
+            for (String surt : rule.surts) {
+                List<AccessRule> list = tree.getValueForExactKey(surt);
+                list.remove(rule);
+            }
+        }
+
+        List<AccessRule> prefixing(String surt) {
+            return flatten(tree.getValuesForKeysPrefixing(surt));
+        }
+
+        static List<AccessRule> flatten(Iterable<List<AccessRule>> listsOfRules) {
+            // XXX make lazy?
+            ArrayList<AccessRule> result = new ArrayList<>();
+            listsOfRules.forEach(result::addAll);
+            return result;
+        }
     }
 }

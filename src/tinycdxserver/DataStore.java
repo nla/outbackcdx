@@ -64,7 +64,8 @@ public class DataStore implements Closeable {
             List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
                     new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions),
                     new ColumnFamilyDescriptor("alias".getBytes(UTF_8), cfOptions),
-                    new ColumnFamilyDescriptor("access-rule".getBytes(UTF_8), cfOptions)
+                    new ColumnFamilyDescriptor("access-rule".getBytes(UTF_8), cfOptions),
+                    new ColumnFamilyDescriptor("access-policy".getBytes(UTF_8), cfOptions)
             );
 
             createColumnFamiliesIfNotExists(options, dbOptions, path.toString(), cfDescriptors);
@@ -72,7 +73,7 @@ public class DataStore implements Closeable {
             List<ColumnFamilyHandle> cfHandles = new ArrayList<>(cfDescriptors.size());
             RocksDB db = RocksDB.open(dbOptions, path.toString(), cfDescriptors, cfHandles);
 
-            AccessControl accessControl = new AccessControl(db, cfHandles.get(2));
+            AccessControl accessControl = new AccessControl(db, cfHandles.get(2), cfHandles.get(3));
             index = new Index(db, filter, cfHandles.get(0), cfHandles.get(1), accessControl);
             indexes.put(collection, index);
             return index;

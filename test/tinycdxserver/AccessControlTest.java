@@ -5,6 +5,9 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.rocksdb.*;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+
 import static java.util.Arrays.asList;
 import static org.junit.Assert.assertEquals;
 
@@ -12,7 +15,7 @@ public class AccessControlTest {
 
     private static AccessControl accessControl;
     private static RocksDB db;
-    private static ColumnFamilyHandle cf;
+    private static ColumnFamilyHandle ruleCf, policyCf;
     private static RocksMemEnv env;
 
     @BeforeClass
@@ -23,25 +26,34 @@ public class AccessControlTest {
                      .setCreateIfMissing(true)
                      .setEnv(env)) {
             db = RocksDB.open(options, "test");
-            cf = db.getDefaultColumnFamily();
-            accessControl = new AccessControl(db, cf);
+            ruleCf = db.getDefaultColumnFamily();
+            policyCf = db.createColumnFamily(new ColumnFamilyDescriptor("policies".getBytes(StandardCharsets.UTF_8)));
+            accessControl = new AccessControl(db, ruleCf, policyCf);
         }
     }
 
     @AfterClass
     public static void tearDown() {
-        cf.close();
+        ruleCf.close();
+        policyCf.close();
         db.close();
         env.close();
     }
 
     @Test
     public void test() throws RocksDBException {
+        AccessPolicy publicPolicy = new AccessPolicy();
+        publicPolicy.name = "Public";
+        publicPolicy.permittedAccessPoints.add("public");
+        publicPolicy.permittedAccessPoints.add("staff");
+        accessControl.put(publicPolicy);
+
         AccessRule rule = new AccessRule();
         rule.surts.add("au,gov,");
+        rule.policy = publicPolicy;
 
         long ruleId = accessControl.put(rule);
-        assertEquals(rule, accessControl.get(ruleId));
+        assertEquals(rule, accessControl.rule(ruleId));
 
         AccessRule rule2 = new AccessRule();
         rule2.surts.add("au,gov,nla,");
@@ -51,8 +63,8 @@ public class AccessControlTest {
         rule3.surts.add("au,gov,example,");
         accessControl.put(rule3);
 
-        assertEquals(asList(rule, rule2), accessControl.query("au,gov,nla,)/hello.html"));
-        assertEquals(asList(rule, rule3, rule2), accessControl.list());
+        assertEquals(asList(rule, rule2), accessControl.rulesForSurt("au,gov,nla,)/hello.html"));
+        assertEquals(asList(rule, rule2, rule3), new ArrayList<>(accessControl.list()));
     }
 }
 
