@@ -131,6 +131,7 @@ public class WbCdxApi {
         @Override
         public void writeCapture(Capture capture) throws IOException {
             out.write(capture.toString());
+            out.write('\n');
         }
 
         @Override
