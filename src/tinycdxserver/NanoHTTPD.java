@@ -786,6 +786,8 @@ public abstract class NanoHTTPD {
                 parms = new HashMap<String, String>();
                 if (null == headers) {
                     headers = new HashMap<String, String>();
+                } else {
+                    headers.clear();
                 }
 
                 // Create a BufferedReader for parsing the header.
@@ -809,7 +811,9 @@ public abstract class NanoHTTPD {
                 Response r = serve(this);
 
                 // ensure body is consumed
-                bodyStream.skip(contentLength);
+                if (contentLength > 0) {
+                    bodyStream.skip(contentLength);
+                }
 
                 if (r == null) {
                     throw new ResponseException(Response.Status.INTERNAL_ERROR, "SERVER INTERNAL ERROR: Serve() returned a null response.");
