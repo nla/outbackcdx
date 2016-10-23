@@ -23,6 +23,7 @@ import static tinycdxserver.NanoHTTPD.Response.Status.OK;
  */
 public class WbCdxApi {
     public static Response query(NanoHTTPD.IHTTPSession session, Index index) {
+        String accessPoint = session.getParms().get("accesspoint");
         String url = session.getParms().get("url");
         String matchType = session.getParms().get("matchType");
         String limitParam = session.getParms().get("limit");
@@ -39,7 +40,7 @@ public class WbCdxApi {
             OutputFormat outf = outputJson ? new JsonFormat(out, fields) : new TextFormat(out, fields);
 
             long row = 0;
-            for (Capture capture : queryForMatchType(index, matchType, url)) {
+            for (Capture capture : queryForMatchType(index, matchType, url, accessPoint)) {
                 if (row >= limit) {
                     break;
                 }
@@ -141,7 +142,7 @@ public class WbCdxApi {
     }
 
 
-    private static Iterable<Capture> queryForMatchType(Index index, String matchType, String url) {
+    private static Iterable<Capture> queryForMatchType(Index index, String matchType, String url, String accessPoint) {
         String surt = UrlCanonicalizer.surtCanonicalize(url);
         if (matchType == null) {
             matchType = "exact";
@@ -149,21 +150,21 @@ public class WbCdxApi {
         switch (matchType) {
             case "exact":
                 if (url.endsWith("*")) {
-                    return queryForMatchType(index, "prefix", url.substring(0, url.length() - 1));
+                    return queryForMatchType(index, "prefix", url.substring(0, url.length() - 1), accessPoint);
                 } else if (url.startsWith("*.")) {
-                    return queryForMatchType(index, "domain", url.substring(2));
+                    return queryForMatchType(index, "domain", url.substring(2), accessPoint);
                 }
-                return index.query(surt);
+                return index.query(surt, accessPoint);
             case "prefix":
                 if (url.endsWith("/") && !surt.endsWith("/")) {
                     surt += "/";
                 }
-                return index.prefixQuery(surt);
+                return index.prefixQuery(surt, accessPoint);
             case "host":
-                return index.prefixQuery(hostFromSurt(surt) + ")/");
+                return index.prefixQuery(hostFromSurt(surt) + ")/", accessPoint);
             case "domain":
                 String host = hostFromSurt(surt);
-                return index.rangeQuery(host, host + "-");
+                return index.rangeQuery(host, host + "-", accessPoint);
             default:
                 throw new IllegalArgumentException("unknown matchType: " + matchType);
         }

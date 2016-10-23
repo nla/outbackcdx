@@ -22,17 +22,19 @@ public class XmlQuery {
     final static String DEFAULT_ENCODING = "UTF-8";
 
     final Index index;
+    final String accessPoint;
     final String queryUrl;
     final long offset;
     final long limit;
     final String queryType;
 
-    public XmlQuery(NanoHTTPD.IHTTPSession session, final Index index) {
+    public XmlQuery(NanoHTTPD.IHTTPSession session, Index index) {
         this.index = index;
 
         Map<String, String> params = session.getParms();
         Map<String, String> query = decodeQueryString(params.get("q"));
 
+        accessPoint = params.get("accesspoint");
         queryType = query.get("type").toLowerCase();
         queryUrl = UrlCanonicalizer.surtCanonicalize(query.get("url"));
 
@@ -99,7 +101,7 @@ public class XmlQuery {
         boolean wroteHeader = false;
         int results = 0;
         int i = 0;
-        for (Capture capture : index.query(queryUrl)) {
+        for (Capture capture : index.query(queryUrl, accessPoint)) {
             if (i < offset) {
                 i++;
                 continue;
@@ -140,7 +142,7 @@ public class XmlQuery {
     private void prefixQuery(XMLStreamWriter out) throws XMLStreamException {
         boolean wroteHeader = false;
         int i = 0;
-        Resources it = new Resources(index.prefixQuery(queryUrl).iterator());
+        Resources it = new Resources(index.prefixQuery(queryUrl, accessPoint).iterator());
         while (it.hasNext()) {
             Resource resource = it.next();
             if (i < offset) {

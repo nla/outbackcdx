@@ -6,5 +6,9 @@ import java.util.Set;
 public class AccessPolicy {
     Long id;
     String name;
-    Set<String> permittedAccessPoints = new HashSet<>();
+
+    /**
+     * Access points permitted to view the captures under this policy.
+     */
+    Set<String> accessPoints = new HashSet<>();
 }

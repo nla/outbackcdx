@@ -9,7 +9,6 @@ import tinycdxserver.NanoHTTPD.IHTTPSession;
 import tinycdxserver.NanoHTTPD.Response;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,11 +16,15 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import static java.lang.System.out;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static tinycdxserver.NanoHTTPD.Method.DELETE;
 import static tinycdxserver.NanoHTTPD.Method.GET;
 import static tinycdxserver.NanoHTTPD.Method.POST;
+import static tinycdxserver.NanoHTTPD.Response.Status.CREATED;
 import static tinycdxserver.NanoHTTPD.Response.Status.NOT_FOUND;
 import static tinycdxserver.NanoHTTPD.Response.Status.OK;
 import static tinycdxserver.Web.jsonResponse;
+import static tinycdxserver.Web.notFound;
 import static tinycdxserver.Web.serve;
 
 class Webapp implements Web.Handler {
@@ -29,26 +32,42 @@ class Webapp implements Web.Handler {
     private final boolean verbose;
     private final DataStore dataStore;
     final Web.Router router = new Web.Router()
-            .on(GET, "/", serve("dashboard.html", "text/html"))
-            .on(GET, "/api.js", serve("api.js", "application/javascript"))
-            .on(GET, "/add.svg", serve("add.svg", "image/svg+xml"))
-            .on(GET, "/database.svg", serve("database.svg", "image/svg+xml"))
-            .on(GET, "/outback.svg",  serve("outback.svg", "image/svg+xml"))
+            .on(GET, "/", serve("dashboard.html"))
+            .on(GET, "/api", serve("api.html"))
+            .on(GET, "/api.js", serve("api.js"))
+            .on(GET, "/add.svg", serve("add.svg"))
+            .on(GET, "/database.svg", serve("database.svg"))
+            .on(GET, "/outback.svg",  serve("outback.svg"))
+            .on(GET, "/favicon.ico",  serve("outback.svg"))
+            .on(GET, "/swagger.json", serve("swagger.json"))
 
-            .on(GET, "/lib/vue-router/2.0.0/vue-router.js", serve("lib/vue-router/2.0.0/vue-router.js", "application/javascript"))
-            .on(GET, "/lib/vue/2.0.1/vue.js", serve("/META-INF/resources/webjars/vue/2.0.1/dist/vue.js", "application/javascript"))
-            .on(GET, "/lib/lodash/4.15.0/lodash.min.js", serve("/META-INF/resources/webjars/lodash/4.15.0/lodash.min.js", "application/javascript"))
-            .on(GET, "/lib/moment/2.15.1/moment.min.js", serve("/META-INF/resources/webjars/moment/2.15.1/min/moment.min.js", "application/javascript"))
-            .on(GET, "/lib/pikaday/1.4.0/pikaday.js", serve("/META-INF/resources/webjars/pikaday/1.4.0/pikaday.js", "application/javascript"))
-            .on(GET, "/lib/pikaday/1.4.0/pikaday.css", serve("/META-INF/resources/webjars/pikaday/1.4.0/css/pikaday.css", "text/css"))
+            .on(GET, "/lib/vue-router/2.0.0/vue-router.js", serve("lib/vue-router/2.0.0/vue-router.js"))
+            .on(GET, "/lib/vue/2.0.1/vue.js", serve("/META-INF/resources/webjars/vue/2.0.1/dist/vue.js"))
+            .on(GET, "/lib/lodash/4.15.0/lodash.min.js", serve("/META-INF/resources/webjars/lodash/4.15.0/lodash.min.js"))
+            .on(GET, "/lib/moment/2.15.1/moment.min.js", serve("/META-INF/resources/webjars/moment/2.15.1/min/moment.min.js"))
+            .on(GET, "/lib/pikaday/1.4.0/pikaday.js", serve("/META-INF/resources/webjars/pikaday/1.4.0/pikaday.js"))
+            .on(GET, "/lib/pikaday/1.4.0/pikaday.css", serve("/META-INF/resources/webjars/pikaday/1.4.0/css/pikaday.css"))
+            .on(GET, "/lib/redoc/1.4.1/redoc.min.js", serve("/META-INF/resources/webjars/redoc/1.4.1/dist/redoc.min.js"))
 
             .on(GET, "/api/collections", this::listCollections)
             .on(GET, "/<collection>", this::query)
+            .on(GET, "/<collection>/ap/<accesspoint>", this::query)
             .on(POST, "/<collection>", this::post)
             .on(GET, "/<collection>/stats", this::stats)
             .on(GET, "/<collection>/captures", this::captures)
             .on(GET, "/<collection>/aliases", this::aliases)
-            .on(GET, "/<collection>/access/rules", this::listAccessRules);
+            .on(GET, "/<collection>/access/rules", this::listAccessRules)
+            .on(POST, "/<collection>/access/rules", this::createAccessRule)
+            .on(GET, "/<collection>/access/rules/<ruleId>", this::getAccessRule)
+            .on(DELETE, "/<collection>/access/rules/<ruleId>", this::deleteAccessRule)
+            .on(POST, "/<collection>/access/policies", this::postAccessPolicy)
+            .on(GET, "/<collection>/access/policies/<policyId>", this::getAccessPolicy);
+
+    private Response deleteAccessRule(IHTTPSession req) throws IOException, Web.ResponseException, RocksDBException {
+        long ruleId = Long.parseLong(req.getParms().get("ruleId"));
+        boolean found = getIndex(req).accessControl.deleteRule(ruleId);
+        return found ? ok() : notFound();
+    }
 
     Webapp(DataStore dataStore, boolean verbose) {
         this.dataStore = dataStore;
@@ -158,12 +177,57 @@ class Webapp implements Web.Handler {
         return new Response(OK, "text/html", page);
     }
 
+    private <T> T fromJson(IHTTPSession session, Class<T> clazz) {
+        return gson.fromJson(new InputStreamReader(session.getInputStream(), UTF_8), clazz);
+    }
+
+    private Response getAccessPolicy(IHTTPSession req) throws IOException, Web.ResponseException {
+        long policyId = Long.parseLong(req.getParms().get("policyId"));
+        AccessPolicy policy = getIndex(req).accessControl.policy(policyId);
+        if (policy == null) {
+            return notFound();
+        }
+        return jsonResponse(policy);
+    }
+
+    private Response postAccessPolicy(IHTTPSession session) throws IOException, Web.ResponseException, RocksDBException {
+        AccessPolicy policy = fromJson(session, AccessPolicy.class);
+        Long id = getIndex(session).accessControl.put(policy);
+        return id == null ? ok() : created(id);
+    }
+
+    private Response createAccessRule(IHTTPSession session) throws IOException, Web.ResponseException, RocksDBException {
+        AccessRule rule = fromJson(session, AccessRule.class);
+        Long id = getIndex(session).accessControl.put(rule);
+        return id == null ? ok() : created(id);
+    }
+
+    private Response ok() {
+        return new Response(OK, null, "");
+    }
+
+    private Response created(long id) {
+        Map<String,String> map = new HashMap<>();
+        map.put("id", Long.toString(id));
+        return new Response(CREATED, "application/json", gson.toJson(map));
+    }
+
+    private Response getAccessRule(IHTTPSession req) throws IOException, Web.ResponseException, RocksDBException {
+        Index index = getIndex(req);
+        Long ruleId = Long.parseLong(req.getParms().get("ruleId"));
+        AccessRule rule = index.accessControl.rule(ruleId);
+        if (rule == null) {
+            return notFound();
+        }
+        return jsonResponse(rule);
+    }
+
     private Response listAccessRules(IHTTPSession request) throws IOException, Web.ResponseException {
         Index index = getIndex(request);
         Iterable<AccessRule> rules = index.accessControl.list();
         return new Response(OK, "application/json", outputStream -> {
             OutputStream out = new BufferedOutputStream(outputStream);
-            JsonWriter json = gson.newJsonWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8));
+            JsonWriter json = gson.newJsonWriter(new OutputStreamWriter(out, UTF_8));
             json.beginArray();
             for (AccessRule rule : rules) {
                 gson.toJson(rule, AccessRule.class, json);

@@ -7,7 +7,7 @@ import java.util.List;
 
 public class AccessRule {
     Long id;
-    AccessPolicy policy;
+    Long policyId;
     List<String> surts = new ArrayList<>();
     DateRange captured;
     DateRange accessed;
@@ -34,7 +34,7 @@ public class AccessRule {
 
         if (enabled != that.enabled) return false;
         if (id != null ? !id.equals(that.id) : that.id != null) return false;
-        if (policy != null ? !policy.equals(that.policy) : that.policy != null)
+        if (policyId != null ? !policyId.equals(that.policyId) : that.policyId != null)
             return false;
         if (surts != null ? !surts.equals(that.surts) : that.surts != null)
             return false;
@@ -53,7 +53,7 @@ public class AccessRule {
     @Override
     public int hashCode() {
         int result = id != null ? id.hashCode() : 0;
-        result = 31 * result + (policy != null ? policy.hashCode() : 0);
+        result = 31 * result + (policyId != null ? policyId.hashCode() : 0);
         result = 31 * result + (surts != null ? surts.hashCode() : 0);
         result = 31 * result + (captured != null ? captured.hashCode() : 0);
         result = 31 * result + (accessed != null ? accessed.hashCode() : 0);

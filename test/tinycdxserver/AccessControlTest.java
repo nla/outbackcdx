@@ -44,23 +44,25 @@ public class AccessControlTest {
     public void test() throws RocksDBException {
         AccessPolicy publicPolicy = new AccessPolicy();
         publicPolicy.name = "Public";
-        publicPolicy.permittedAccessPoints.add("public");
-        publicPolicy.permittedAccessPoints.add("staff");
-        accessControl.put(publicPolicy);
+        publicPolicy.accessPoints.add("public");
+        publicPolicy.accessPoints.add("staff");
+        long policyId = accessControl.put(publicPolicy);
 
         AccessRule rule = new AccessRule();
         rule.surts.add("au,gov,");
-        rule.policy = publicPolicy;
+        rule.policyId = policyId;
 
         long ruleId = accessControl.put(rule);
         assertEquals(rule, accessControl.rule(ruleId));
 
         AccessRule rule2 = new AccessRule();
         rule2.surts.add("au,gov,nla,");
+        rule2.policyId = policyId;
         accessControl.put(rule2);
 
         AccessRule rule3 = new AccessRule();
         rule3.surts.add("au,gov,example,");
+        rule3.policyId = policyId;
         accessControl.put(rule3);
 
         assertEquals(asList(rule, rule2), accessControl.rulesForSurt("au,gov,nla,)/hello.html"));

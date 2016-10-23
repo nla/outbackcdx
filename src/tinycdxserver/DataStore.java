@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.Comparator;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -18,11 +17,9 @@ public class DataStore implements Closeable {
 
     private final File dataDir;
     private final Map<String, Index> indexes = new ConcurrentHashMap<String, Index>();
-    private final Predicate<Capture> filter;
 
-    public DataStore(File dataDir, Predicate<Capture> filter) {
+    public DataStore(File dataDir) {
         this.dataDir = dataDir;
-        this.filter = filter;
     }
 
     public Index getIndex(String collection) throws IOException {
@@ -74,7 +71,7 @@ public class DataStore implements Closeable {
             RocksDB db = RocksDB.open(dbOptions, path.toString(), cfDescriptors, cfHandles);
 
             AccessControl accessControl = new AccessControl(db, cfHandles.get(2), cfHandles.get(3));
-            index = new Index(db, filter, cfHandles.get(0), cfHandles.get(1), accessControl);
+            index = new Index(db, cfHandles.get(0), cfHandles.get(1), accessControl);
             indexes.put(collection, index);
             return index;
         } catch (RocksDBException e) {

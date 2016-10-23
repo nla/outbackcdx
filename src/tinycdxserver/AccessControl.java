@@ -89,9 +89,14 @@ class AccessControl {
     /**
      * Save an access control rule to the database.
      */
-    public long put(AccessRule rule) throws RocksDBException {
+    public Long put(AccessRule rule) throws RocksDBException {
+        if (policies.get(rule.policyId) == null) {
+            throw new IllegalArgumentException("no such policyId: " + rule.policyId);
+        }
+
+        Long generatedId = null;
         if (rule.id == null) {
-            rule.id = nextRuleId.getAndIncrement();
+            generatedId = rule.id = nextRuleId.getAndIncrement();
         }
         byte[] value = gson.toJson(rule).getBytes(UTF_8);
         db.put(ruleCf, encodeKey(rule.id), value);
@@ -103,19 +108,21 @@ class AccessControl {
         // XXX: race
         rulesBySurt.put(rule);
 
-        return rule.id;
+        return generatedId;
     }
 
     /**
      * Save an access control policy to the database.
      */
-    public long put(AccessPolicy policy) throws RocksDBException {
+    public Long put(AccessPolicy policy) throws RocksDBException {
+        Long generatedId = null;
         if (policy.id == null) {
-            policy.id = nextPolicyId.getAndIncrement();
+            generatedId = policy.id = nextPolicyId.getAndIncrement();
         }
         byte[] value = gson.toJson(policy).getBytes(UTF_8);
         db.put(ruleCf, encodeKey(policy.id), value);
-        return policy.id;
+        policies.put(policy.id, policy);
+        return generatedId;
     }
 
     /**
@@ -146,7 +153,8 @@ class AccessControl {
         return capture -> {
             AccessRule rule = ruleForCapture(capture, accessTime);
             if (rule != null) {
-                if (!rule.policy.permittedAccessPoints.contains(accessPoint)) {
+                AccessPolicy policy = policies.get(rule.policyId);
+                if (policy != null && !policy.accessPoints.contains(accessPoint)) {
                     return false;
                 }
             }
@@ -169,9 +177,27 @@ class AccessControl {
         return ByteBuffer.allocate(8).order(BIG_ENDIAN).putLong(ruleId).array();
     }
 
+    public AccessPolicy policy(long policyId) {
+        return policies.get(policyId);
+    }
+
+    public boolean deleteRule(long ruleId) throws RocksDBException {
+        // XXX: sync?
+        AccessRule rule = rules.remove(ruleId);
+        if (rule == null) {
+            return false;
+        }
+        rulesBySurt.remove(rule);
+        db.remove(encodeKey(ruleId));
+        return true;
+    }
+
     /**
      * A secondary index for looking up access control URLs which prefix a
      * given SURT.
+     *
+     * As the radix tree library can't handle an empty ley we prefix every key
+     * by "(" to allow for a default rule.
      */
     static class RulesBySurt {
         private final InvertedRadixTree<List<AccessRule>> tree;
@@ -189,10 +215,10 @@ class AccessControl {
          */
         void put(AccessRule rule) {
             for (String surt: rule.surts) {
-                List<AccessRule> list = tree.getValueForExactKey(surt);
+                List<AccessRule> list = tree.getValueForExactKey("(" + surt);
                 if (list == null) {
                     list = Collections.synchronizedList(new ArrayList<>());
-                    tree.put(surt, list);
+                    tree.put("(" + surt, list);
                 }
                 list.add(rule);
             }
@@ -200,13 +226,13 @@ class AccessControl {
 
         void remove(AccessRule rule) {
             for (String surt : rule.surts) {
-                List<AccessRule> list = tree.getValueForExactKey(surt);
+                List<AccessRule> list = tree.getValueForExactKey("(" + surt);
                 list.remove(rule);
             }
         }
 
         List<AccessRule> prefixing(String surt) {
-            return flatten(tree.getValuesForKeysPrefixing(surt));
+            return flatten(tree.getValuesForKeysPrefixing("(" + surt));
         }
 
         static List<AccessRule> flatten(Iterable<List<AccessRule>> listsOfRules) {

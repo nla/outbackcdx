@@ -5,7 +5,6 @@ import tinycdxserver.NanoHTTPD.IHTTPSession;
 import tinycdxserver.NanoHTTPD.Method;
 import tinycdxserver.NanoHTTPD.Response;
 
-import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.URL;
 import java.util.ArrayList;
@@ -20,7 +19,7 @@ class Web {
     private static Gson gson = new Gson();
 
     interface Handler {
-        Response handle(IHTTPSession session) throws IOException, Web.ResponseException;
+        Response handle(IHTTPSession session) throws Exception;
     }
 
     static class Server extends NanoHTTPD {
@@ -52,12 +51,29 @@ class Web {
         }
     }
 
-    static Handler serve(String file, String type) {
+    private static String guessType(String file) {
+        switch (file.substring(file.lastIndexOf('.') + 1)) {
+            case "css":
+                return "text/css";
+            case "html":
+                return "text/html";
+            case "js":
+                return "application/javascript";
+            case "json":
+                return "application/json";
+            case "svg":
+                return "image/svg+xml";
+            default:
+                throw new IllegalArgumentException("Unknown file type: " + file);
+        }
+    }
+
+    static Handler serve(String file) {
         URL url = Web.class.getResource(file);
         if (url == null) {
             throw new IllegalArgumentException("No such resource: " + file);
         }
-        return req -> new Response(OK, type, url.openStream());
+        return req -> new Response(OK, guessType(file), url.openStream());
     }
 
     static Response jsonResponse(Object data) {
@@ -66,7 +82,7 @@ class Web {
         return response;
     }
 
-    private static Response notFound() {
+    static Response notFound() {
         return new Response(NOT_FOUND, "text/plain", "Not found\n");
     }
 
@@ -112,7 +128,7 @@ class Web {
         }
 
         @Override
-        public Response handle(IHTTPSession request) throws IOException, Web.ResponseException {
+        public Response handle(IHTTPSession request) throws Exception {
             if (method == null || method == request.getMethod()) {
                 Matcher m = re.matcher(request.getUri());
                 if (m.matches()) {

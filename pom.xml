@@ -68,6 +68,13 @@
                                         <include>META-INF/resources/webjars/lodash/4.15.0/lodash.min.js</include>
                                     </includes>
                                 </filter>
+                                <filter>
+                                    <artifact>org.webjars.bower:redoc</artifact>
+                                    <includes>
+                                        <include>META-INF/resources/webjars/redoc/1.4.1/dist/redoc.min.js</include>
+                                        <include>META-INF/resources/webjars/redoc/1.4.1/LICENSE</include>
+                                    </includes>
+                                </filter>
                             </filters>
                         </configuration>
                     </execution>
@@ -136,6 +143,11 @@
             <groupId>org.webjars</groupId>
             <artifactId>lodash</artifactId>
             <version>4.15.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.webjars.bower</groupId>
+            <artifactId>redoc</artifactId>
+            <version>1.4.1</version>
         </dependency>
 
         <!--

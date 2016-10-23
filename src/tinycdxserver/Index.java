@@ -3,10 +3,7 @@ package tinycdxserver;
 import org.rocksdb.*;
 
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.*;
 import java.util.function.Predicate;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
@@ -16,14 +13,12 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
  */
 public class Index {
     final RocksDB db;
-    final Predicate<Capture> filter;
     final ColumnFamilyHandle defaultCF;
     final ColumnFamilyHandle aliasCF;
     final AccessControl accessControl;
 
-    public Index(RocksDB db, Predicate<Capture> filter, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl) {
+    public Index(RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl) {
         this.db = db;
-        this.filter = filter;
         this.defaultCF = defaultCF;
         this.aliasCF = aliasCF;
         this.accessControl = accessControl;
@@ -32,36 +27,36 @@ public class Index {
     /**
      * Returns all captures that match the given prefix.
      */
-    public Iterable<Capture> prefixQuery(String surtPrefix) {
-        return () -> filteredCaptures(surtPrefix, record -> record.urlkey.startsWith(surtPrefix));
+    public Iterable<Capture> prefixQuery(String surtPrefix, String accessPoint) {
+        return () -> filteredCaptures(surtPrefix, record -> record.urlkey.startsWith(surtPrefix), accessPoint);
     }
 
     /**
      * Returns all captures with keys in the given range.
      */
-    public Iterable<Capture> rangeQuery(String startSurt, String endSurt) {
-        return () -> filteredCaptures(startSurt, record -> record.urlkey.compareTo(endSurt) < 0);
+    public Iterable<Capture> rangeQuery(String startSurt, String endSurt, String accessPoint) {
+        return () -> filteredCaptures(startSurt, record -> record.urlkey.compareTo(endSurt) < 0, accessPoint);
     }
 
     /**
      * Returns all captures for the given url.
      */
-    public Iterable<Capture> query(String surt) {
-        return rawQuery(resolveAlias(surt));
+    public Iterable<Capture> query(String surt, String accessPoint) {
+        return rawQuery(resolveAlias(surt), accessPoint);
     }
 
     /**
      * Perform a query without first resolving aliases.
      */
-    private Iterable<Capture> rawQuery(String surt) {
-        return () -> filteredCaptures(surt, record -> record.urlkey.equals(surt));
+    private Iterable<Capture> rawQuery(String surt, String accessPoint) {
+        return () -> filteredCaptures(surt, record -> record.urlkey.equals(surt), accessPoint);
     }
 
     /**
      * Returns all captures starting from the given key.
      */
     Iterable<Capture> capturesAfter(String start) {
-        return () -> filteredCaptures(start, record -> true);
+        return () -> filteredCaptures(start, record -> true, null);
     }
 
     public String resolveAlias(String surt) {
@@ -77,11 +72,11 @@ public class Index {
         }
     }
 
-    private Iterator<Capture> filteredCaptures(String queryUrl, Predicate<Capture> scope) {
+    private Iterator<Capture> filteredCaptures(String queryUrl, Predicate<Capture> scope, String accessPoint) {
         byte[] key = Capture.encodeKey(queryUrl, 0);
         Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope);
-        if (filter != null) {
-            captures = new FilteringIterator<>(captures, filter);
+        if (accessPoint != null) {
+            captures = new FilteringIterator<>(captures, accessControl.filter(accessPoint, new Date()));
         }
         return captures;
     }
@@ -261,7 +256,7 @@ public class Index {
         }
 
         private void updateExistingRecordsWithNewAlias(WriteBatch wb, String aliasSurt, String targetSurt) {
-            for (Capture capture : rawQuery(aliasSurt)) {
+            for (Capture capture : rawQuery(aliasSurt, null)) {
                 wb.remove(capture.encodeKey());
                 capture.urlkey = targetSurt;
                 wb.put(capture.encodeKey(), capture.encodeValue());

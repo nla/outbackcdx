@@ -12,7 +12,6 @@ public class Main {
     public static void usage() {
         System.err.println("Usage: java " + Main.class.getName() + " [options...]");
         System.err.println("");
-        System.err.println("  -a url        Use a wayback access control oracle");
         System.err.println("  -b bindaddr   Bind to a particular IP address");
         System.err.println("  -d datadir    Directory to store index data under");
         System.err.println("  -i            Inherit the server socket via STDIN (for use with systemd, inetd etc)");
@@ -52,7 +51,7 @@ public class Main {
             }
         }
 
-        try (DataStore dataStore = new DataStore(dataPath, filter)) {
+        try (DataStore dataStore = new DataStore(dataPath)) {
             Webapp controller = new Webapp(dataStore, verbose);
             ServerSocket socket = openSocket(host, port, inheritSocket);
             Web.Server server = new Web.Server(socket, controller);
