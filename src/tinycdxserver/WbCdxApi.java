@@ -1,6 +1,5 @@
 package tinycdxserver;
 
-import com.google.gson.Gson;
 import com.google.gson.stream.JsonWriter;
 import tinycdxserver.NanoHTTPD.Response;
 
@@ -10,6 +9,7 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static tinycdxserver.Json.GSON;
 import static tinycdxserver.NanoHTTPD.Response.Status.OK;
 
 /**
@@ -70,7 +70,7 @@ public class WbCdxApi {
 
         JsonFormat(Writer out, String[] fields) throws IOException {
             this.fields = fields;
-            this.out = new Gson().newJsonWriter(out);
+            this.out = GSON.newJsonWriter(out);
             this.out.beginArray();
         }
 

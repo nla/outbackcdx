@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>OutbackCDX</title>
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <style>
         /*
 
@@ -276,9 +277,27 @@
     <script src="lib/vue/2.0.1/vue.js"></script>
     <script src="lib/vue-router/2.0.0/vue-router.js"></script>
     <script src="lib/lodash/4.15.0/lodash.min.js"></script>
-    <script src="lib/moment/2.15.1/moment.min.js"></script>
+    <script src="lib/moment/2.15.2/moment.min.js"></script>
     <script src="lib/pikaday/1.4.0/pikaday.js"></script>
     <script src="api.js"></script>
+    <script>
+        function urlTemplate(template, pathParams, queryParams) {
+            var path = template;
+            for (var key in pathParams) {
+                path = path.replace('{' + key + '}', encodeURIComponent(pathParams[key]));
+            }
+            var qs = "";
+            if (queryParams) {
+                for (var key in queryParams) {
+                    if (queryParams[key]) {
+                        qs += qs ? "&" : "?";
+                        qs += encodeURIComponent(key) + "=" + encodeURIComponent(queryParams[key]);
+                    }
+                }
+            }
+            return path + qs;
+        }
+    </script>
 </head>
 <body>
 
@@ -326,15 +345,15 @@
         },
         methods: {
             onQueryInput: _.throttle(function () {
-                var self = this;
-                cdxApi.collection(this.$route.params.collection)
-                        .query({url: this.query, limit: 100, fl: this.fields.join(",")}, function(captures) {
-                    if (captures) {
-                        self.rows = captures.slice(1);
-                    } else {
-                        self.rows = [];
-                    }
-                });
+                var query = {
+                    url: this.query,
+                    limit: 100,
+                    fl: this.fields.join(","),
+                    output: 'json'
+                };
+                fetch(urlTemplate("/{collection}", this.$route.params, query))
+                        .then(r => r.json())
+                        .then(rows => this.rows = rows ? rows.slice(1) : []);
             }, 250),
             classForField: function (i, value) {
                 if (this.fields[i] == "status") {
@@ -363,15 +382,26 @@
     Vue.component('date-range', {
         template: '#date-range-template',
         props: ['value'],
+        watch: {
+            value: function(value) {
+                this.startPicker.setDate(value && value.start ? moment(value.start).toDate() : null, true);
+                this.endPicker.setDate(value && value.start ? moment(value.end).toDate() : null, true);
+            }
+        },
         mounted: function() {
-            var startPicker = new Pikaday({
+            var emitInput = () => {
+                var value = {
+                    start: startPicker.getMoment().startOf('day').format(),
+                    end: endPicker.getMoment().endOf('day').format()
+                };
+                this.$emit('input', value)
+            }, startPicker = new Pikaday({
                 field: this.$el.getElementsByTagName('input')[0],
                 onSelect: function() {
                     var startDate = startPicker.getDate();
                     startPicker.setStartRange(startDate);
                     endPicker.setStartRange(startDate);
-                    this.value.start = startPicker.toString();
-                    this.onInput();
+                    emitInput();
                 }.bind(this)
             }), endPicker = new Pikaday({
                 field: this.$el.getElementsByTagName('input')[1],
@@ -379,15 +409,11 @@
                     var endDate = endPicker.getDate();
                     startPicker.setEndRange(endDate);
                     endPicker.setEndRange(endDate);
-                    this.value.end = endPicker.toString();
-                    this.onInput();
+                    emitInput();
                 }.bind(this)
             });
-        },
-        methods: {
-            onInput: function(event) {
-                this.$emit('input', this.value)
-            }
+            this.startPicker = startPicker;
+            this.endPicker = endPicker;
         }
     });
 </script>
@@ -425,61 +451,58 @@
 ------------------------------------------------------------------------->
 
 <script type="x-template" id="access-rule-template">
-    <form @submit="save">
-        <main id="access-rules" class="row">
-            <div class="form">
-                <p>
-                    <label>
-                        URLs matching any of these patterns
-                        <textarea class="form-field"></textarea>
-                    </label>
-                </p>
-                <p>
-                    <label>
-                        Captured between
-                        <date-range v-model="rule.captured"></date-range>
-                    </label>
-                </p>
-                <p>
-                    <label>
-                        Accessed between
-                        <date-range v-model="rule.accessed"></date-range>
-                    </label>
-                </p>
-                <period v-model="rule.period"></period>
-            </div>
-            <div class="form">
-                <p>
-                    <label>
-                        Access Policy
-                        <select class="form-field" v-model="rule.policy">
-                            <option>Public</option>
-                            <option>Public + No Search</option>
-                            <option>Staff Only</option>
-                            <option>No Access</option>
-                        </select>
-                    </label>
-                </p>
-                <p>
-                    <label>
-                        Public Message
-                        <textarea v-model="rule.publicMessage" class="form-field"></textarea>
-                    </label>
-                </p>
-                <p>
-                    <label>
-                        Private Comment
-                        <textarea v-model="rule.privateComment" class="form-field"></textarea>
-                    </label>
-                </p>
-                <p>
-                    <button type="submit">Save</button>
-                    <button>Cancel</button>
-                </p>
-            </div>
+    <main id="access-rules" class="row">
+        <div class="form">
+            <p>
+                <label>
+                    URLs matching any of these patterns
+                    <textarea class="form-field"></textarea>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Captured between
+                    <date-range v-model="rule.captured"></date-range>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Accessed between
+                    <date-range v-model="rule.accessed"></date-range>
+                </label>
+            </p>
+            <period v-model="rule.period"></period>
+        </div>
+        <div class="form">
+            <p>
+                <label>
+                    Access Policy
+                    <select class="form-field" v-model="rule.policyId">
+                        <option v-for="policy in policies" :value="policy.id">
+                        {{policy.name}}
+                        </option>
+                    </select>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Public Message
+                    <textarea v-model="rule.publicMessage" class="form-field"></textarea>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Private Comment
+                    <textarea v-model="rule.privateComment" class="form-field"></textarea>
+                </label>
+            </p>
+            <p>
+                <button @click="save">Save</button>
+                <button>Cancel</button>
+            </p>
+        </div>
 
-        </main>
-    </form>
+    </main>
 </script>
 
 <script>
@@ -491,14 +514,49 @@
                     privateComment: "comment",
                     publicMessage: "msg",
                     embargo: "4Y",
-                    period: {}
-                }
+                    period: {},
+                },
+                policies: []
             };
+        },
+        created: function() {
+            this.fetchData();
+        },
+        watch: {
+            '$route': 'fetchData'
         },
         methods: {
             save: function () {
-                var collection = cdxApi.collection(this.$route.params.collection);
-                collection.saveAccessRule(this.rule);
+                fetch(urlTemplate("/{collection}/access/rules", this.$route.params),
+                        {method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(this.rule)})
+                        .then(r => this.$router.replace({
+                            name: 'access-rule-list',
+                            params: {
+                                collection: this.$route.params.collection,
+                            }
+                        }));
+            },
+            fetchData: function () {
+                // load in parallel but policy list must be populated first
+                Promise.all([
+                    fetch(urlTemplate("{collection}/access/policies", this.$route.params)).then(r => r.json()),
+                    fetch(urlTemplate("{collection}/access/rules/{ruleId}", this.$route.params)).then(r => r.json())
+                ]).then(([policies, rule]) => {
+                    this.policies = policies;
+                    // the objects need to be present for the model binding
+                    if (rule.period == undefined) {
+                        rule.period = {};
+                    }
+                    if (rule.captured == undefined) {
+                        rule.captured = {};
+                    }
+                    if (rule.accessed == undefined) {
+                        rule.accessed = {};
+                    }
+                    this.rule = rule;
+                });
             }
         }
     };
@@ -531,20 +589,20 @@
                 </td>
                 <td>
                     <div  v-if="rule.captured && (rule.captured.start || rule.captured.end)">
-                        <strong>Captured:</strong> {{rule.captured.start}}–{{rule.captured.end}}
+                        Captured {{formatDate(rule.captured.start)}}–{{formatDate(rule.captured.end)}}
                     </div>
                     <div v-if="rule.accessed && (rule.accessed.start || rule.accessed.end)">
-                        <strong>Retrieved:</strong> {{rule.retrieved.start}}–{{rule.retrieved.end}}
+                        Accessed {{formatDate(rule.accessed.start)}}–{{formatDate(rule.accessed.end)}}
                     </div>
                     <div v-if="rule.period && (rule.period.days || rule.period.months || rule.period.years)">
-                        <strong>Period:</strong>
-                        <span v-if="rule.period.years">{{rule.period.years}} years</span>
-                        <span v-if="rule.period.months">{{rule.period.months}} months</span>
-                        <span v-if="rule.period.days">{{rule.period.days}} days</span>
+                        Period
+                        <span v-if="rule.period.years">{{rule.period.years}}y</span>
+                        <span v-if="rule.period.months">{{rule.period.months}}m</span>
+                        <span v-if="rule.period.days">{{rule.period.days}}d</span>
                     </div>
                 </td>
                 <td>
-                    {{rule.policy}}
+                    {{policyNames[rule.policyId]}}
                 </td>
                 <td>
                     <router-link :to="{name: 'access-rule', params: {collection: $route.params.collection, ruleId: rule.id}}">Edit</router-link>
@@ -559,14 +617,8 @@
         template: "#access-rule-list-template",
         data: function() {
             return {
-                rules: [
-                    {id: 4, patterns: ["*.nla.gov.au", "*.pictureaustralia.org"],
-                    captured: {start: 'now', end: 'then'},
-                        period: {years: 4, months: 2},
-                        policy: "Staff Only"
-
-                    }
-                ]
+                policyNames: {},
+                rules: []
             };
         },
         created: function() {
@@ -576,6 +628,9 @@
             '$route': 'fetchData'
         },
         methods: {
+            formatDate: function(date) {
+                return date ? moment(date).format('YYYY-MM-DD') : "";
+            },
             onQueryInput: function(event) {
                 var url = event.target.value;
                 this.$router.replace({
@@ -583,21 +638,64 @@
                     params: {
                         collection: this.$route.params.collection,
                     },
-                    query: url ? {url} : null
+                    query: url ? {url} : null,
                 });
             },
             fetchData: _.throttle(function() {
-                cdxApi.collection(this.$route.params.collection)
-                        .accessRules(this.$route.query.url,
-                    function(rules) {
-                        this.rules = rules;
-                    }.bind(this)
-                );
+                Promise.all([
+                    fetch(urlTemplate('{collection}/access/policies', this.$route.params)).then(r => r.json()),
+                    fetch(urlTemplate('{collection}/access/rules', this.$route.params, this.$route.query)).then(r => r.json())
+                ]).then(([policies, rules]) => {
+                    policies.forEach(policy => this.policyNames[policy.id] = policy.name);
+                    this.rules = rules;
+                });
             }, 250)
         }
     };
 </script>
 
+<!-----------------------------------------------------------------------
+    Access Policies List
+------------------------------------------------------------------------->
+
+<script type="x-template" id="access-policy-list-template">
+    <main id="access-policy-list">
+        <table class="table big-table">
+            <tr>
+                <th>Name</th>
+                <th>Access Points</th>
+            </tr>
+            <tr v-for="policy in policies">
+                <td>{{policy.name}}</td>
+                <td>{{policy.accessPoints.join(", ")}}</td>
+            </tr>
+        </table>
+    </main>
+</script>
+
+<script>
+    var AccessPolicyList = {
+        template: "#access-policy-list-template",
+        data: function() {
+            return {
+                policies: []
+            };
+        },
+        created: function() {
+            this.fetchData();
+        },
+        watch: {
+            '$route': 'fetchData'
+        },
+        methods: {
+            fetchData: _.throttle(function() {
+                fetch(urlTemplate('{collection}/access/policies', this.$route.params,
+                        this.$route.query)).then(r => r.json())
+                        .then(policies => this.policies = policies);
+            }, 250)
+        }
+    };
+</script>
 
 
 <!-----------------------------------------------------------------------
@@ -616,6 +714,7 @@
             <ul>
                 <li><router-link :to="'/' + $route.params.collection" exact>Query</router-link></li>
                 <li><router-link :to="'/' + $route.params.collection + '/access/rules'">Access Rules</router-link></li>
+                <li><router-link :to="'/' + $route.params.collection + '/access/policies'">Access Policies</router-link></li>
             </ul>
         </nav>
     </div>
@@ -624,8 +723,8 @@
         <h2>Collections <img src="add.svg" width="18px" height="18px" style="vertical-align: top" alt="Add"></h2>
         <ul>
             <li v-for="col in collections">
-                <router-link :to="'/' + col.name">
-                    <img class="icon" src="database.svg" width="20px" height="20px">{{ col.name }}
+                <router-link :to="'/' + col">
+                    <img class="icon" src="database.svg" width="20px" height="20px">{{ col }}
                 </router-link>
             </li>
         </ul>
@@ -635,18 +734,16 @@
 
 <script>
 
-    var routes = [
-    ];
     var router = new VueRouter({
         linkActiveClass: "active",
         routes: [
             {path: '/:collection', name: 'query', component: Query},
             {path: '/:collection/access/rules', name: 'access-rule-list', component: AccessRuleList},
             {path: '/:collection/access/rules/:ruleId', name: 'access-rule', component: AccessRule},
+            {path: '/:collection/access/policies', name: 'access-policy-list', component: AccessPolicyList},
         ]
     });
 
-    var cdxApi = new CdxApi("");
     var app = new Vue({
         router,
         el: "#app",
@@ -657,8 +754,8 @@
         },
         created: function() {
             var self = this;
-            cdxApi.listCollections(function(collections) {
-                self.collections = collections;
+            fetch("api/collections").then(r => r.json()).then(collections => {
+                this.collections = collections;
                 if (collections && !self.activeCollection) {
                     self.activeCollection = collections[0];
                 }

@@ -2,7 +2,14 @@
   "swagger": "2.0",
   "info": {
     "title": "OutbackCDX API",
-    "version": "unstable"
+    "version": "unstable",
+    "license": {
+      "name": "Apache 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "x-logo": {
+      "url": "outback.svg"
+    }
   },
   "parameters": {
     "collection": {

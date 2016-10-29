@@ -1,6 +1,5 @@
 package tinycdxserver;
 
-import com.google.gson.Gson;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import com.googlecode.concurrenttrees.radixinverted.ConcurrentInvertedRadixTree;
 import com.googlecode.concurrenttrees.radixinverted.InvertedRadixTree;
@@ -16,6 +15,7 @@ import java.util.function.Predicate;
 
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static tinycdxserver.Json.GSON;
 
 /**
  * Manages a set of access control rules and policies. Rules are persisted
@@ -23,8 +23,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * of results.
  */
 class AccessControl {
-    private final static Gson gson = new Gson();
-
     private final Map<Long,AccessPolicy> policies;
     private final Map<Long,AccessRule> rules;
     private final RulesBySurt rulesBySurt;
@@ -32,7 +30,7 @@ class AccessControl {
     private final ColumnFamilyHandle ruleCf, policyCf;
     private final AtomicLong nextRuleId, nextPolicyId;
 
-    public AccessControl(RocksDB db, ColumnFamilyHandle ruleCf, ColumnFamilyHandle policyCf) {
+    public AccessControl(RocksDB db, ColumnFamilyHandle ruleCf, ColumnFamilyHandle policyCf) throws RocksDBException {
         this.db = db;
         this.ruleCf = ruleCf;
         this.policyCf = policyCf;
@@ -44,6 +42,13 @@ class AccessControl {
 
         nextRuleId = new AtomicLong(calculateNextId(db, ruleCf));
         nextPolicyId = new AtomicLong(calculateNextId(db, policyCf));
+
+        if (policies.isEmpty()) {
+            // create some default policies
+            put(new AccessPolicy("Public", "public", "staff"));
+            put(new AccessPolicy("Staff Only", "staff"));
+            put(new AccessPolicy("No Access"));
+        }
     }
 
     private long calculateNextId(RocksDB db, ColumnFamilyHandle cf) {
@@ -58,7 +63,7 @@ class AccessControl {
         try (RocksIterator it = db.newIterator(policyCf)) {
             it.seekToFirst();
             while (it.isValid()) {
-                AccessPolicy policy = gson.fromJson(new String(it.value(), UTF_8), AccessPolicy.class);
+                AccessPolicy policy = GSON.fromJson(new String(it.value(), UTF_8), AccessPolicy.class);
                 map.put(policy.id, policy);
                 it.next();
             }
@@ -71,7 +76,7 @@ class AccessControl {
         try (RocksIterator it = db.newIterator(ruleCf)) {
             it.seekToFirst();
             while (it.isValid()) {
-                AccessRule rule = gson.fromJson(new String(it.value(), UTF_8), AccessRule.class);
+                AccessRule rule = GSON.fromJson(new String(it.value(), UTF_8), AccessRule.class);
                 map.put(rule.id, rule);
                 it.next();
             }
@@ -90,7 +95,7 @@ class AccessControl {
      * Save an access control rule to the database.
      */
     public Long put(AccessRule rule) throws RocksDBException {
-        if (policies.get(rule.policyId) == null) {
+        if (rule.policyId == null || policies.get(rule.policyId) == null) {
             throw new IllegalArgumentException("no such policyId: " + rule.policyId);
         }
 
@@ -98,7 +103,7 @@ class AccessControl {
         if (rule.id == null) {
             generatedId = rule.id = nextRuleId.getAndIncrement();
         }
-        byte[] value = gson.toJson(rule).getBytes(UTF_8);
+        byte[] value = GSON.toJson(rule).getBytes(UTF_8);
         db.put(ruleCf, encodeKey(rule.id), value);
 
         AccessRule previous = rules.put(rule.id, rule);
@@ -119,7 +124,7 @@ class AccessControl {
         if (policy.id == null) {
             generatedId = policy.id = nextPolicyId.getAndIncrement();
         }
-        byte[] value = gson.toJson(policy).getBytes(UTF_8);
+        byte[] value = GSON.toJson(policy).getBytes(UTF_8);
         db.put(ruleCf, encodeKey(policy.id), value);
         policies.put(policy.id, policy);
         return generatedId;
@@ -188,8 +193,12 @@ class AccessControl {
             return false;
         }
         rulesBySurt.remove(rule);
-        db.remove(encodeKey(ruleId));
+        db.remove(ruleCf, encodeKey(ruleId));
         return true;
+    }
+
+    public Collection<AccessPolicy> listPolicies() {
+        return policies.values();
     }
 
     /**

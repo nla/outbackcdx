@@ -1,6 +1,5 @@
 package tinycdxserver;
 
-import com.google.gson.Gson;
 import tinycdxserver.NanoHTTPD.IHTTPSession;
 import tinycdxserver.NanoHTTPD.Method;
 import tinycdxserver.NanoHTTPD.Response;
@@ -12,11 +11,10 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static tinycdxserver.Json.GSON;
 import static tinycdxserver.NanoHTTPD.Response.Status.*;
 
 class Web {
-
-    private static Gson gson = new Gson();
 
     interface Handler {
         Response handle(IHTTPSession session) throws Exception;
@@ -77,7 +75,7 @@ class Web {
     }
 
     static Response jsonResponse(Object data) {
-        Response response =  new Response(OK, "application/json", gson.toJson(data));
+        Response response =  new Response(OK, "application/json", GSON.toJson(data));
         response.addHeader("Access-Control-Allow-Origin", "*");
         return response;
     }

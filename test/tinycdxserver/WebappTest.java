@@ -1,6 +1,5 @@
 package tinycdxserver;
 
-import com.google.gson.Gson;
 import org.apache.commons.lang.StringUtils;
 import org.junit.Before;
 import org.junit.Rule;
@@ -14,15 +13,12 @@ import java.util.*;
 import static java.util.Arrays.asList;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static tinycdxserver.NanoHTTPD.Method.DELETE;
-import static tinycdxserver.NanoHTTPD.Method.GET;
-import static tinycdxserver.NanoHTTPD.Method.POST;
+import static tinycdxserver.Json.GSON;
+import static tinycdxserver.NanoHTTPD.Method.*;
 import static tinycdxserver.NanoHTTPD.Response.Status.CREATED;
 import static tinycdxserver.NanoHTTPD.Response.Status.OK;
 
 public class WebappTest {
-    private static final Gson gson = new Gson();
-
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
 
@@ -75,11 +71,15 @@ public class WebappTest {
                 "- 20030614070159 http://a.ex.org/ text/html 200 - - - - 42 wrc\n" +
                 "- 20030614070159 http://b.ex.org/ text/html 200 - - - - 42 wrc\n");
 
-        long publicPolicyId = createPolicy("Public", "public", "staff");
-        long staffPolicyId = createPolicy("Staff Only", "staff");
+        long publicPolicyId = createPolicy("Normal", "public", "staff");
+        long staffPolicyId = createPolicy("Restricted", "staff");
+
+        assertEquals(5, GSON.fromJson(GET("/testap/access/policies"), AccessPolicy[].class).length);
 
         createRule(publicPolicyId, "");
         long ruleId = createRule(staffPolicyId, "org,ex,a)/");
+
+        assertEquals(2, GSON.fromJson(GET("/testap/access/rules"), AccessRule[].class).length);
 
         assertEquals(asList("http://a.ex.org/", "http://a.ex.org/", "http://b.ex.org/"),
                 cdxUrls(GET("/testap", "url", "*.ex.org")));
@@ -94,9 +94,9 @@ public class WebappTest {
         // try modifying a policy
         //
 
-        AccessPolicy policy = gson.fromJson(GET("/testap/access/policies/" + staffPolicyId), AccessPolicy.class);
+        AccessPolicy policy = GSON.fromJson(GET("/testap/access/policies/" + staffPolicyId), AccessPolicy.class);
         policy.accessPoints.remove("staff");
-        POST("/testap/access/policies", gson.toJson(policy));
+        POST("/testap/access/policies", GSON.toJson(policy));
 
         assertEquals(asList("http://b.ex.org/"),
                 cdxUrls(GET("/testap/ap/staff", "url", "*.ex.org")));
@@ -105,11 +105,11 @@ public class WebappTest {
         // try modifying a rule
         //
 
-        AccessRule rule = gson.fromJson(GET("/testap/access/rules/" + ruleId), AccessRule.class);
+        AccessRule rule = GSON.fromJson(GET("/testap/access/rules/" + ruleId), AccessRule.class);
         rule.surts.clear();
         rule.surts.add("org,ex,b)");
 
-        POST("/testap/access/rules", gson.toJson(rule));
+        POST("/testap/access/rules", GSON.toJson(rule));
 
         assertEquals(asList("http://a.ex.org/", "http://a.ex.org/"),
                 cdxUrls(GET("/testap/ap/public", "url", "*.ex.org")));
@@ -138,8 +138,8 @@ public class WebappTest {
         AccessRule rule = new AccessRule();
         rule.policyId = policyId;
         rule.surts.addAll(asList(surts));
-        String response = POST("/testap/access/rules", gson.toJson(rule), CREATED);
-        return gson.fromJson(response, Id.class).id;
+        String response = POST("/testap/access/rules", GSON.toJson(rule), CREATED);
+        return GSON.fromJson(response, Id.class).id;
     }
 
     private long createPolicy(String name, String... accessPoints) throws IOException, Web.ResponseException {
@@ -147,8 +147,8 @@ public class WebappTest {
         publicPolicy.name = name;
         publicPolicy.accessPoints.addAll(asList(accessPoints));
 
-        String response = POST("/testap/access/policies", gson.toJson(publicPolicy), CREATED);
-        return gson.fromJson(response, Id.class).id;
+        String response = POST("/testap/access/policies", GSON.toJson(publicPolicy), CREATED);
+        return GSON.fromJson(response, Id.class).id;
     }
 
     public static class Id {

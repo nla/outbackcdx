@@ -62,15 +62,11 @@ function CdxApi(baseUrl) {
     
     CdxCollection.prototype.accessRules = function(url, success) {
         getJson(this.baseUrl + "/access/rules?url=" + encodeURIComponent(url), success);
-    }
+    };
 
     CdxCollection.prototype.saveAccessRule = function(rule, success) {
         var request = new XMLHttpRequest();
-        if (rule.id) {
-            request.open('PUT', this.baseUrl + "/access/rules/" + encodeURIComponent(rule.id));
-        } else {
-            request.open('POST', this.baseUrl + "/access/rules");
-        }
+        request.open('POST', this.baseUrl + "/access/rules");
         request.setRequestHeader("Content-Type", "application/json");
         request.addEventListener('load', function() {
             if (request.status == 200 || request.status == 201) {
@@ -78,7 +74,7 @@ function CdxApi(baseUrl) {
             }
         });
         request.send(rule);
-    }
+    };
 
 
     function getCaptures(collection, key, limit, success) {

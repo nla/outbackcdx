@@ -11,7 +11,7 @@ public class AccessRule {
     List<String> surts = new ArrayList<>();
     DateRange captured;
     DateRange accessed;
-    Period periodSinceCapture;
+    Period period;
     String privateComment;
     String publicComment;
     boolean enabled;
@@ -22,7 +22,7 @@ public class AccessRule {
     public boolean matchesDates(Date captureTime, Date accessTime) {
         return (captured == null || captured.contains(captureTime)) &&
                 (accessed == null || accessed.contains(accessTime)) &&
-                (periodSinceCapture == null || captureTime.toInstant().plus(periodSinceCapture).isBefore(accessTime.toInstant()));
+                (period == null || captureTime.toInstant().plus(period).isBefore(accessTime.toInstant()));
     }
 
     @Override
@@ -42,7 +42,7 @@ public class AccessRule {
             return false;
         if (accessed != null ? !accessed.equals(that.accessed) : that.accessed != null)
             return false;
-        if (periodSinceCapture != null ? !periodSinceCapture.equals(that.periodSinceCapture) : that.periodSinceCapture != null)
+        if (period != null ? !period.equals(that.period) : that.period != null)
             return false;
         if (privateComment != null ? !privateComment.equals(that.privateComment) : that.privateComment != null)
             return false;
@@ -57,7 +57,7 @@ public class AccessRule {
         result = 31 * result + (surts != null ? surts.hashCode() : 0);
         result = 31 * result + (captured != null ? captured.hashCode() : 0);
         result = 31 * result + (accessed != null ? accessed.hashCode() : 0);
-        result = 31 * result + (periodSinceCapture != null ? periodSinceCapture.hashCode() : 0);
+        result = 31 * result + (period != null ? period.hashCode() : 0);
         result = 31 * result + (privateComment != null ? privateComment.hashCode() : 0);
         result = 31 * result + (publicComment != null ? publicComment.hashCode() : 0);
         result = 31 * result + (enabled ? 1 : 0);
