@@ -58,8 +58,8 @@
                                 <filter>
                                     <artifact>org.webjars.npm:moment</artifact>
                                     <includes>
-                                        <include>META-INF/resources/webjars/moment/2.15.1/min/moment.min.js</include>
-                                        <include>META-INF/resources/webjars/moment/2.15.1/LICENSE</include>
+                                        <include>META-INF/resources/webjars/moment/2.15.2/min/moment.min.js</include>
+                                        <include>META-INF/resources/webjars/moment/2.15.2/LICENSE</include>
                                     </includes>
                                 </filter>
                                 <filter>
