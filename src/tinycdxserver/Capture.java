@@ -181,6 +181,10 @@ public class Capture {
     }
 
     public Date date() {
+        return parseTimestamp(timestamp);
+    }
+
+    public static Date parseTimestamp(long timestamp) {
         return Date.from(LocalDateTime.parse(Long.toString(timestamp), arcTimeFormat).toInstant(ZoneOffset.UTC));
     }
 }

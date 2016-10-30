@@ -25,14 +25,35 @@ public class WbCdxApi {
     public static Response query(NanoHTTPD.IHTTPSession session, Index index) {
         String accessPoint = session.getParms().get("accesspoint");
         String url = session.getParms().get("url");
-        String matchType = session.getParms().get("matchType");
+        String matchType = session.getParms().getOrDefault("matchType", "exact");
         String limitParam = session.getParms().get("limit");
+        String sort = session.getParms().get("sort");
         String fl = session.getParms().get("fl");
+        String closest = session.getParms().get("closest");
         if (fl == null) {
             fl = "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename";
         }
         String[] fields = fl.split(",");
         long limit = limitParam == null ? Long.MAX_VALUE : Long.parseLong(limitParam);
+
+        Iterable<Capture> captures;
+
+        if ("closest".equals(sort)) {
+            if (!"exact".equals(matchType)) {
+                throw new IllegalArgumentException("sort=closest is currently only implemented for exact matches");
+            }
+            if (closest == null) {
+                throw new IllegalArgumentException("closest={timestamp} is mandatory when using sort=closest");
+            }
+            captures = index.closestQuery(UrlCanonicalizer.surtCanonicalize(url), Long.parseLong(closest), accessPoint);
+        } else if ("reverse".equals(sort)) {
+            if (!"exact".equals(matchType)) {
+                throw new IllegalArgumentException("sort=closest is currently only implemented for exact matches");
+            }
+            captures = index.reverseQuery(UrlCanonicalizer.surtCanonicalize(url), accessPoint);
+        } else {
+            captures = queryForMatchType(index, matchType, url, accessPoint);
+        }
 
         boolean outputJson = "json".equals(session.getParms().get("output"));
         Response response = new Response(OK, outputJson ? "application/json" : "text/plain", outputStream -> {
@@ -40,7 +61,7 @@ public class WbCdxApi {
             OutputFormat outf = outputJson ? new JsonFormat(out, fields) : new TextFormat(out, fields);
 
             long row = 0;
-            for (Capture capture : queryForMatchType(index, matchType, url, accessPoint)) {
+            for (Capture capture : captures) {
                 if (row >= limit) {
                     break;
                 }

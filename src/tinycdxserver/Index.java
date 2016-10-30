@@ -28,35 +28,120 @@ public class Index {
      * Returns all captures that match the given prefix.
      */
     public Iterable<Capture> prefixQuery(String surtPrefix, String accessPoint) {
-        return () -> filteredCaptures(surtPrefix, record -> record.urlkey.startsWith(surtPrefix), accessPoint);
+        return () -> filteredCaptures(Capture.encodeKey(surtPrefix, 0), record -> record.urlkey.startsWith(surtPrefix), accessPoint, false);
     }
 
     /**
      * Returns all captures with keys in the given range.
      */
     public Iterable<Capture> rangeQuery(String startSurt, String endSurt, String accessPoint) {
-        return () -> filteredCaptures(startSurt, record -> record.urlkey.compareTo(endSurt) < 0, accessPoint);
+        return () -> filteredCaptures(Capture.encodeKey(startSurt, 0), record -> record.urlkey.compareTo(endSurt) < 0, accessPoint, false);
     }
 
     /**
      * Returns all captures for the given url.
      */
     public Iterable<Capture> query(String surt, String accessPoint) {
-        return rawQuery(resolveAlias(surt), accessPoint);
+        byte[] key = Capture.encodeKey(resolveAlias(surt), 0);
+        return () -> filteredCaptures(key, record -> record.urlkey.equals(surt), accessPoint, false);
+    }
+
+    /**
+     * Returns all captures for the given url in reverse order.
+     */
+    public Iterable<Capture> reverseQuery(String surt, String accessPoint) {
+        byte[] key = Capture.encodeKey(resolveAlias(surt), 99999999999999L);
+        return () -> filteredCaptures(key, record -> record.urlkey.equals(surt), accessPoint, true);
+    }
+
+    /**
+     * Returns all captures for the given url ordered by distance from the given timestamp.
+     */
+    public Iterable<Capture> closestQuery(String surt, long targetTimestamp, String accessPoint) {
+        byte[] key = Capture.encodeKey(resolveAlias(surt), targetTimestamp);
+        Predicate<Capture> scope = record -> record.urlkey.equals(surt);
+        return () -> new ClosestTimestampIterator(targetTimestamp,
+                filteredCaptures(key, scope, accessPoint, false),
+                filteredCaptures(key, scope, accessPoint, true));
+    }
+
+    /**
+     * Combines a forward iterator and backward iterator into order-by closest
+     * distance to timestamp iterator.
+     */
+    static class ClosestTimestampIterator implements Iterator<Capture> {
+        final long targetMillis;
+        final Iterator<Capture> forwardIterator;
+        final Iterator<Capture> backwardIterator;
+        Capture nextForward = null;
+        Capture nextBackward = null;
+
+        ClosestTimestampIterator(long targetTimestamp, Iterator<Capture> forwardIterator, Iterator<Capture> backwardIterator) {
+            this.targetMillis = Capture.parseTimestamp(targetTimestamp).getTime();
+            this.forwardIterator = forwardIterator;
+            this.backwardIterator = backwardIterator;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return nextForward != null || nextBackward != null || forwardIterator.hasNext() || backwardIterator.hasNext();
+        }
+
+        @Override
+        public Capture next() {
+            if (nextForward == null && forwardIterator.hasNext()) {
+                nextForward = forwardIterator.next();
+            }
+            if (nextBackward == null && backwardIterator.hasNext()) {
+                nextBackward = backwardIterator.next();
+            }
+
+            // if one or the other iterator is exhausted pick from its rival
+            if (nextForward == null) {
+                if (nextBackward == null) {
+                    throw new NoSuchElementException();
+                }
+                return pickBackward();
+            } else if (nextBackward == null) {
+                return pickForward();
+            }
+
+            // both are still active so pick the closest
+            long forwardDistance = nextForward.date().getTime() - targetMillis;
+            long backwardDistance = targetMillis - nextBackward.date().getTime();
+
+            if (forwardDistance <= backwardDistance) {
+                return pickForward();
+            } else {
+                return pickBackward();
+            }
+        }
+
+        private Capture pickBackward() {
+            Capture result = nextBackward;
+            nextBackward = null;
+            return result;
+        }
+
+        private Capture pickForward() {
+            Capture result = nextForward;
+            nextForward = null;
+            return result;
+        }
     }
 
     /**
      * Perform a query without first resolving aliases.
      */
-    private Iterable<Capture> rawQuery(String surt, String accessPoint) {
-        return () -> filteredCaptures(surt, record -> record.urlkey.equals(surt), accessPoint);
+    private Iterable<Capture> rawQuery(String key, String accessPoint, boolean reverse) {
+        return () -> filteredCaptures(Capture.encodeKey(key, 0), record -> record.urlkey.equals(key), accessPoint, reverse);
     }
 
     /**
      * Returns all captures starting from the given key.
      */
     Iterable<Capture> capturesAfter(String start) {
-        return () -> filteredCaptures(start, record -> true, null);
+        return () -> filteredCaptures(Capture.encodeKey(start, 0), record -> true, null, false);
     }
 
     public String resolveAlias(String surt) {
@@ -72,9 +157,8 @@ public class Index {
         }
     }
 
-    private Iterator<Capture> filteredCaptures(String queryUrl, Predicate<Capture> scope, String accessPoint) {
-        byte[] key = Capture.encodeKey(queryUrl, 0);
-        Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope);
+    private Iterator<Capture> filteredCaptures(byte[] key, Predicate<Capture> scope, String accessPoint, boolean reverse) {
+        Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope, reverse);
         if (accessPoint != null && accessControl != null) {
             captures = new FilteringIterator<>(captures, accessControl.filter(accessPoint, new Date()));
         }
@@ -83,7 +167,7 @@ public class Index {
 
     public Iterable<Alias> listAliases(String start) {
         byte[] key = start.getBytes(US_ASCII);
-        return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true);
+        return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true, false);
     }
 
     public long estimatedRecordCount() {
@@ -105,6 +189,7 @@ public class Index {
         private final RocksIterator it;
         private final Predicate<T> scope;
         private final RecordConstructor<T> constructor;
+        private final boolean reverse;
         private T record = null;
         private boolean exhausted = false;
 
@@ -114,12 +199,20 @@ public class Index {
             super.finalize();
         }
 
-        public Records(RocksDB db, ColumnFamilyHandle columnFamilyHandle, byte[] startKey, RecordConstructor<T> constructor, Predicate<T> scope) {
+        public Records(RocksDB db, ColumnFamilyHandle columnFamilyHandle, byte[] startKey, RecordConstructor<T> constructor, Predicate<T> scope, boolean reverse) {
             final RocksIterator it = db.newIterator(columnFamilyHandle);
             it.seek(startKey);
+            if (reverse) {
+                if (it.isValid()) {
+                    it.prev();
+                } else {
+                    it.seekToLast();
+                }
+            }
             this.constructor = constructor;
             this.scope = scope;
             this.it = it;
+            this.reverse = reverse;
         }
 
         public boolean hasNext() {
@@ -144,7 +237,11 @@ public class Index {
             }
             T record = this.record;
             this.record = null;
-            it.next();
+            if (reverse) {
+                it.prev();
+            } else {
+                it.next();
+            }
             return record;
         }
     }
@@ -256,7 +353,7 @@ public class Index {
         }
 
         private void updateExistingRecordsWithNewAlias(WriteBatch wb, String aliasSurt, String targetSurt) {
-            for (Capture capture : rawQuery(aliasSurt, null)) {
+            for (Capture capture : rawQuery(aliasSurt, null, false)) {
                 wb.remove(capture.encodeKey());
                 capture.urlkey = targetSurt;
                 wb.put(capture.encodeKey(), capture.encodeValue());
