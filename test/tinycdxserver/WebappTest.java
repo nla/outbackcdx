@@ -1,6 +1,7 @@
 package tinycdxserver;
 
 import org.apache.commons.lang.StringUtils;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -26,9 +27,15 @@ public class WebappTest {
 
     @Before
     public void setUp() throws IOException {
+        FeatureFlags.setExperimentalAccessControl(true);
         File root = folder.newFolder();
         DataStore manager = new DataStore(root);
         webapp = new Webapp(manager, false);
+    }
+
+    @After
+    public void tearDown() {
+        FeatureFlags.setExperimentalAccessControl(false);
     }
 
     @Test

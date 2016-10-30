@@ -9,8 +9,18 @@ import java.util.Map;
  * mature.
  */
 public class FeatureFlags {
+    private static boolean experimentalAccessControl;
+
+    static {
+        experimentalAccessControl = "1".equals(System.getenv("EXPERIMENTAL_ACCESS_CONTROL"));
+    }
+
     public static boolean experimentalAccessControl() {
-        return "1".equals(System.getenv("EXPERIMENTAL_ACCESS_CONTROL"));
+        return experimentalAccessControl;
+    }
+
+    public static void setExperimentalAccessControl(boolean enabled) {
+        experimentalAccessControl = enabled;
     }
 
     public static Map<String, Boolean> asMap() {

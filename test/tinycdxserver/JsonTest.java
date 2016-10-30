@@ -12,7 +12,6 @@ public class JsonTest {
     public void roundtripPeriod() {
         Period original = Period.of(1,2,3);
         String json = GSON.toJson(original);
-        System.out.println(json);
         Period decoded = GSON.fromJson(json, Period.class);
         assertEquals(original, decoded);
     }
