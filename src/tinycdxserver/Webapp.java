@@ -43,19 +43,16 @@ class Webapp implements Web.Handler {
             .on(GET, "/lib/redoc/1.4.1/redoc.min.js", serve("/META-INF/resources/webjars/redoc/1.4.1/dist/redoc.min.js"))
 
             .on(GET, "/api/collections", this::listCollections)
+            .on(GET, "/api/featureflags", this::featureFlags)
             .on(GET, "/<collection>", this::query)
-            .on(GET, "/<collection>/ap/<accesspoint>", this::query)
             .on(POST, "/<collection>", this::post)
             .on(GET, "/<collection>/stats", this::stats)
             .on(GET, "/<collection>/captures", this::captures)
-            .on(GET, "/<collection>/aliases", this::aliases)
-            .on(GET, "/<collection>/access/rules", this::listAccessRules)
-            .on(POST, "/<collection>/access/rules", this::createAccessRule)
-            .on(GET, "/<collection>/access/rules/<ruleId>", this::getAccessRule)
-            .on(DELETE, "/<collection>/access/rules/<ruleId>", this::deleteAccessRule)
-            .on(GET, "/<collection>/access/policies", this::listAccessPolicies)
-            .on(POST, "/<collection>/access/policies", this::postAccessPolicy)
-            .on(GET, "/<collection>/access/policies/<policyId>", this::getAccessPolicy);
+            .on(GET, "/<collection>/aliases", this::aliases);
+
+    private Response featureFlags(IHTTPSession req) {
+        return jsonResponse(FeatureFlags.asMap());
+    }
 
     private Response listAccessPolicies(IHTTPSession req) throws IOException, Web.ResponseException {
         return jsonResponse(getIndex(req).accessControl.listPolicies());
@@ -70,6 +67,17 @@ class Webapp implements Web.Handler {
     Webapp(DataStore dataStore, boolean verbose) {
         this.dataStore = dataStore;
         this.verbose = verbose;
+
+        if (FeatureFlags.experimentalAccessControl()) {
+            router.on(GET, "/<collection>/ap/<accesspoint>", this::query)
+                    .on(GET, "/<collection>/access/rules", this::listAccessRules)
+                    .on(POST, "/<collection>/access/rules", this::createAccessRule)
+                    .on(GET, "/<collection>/access/rules/<ruleId>", this::getAccessRule)
+                    .on(DELETE, "/<collection>/access/rules/<ruleId>", this::deleteAccessRule)
+                    .on(GET, "/<collection>/access/policies", this::listAccessPolicies)
+                    .on(POST, "/<collection>/access/policies", this::postAccessPolicy)
+                    .on(GET, "/<collection>/access/policies/<policyId>", this::getAccessPolicy);
+        }
     }
 
     Response listCollections(IHTTPSession request) {

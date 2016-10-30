@@ -713,8 +713,8 @@
         <nav class="tabs" v-if="$route && $route.params.collection">
             <ul>
                 <li><router-link :to="'/' + $route.params.collection" exact>Query</router-link></li>
-                <li><router-link :to="'/' + $route.params.collection + '/access/rules'">Access Rules</router-link></li>
-                <li><router-link :to="'/' + $route.params.collection + '/access/policies'">Access Policies</router-link></li>
+                <li v-if="featureFlags.experimentalAccessControl"><router-link :to="'/' + $route.params.collection + '/access/rules'">Access Rules</router-link></li>
+                <li v-if="featureFlags.experimentalAccessControl"><router-link :to="'/' + $route.params.collection + '/access/policies'">Access Policies</router-link></li>
             </ul>
         </nav>
     </div>
@@ -750,10 +750,13 @@
         data: {
             collection: null,
             collections: {},
-            stats: null
+            stats: null,
+            featureFlags: {}
         },
         created: function() {
             var self = this;
+            fetch("api/featureflags").then(r => r.json())
+                    .then(featureFlags => this.featureFlags = featureFlags);
             fetch("api/collections").then(r => r.json()).then(collections => {
                 this.collections = collections;
                 if (collections && !self.activeCollection) {

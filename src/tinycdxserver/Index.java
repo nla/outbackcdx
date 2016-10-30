@@ -75,7 +75,7 @@ public class Index {
     private Iterator<Capture> filteredCaptures(String queryUrl, Predicate<Capture> scope, String accessPoint) {
         byte[] key = Capture.encodeKey(queryUrl, 0);
         Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope);
-        if (accessPoint != null) {
+        if (accessPoint != null && accessControl != null) {
             captures = new FilteringIterator<>(captures, accessControl.filter(accessPoint, new Date()));
         }
         return captures;

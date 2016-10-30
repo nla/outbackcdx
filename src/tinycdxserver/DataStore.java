@@ -58,19 +58,30 @@ public class DataStore implements Closeable {
             ColumnFamilyOptions cfOptions = new ColumnFamilyOptions();
             configureColumnFamily(cfOptions);
 
-            List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
-                    new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions),
-                    new ColumnFamilyDescriptor("alias".getBytes(UTF_8), cfOptions),
-                    new ColumnFamilyDescriptor("access-rule".getBytes(UTF_8), cfOptions),
-                    new ColumnFamilyDescriptor("access-policy".getBytes(UTF_8), cfOptions)
-            );
+            List<ColumnFamilyDescriptor> cfDescriptors;
+            if (FeatureFlags.experimentalAccessControl()) {
+                cfDescriptors = Arrays.asList(
+                        new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions),
+                        new ColumnFamilyDescriptor("alias".getBytes(UTF_8), cfOptions),
+                        new ColumnFamilyDescriptor("access-rule".getBytes(UTF_8), cfOptions),
+                        new ColumnFamilyDescriptor("access-policy".getBytes(UTF_8), cfOptions)
+                );
+            } else {
+                cfDescriptors = Arrays.asList(
+                        new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions),
+                        new ColumnFamilyDescriptor("alias".getBytes(UTF_8), cfOptions));
+            }
 
             createColumnFamiliesIfNotExists(options, dbOptions, path.toString(), cfDescriptors);
 
             List<ColumnFamilyHandle> cfHandles = new ArrayList<>(cfDescriptors.size());
             RocksDB db = RocksDB.open(dbOptions, path.toString(), cfDescriptors, cfHandles);
 
-            AccessControl accessControl = new AccessControl(db, cfHandles.get(2), cfHandles.get(3));
+            AccessControl accessControl = null;
+            if (FeatureFlags.experimentalAccessControl()) {
+                accessControl = new AccessControl(db, cfHandles.get(2), cfHandles.get(3));
+            }
+
             index = new Index(db, cfHandles.get(0), cfHandles.get(1), accessControl);
             indexes.put(collection, index);
             return index;

@@ -35,7 +35,7 @@ public class XmlQuery {
         Map<String, String> query = decodeQueryString(params.get("q"));
 
         accessPoint = params.get("accesspoint");
-        queryType = query.get("type").toLowerCase();
+        queryType = query.getOrDefault("type", "urlquery").toLowerCase();
         queryUrl = UrlCanonicalizer.surtCanonicalize(query.get("url"));
 
         offset = Long.parseLong(query.getOrDefault("offset", "0"));
