@@ -13,8 +13,8 @@ public class SSURTTest {
         assertEquals("(org,example,www,):1443:https:user:pass/", SSURT.fromUrl("https://user:pass@www.example.org:1443/"));
         assertEquals("1.2.3.4:8080:https:/", SSURT.fromUrl("https://1.2.3.4:8080/"));
         assertEquals("(jp,xn--wgv71a,):80:http:/[%20F%C3%9CNKY%20]", SSURT.fromUrl(" http:/日本.jp:80//.././[ FÜNKY ] "));
-        // TODO
-        //assertEquals("[2001:db8:0:0:1:0:0:1]:8080:https:/", SSURT.fromUrl("https://[2001:db8::1:0:0:1]:8080/"));
+        assertEquals("[2001:0db8:0000:0000:0001:0000:0000:0001]:8080:https:/", SSURT.fromUrl("https://[2001:db8::1:0:0:1]:8080/"));
+        assertEquals("[0000:0000:0000:0000:0000:ffff:7f00:0001]:443:https:/", SSURT.fromUrl("https://[::FFFF:127.0.0.1]"));
     }
 
     @Test

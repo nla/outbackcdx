@@ -165,7 +165,7 @@ final class InetAddresses {
         return bytes;
     }
 
-    private static byte[] textToNumericFormatV6(String ipString) {
+    static byte[] textToNumericFormatV6(String ipString) {
         // An address can have [2..8] colons, and N colons make N+1 parts.
         String[] parts = ipString.split(":", IPV6_PART_COUNT + 2);
         if (parts.length < 3 || parts.length > IPV6_PART_COUNT + 1) {

@@ -11,8 +11,7 @@ import io.mola.galimatias.*;
  *
  * Resolves the following issues with Heritrix SURTs:
  *
- * 1. Prefix based rules are more powerful and can match any of:
- *    domain, domain+port, domain+port+scheme, domain+port+scheme+userinfo, domain+port+scheme+userinfo+path.
+ * 1. Matching everything from a domain required a separate rule for each protocol.
  * 2. Correct parsing of a SURT is awkward due to ")" being allowed in userinfo but also used to delimit it.
  *    So SSURT instead treats () as part of the host, similar to the way [] is used by IPv6 addresses.
  * 3. 'Practically' reversible. This should be true: WHATWG(unSSURT(SSURT(url))) = WHATWG(url) where WHATWG() is the
@@ -26,7 +25,8 @@ import io.mola.galimatias.*;
  * (au,gov,nla,):80:http:  => http on port 80 on host 'nla.gov.au' any userinfo
  * (au,gov,nla,):80:http:/ => http on port 80 on host 'nla.gov.au' blank userinfo
  * 10.                     => everything in ipv4 subnet 10.0.0.0/8
- * [2001:0db8:             => everything in ipv6 subnet 2001:0db8:
+ * [2001:0db8:             => everything in ipv6 subnet 2001:0db8/32
+ * [2001:0db8:0000:0042:0000:8a2e:0370:7334]:80:ws:/chat
  *
  * Indicative grammar (grammars alone are not powerful enough to describe URL parsing):
  *
@@ -37,8 +37,11 @@ import io.mola.galimatias.*;
  * or reorder the query pairs. For many use cases it will be be useful to layer on more aggressive rules (wider
  * lowercasing, exhaustive percent decoding etc) but SSURT by itself does not imply them.
  *
- * Open questions: should we pad IPv6 addresses with leading zeros and expand zero compress (::)?
- * Should we convert IPv4 addresses to mapped IPv6? (or vice versa)
+ * Pad IPv6 address hosts with leading zeros and don't zero compress with "::".
+ * Use lowercase hex digits.
+ *
+ * [2001:db8::1:0:0:1] => [2001:0db8:0000:0000:0001:0000:0000:0001]
+ * [::FFFF:127.0.0.1]  => [0000:0000:0000:0000:0000:ffff:7f00:0001]
  *
  */
 public class SSURT {
@@ -64,6 +67,17 @@ public class SSURT {
             out.append(')');
         } else if (host instanceof IPv4Address) {
             out.append(host);
+        } else if (host instanceof IPv6Address) {
+            out.append('[');
+            byte[] bytes = InetAddresses.textToNumericFormatV6(host.toString());
+            for (int i = 0; i < bytes.length; i ++) {
+                if (i % 2 == 0 && i > 0) {
+                    out.append(':');
+                }
+                out.append(Character.forDigit((bytes[i] >> 4) & 0xf, 16));
+                out.append(Character.forDigit(bytes[i] & 0xf, 16));
+            }
+            out.append(']');
         } else {
             out.append('[').append(host.toString()).append(']');
         }
