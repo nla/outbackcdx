@@ -55,10 +55,6 @@ public class SSURT {
         }
     }
 
-    private static String canonicalizePath(String path) {
-        return path.isEmpty() ? "/" : UrlCanonicalizer.canonicalizeUrlEncoding(path);
-    }
-
     public static String fromUrl(Host host, int port, String scheme, String userInfo, String path, String query,
                                  String fragment) {
         StringBuilder out = new StringBuilder();
