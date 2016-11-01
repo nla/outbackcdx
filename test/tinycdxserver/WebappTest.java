@@ -84,7 +84,7 @@ public class WebappTest {
         assertEquals(5, GSON.fromJson(GET("/testap/access/policies"), AccessPolicy[].class).length);
 
         createRule(publicPolicyId, "");
-        long ruleId = createRule(staffPolicyId, "org,ex,a)/");
+        long ruleId = createRule(staffPolicyId, "(org,ex,a,)");
 
         assertEquals(2, GSON.fromJson(GET("/testap/access/rules"), AccessRule[].class).length);
 
@@ -113,8 +113,8 @@ public class WebappTest {
         //
 
         AccessRule rule = GSON.fromJson(GET("/testap/access/rules/" + ruleId), AccessRule.class);
-        rule.surts.clear();
-        rule.surts.add("org,ex,b)");
+        rule.urlPatterns.clear();
+        rule.urlPatterns.add("(org,ex,b,)");
 
         POST("/testap/access/rules", GSON.toJson(rule));
 
@@ -144,7 +144,7 @@ public class WebappTest {
     private long createRule(long policyId, String... surts) throws IOException, Web.ResponseException {
         AccessRule rule = new AccessRule();
         rule.policyId = policyId;
-        rule.surts.addAll(asList(surts));
+        rule.urlPatterns.addAll(asList(surts));
         String response = POST("/testap/access/rules", GSON.toJson(rule), CREATED);
         return GSON.fromJson(response, Id.class).id;
     }

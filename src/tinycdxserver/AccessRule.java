@@ -4,11 +4,12 @@ import java.time.Period;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Stream;
 
 public class AccessRule {
     Long id;
     Long policyId;
-    List<String> surts = new ArrayList<>();
+    List<String> urlPatterns = new ArrayList<>();
     DateRange captured;
     DateRange accessed;
     Period period;
@@ -36,7 +37,7 @@ public class AccessRule {
         if (id != null ? !id.equals(that.id) : that.id != null) return false;
         if (policyId != null ? !policyId.equals(that.policyId) : that.policyId != null)
             return false;
-        if (surts != null ? !surts.equals(that.surts) : that.surts != null)
+        if (urlPatterns != null ? !urlPatterns.equals(that.urlPatterns) : that.urlPatterns != null)
             return false;
         if (captured != null ? !captured.equals(that.captured) : that.captured != null)
             return false;
@@ -54,7 +55,7 @@ public class AccessRule {
     public int hashCode() {
         int result = id != null ? id.hashCode() : 0;
         result = 31 * result + (policyId != null ? policyId.hashCode() : 0);
-        result = 31 * result + (surts != null ? surts.hashCode() : 0);
+        result = 31 * result + (urlPatterns != null ? urlPatterns.hashCode() : 0);
         result = 31 * result + (captured != null ? captured.hashCode() : 0);
         result = 31 * result + (accessed != null ? accessed.hashCode() : 0);
         result = 31 * result + (period != null ? period.hashCode() : 0);
@@ -62,5 +63,9 @@ public class AccessRule {
         result = 31 * result + (publicComment != null ? publicComment.hashCode() : 0);
         result = 31 * result + (enabled ? 1 : 0);
         return result;
+    }
+
+    Stream<String> ssurtPrefixes() {
+        return urlPatterns.stream().map(SSURT::prefixFromPattern);
     }
 }

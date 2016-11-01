@@ -49,24 +49,27 @@ public class AccessControlTest {
         long policyId = accessControl.put(publicPolicy);
 
         AccessRule rule = new AccessRule();
-        rule.surts.add("au,gov,");
+        rule.urlPatterns.add("(au,gov,");
         rule.policyId = policyId;
 
         long ruleId = accessControl.put(rule);
         assertEquals(rule, accessControl.rule(ruleId));
 
         AccessRule rule2 = new AccessRule();
-        rule2.surts.add("au,gov,nla,");
+        rule2.urlPatterns.add("(au,gov,nla,");
         rule2.policyId = policyId;
         accessControl.put(rule2);
 
         AccessRule rule3 = new AccessRule();
-        rule3.surts.add("au,gov,example,");
+        rule3.urlPatterns.add("(au,gov,example,");
         rule3.policyId = policyId;
         accessControl.put(rule3);
 
-        assertEquals(asList(rule, rule2), accessControl.rulesForSurt("au,gov,nla,)/hello.html"));
+        assertEquals(asList(rule, rule2), accessControl.rulesForSsurt("(au,gov,nla,)/hello.html"));
         assertEquals(asList(rule, rule2, rule3), new ArrayList<>(accessControl.list()));
+
+
+        // patterns. *.gov.au
     }
 }
 
