@@ -54,6 +54,7 @@ public class DataStore implements Closeable {
 
             DBOptions dbOptions = new DBOptions();
             dbOptions.setCreateIfMissing(createAllowed);
+            dbOptions.setMaxBackgroundCompactions(Math.min(8, Runtime.getRuntime().availableProcessors()));
 
             ColumnFamilyOptions cfOptions = new ColumnFamilyOptions();
             configureColumnFamily(cfOptions);
