@@ -117,6 +117,7 @@ public class XmlQuery {
             }
             out.writeStartElement("result");
             writeElement(out, "compressedoffset", capture.compressedoffset);
+            writeElement(out, "compressedendoffset", capture.length);
             writeElement(out, "mimetype", capture.mimetype);
             writeElement(out, "file", capture.file);
             writeElement(out, "redirecturl", capture.redirecturl);
