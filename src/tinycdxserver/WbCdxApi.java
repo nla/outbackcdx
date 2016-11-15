@@ -125,6 +125,9 @@ public class WbCdxApi {
                     case "redirect":
                         out.value(capture.redirecturl);
                         break;
+                    case "length":
+                        out.value(capture.length);
+                        break;
                     case "offset":
                         out.value(capture.compressedoffset);
                         break;
