@@ -6,6 +6,9 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.nio.channels.Channel;
 import java.nio.channels.ServerSocketChannel;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 
 public class Main {
@@ -23,6 +26,7 @@ public class Main {
     public static void main(String args[]) {
         String host = null;
         int port = 8080;
+        int webThreads = Runtime.getRuntime().availableProcessors();
         boolean inheritSocket = false;
         File dataPath = new File("data");
         boolean verbose = false;
@@ -45,6 +49,9 @@ public class Main {
                 case "-v":
                     verbose = true;
                     break;
+                case "-t":
+                    webThreads = Integer.parseInt(args[++i]);
+                    break;
                 default:
                     usage();
                     break;
@@ -55,12 +62,18 @@ public class Main {
             Webapp controller = new Webapp(dataStore, verbose);
             ServerSocket socket = openSocket(host, port, inheritSocket);
             Web.Server server = new Web.Server(socket, controller);
-            server.start();
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                server.stop();
-                dataStore.close();
-            }));
-            Thread.sleep(Long.MAX_VALUE);
+            ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
+            try {
+                server.setAsyncRunner(threadPool::execute);
+                server.start();
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    server.stop();
+                    dataStore.close();
+                }));
+                Thread.sleep(Long.MAX_VALUE);
+            } finally {
+                threadPool.shutdown();
+            }
         } catch (InterruptedException | IOException e) {
             e.printStackTrace();
         }
