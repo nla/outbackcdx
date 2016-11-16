@@ -42,24 +42,27 @@ public class Index {
      * Returns all captures for the given url.
      */
     public Iterable<Capture> query(String surt, String accessPoint) {
-        byte[] key = Capture.encodeKey(resolveAlias(surt), 0);
-        return () -> filteredCaptures(key, record -> record.urlkey.equals(surt), accessPoint, false);
+        String urlkey = resolveAlias(surt);
+        byte[] key = Capture.encodeKey(urlkey, 0);
+        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey), accessPoint, false);
     }
 
     /**
      * Returns all captures for the given url in reverse order.
      */
     public Iterable<Capture> reverseQuery(String surt, String accessPoint) {
-        byte[] key = Capture.encodeKey(resolveAlias(surt), 99999999999999L);
-        return () -> filteredCaptures(key, record -> record.urlkey.equals(surt), accessPoint, true);
+        String urlkey = resolveAlias(surt);
+        byte[] key = Capture.encodeKey(urlkey, 99999999999999L);
+        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey), accessPoint, true);
     }
 
     /**
      * Returns all captures for the given url ordered by distance from the given timestamp.
      */
     public Iterable<Capture> closestQuery(String surt, long targetTimestamp, String accessPoint) {
-        byte[] key = Capture.encodeKey(resolveAlias(surt), targetTimestamp);
-        Predicate<Capture> scope = record -> record.urlkey.equals(surt);
+        String urlkey = resolveAlias(surt);
+        byte[] key = Capture.encodeKey(urlkey, targetTimestamp);
+        Predicate<Capture> scope = record -> record.urlkey.equals(urlkey);
         return () -> new ClosestTimestampIterator(targetTimestamp,
                 filteredCaptures(key, scope, accessPoint, false),
                 filteredCaptures(key, scope, accessPoint, true));
