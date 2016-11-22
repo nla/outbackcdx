@@ -3,6 +3,8 @@ package tinycdxserver;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import com.googlecode.concurrenttrees.radixinverted.ConcurrentInvertedRadixTree;
 import com.googlecode.concurrenttrees.radixinverted.InvertedRadixTree;
+import org.netpreserve.urlcanon.Canonicalizer;
+import org.netpreserve.urlcanon.ParsedUrl;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -138,6 +140,16 @@ class AccessControl {
     }
 
     /**
+     * Find all rules that may apply to the given URL.
+     */
+    List<AccessRule> rulesForUrl(String url) {
+        ParsedUrl parsed = ParsedUrl.parseUrl(url);
+        Canonicalizer.WHATWG.canonicalize(parsed);
+        String ssurt = parsed.ssurt().toString();
+        return rulesBySurt.prefixing(ssurt);
+    }
+
+    /**
      * Returns a predicate which can be used to filter a list of captures.
      */
     public Predicate<Capture> filter(String accessPoint, Date accessTime) {
@@ -154,9 +166,8 @@ class AccessControl {
                 if (Objects.equals(previousUrl, capture.original)) {
                     rules = previousRules;
                 } else {
-                    String ssurt = SSURT.fromUrl(capture.original);
                     previousUrl = capture.original;
-                    previousRules = rules = rulesForSsurt(ssurt);
+                    previousRules = rules = rulesForUrl(capture.original);
                 }
 
                 for (AccessRule rule : rules) {

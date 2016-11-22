@@ -84,7 +84,7 @@ public class WebappTest {
         assertEquals(5, GSON.fromJson(GET("/testap/access/policies"), AccessPolicy[].class).length);
 
         createRule(publicPolicyId, "");
-        long ruleId = createRule(staffPolicyId, "(org,ex,a,)");
+        long ruleId = createRule(staffPolicyId, "*.a.ex.org");
 
         assertEquals(2, GSON.fromJson(GET("/testap/access/rules"), AccessRule[].class).length);
 
@@ -114,7 +114,7 @@ public class WebappTest {
 
         AccessRule rule = GSON.fromJson(GET("/testap/access/rules/" + ruleId), AccessRule.class);
         rule.urlPatterns.clear();
-        rule.urlPatterns.add("(org,ex,b,)");
+        rule.urlPatterns.add("*.b.ex.org");
 
         POST("/testap/access/rules", GSON.toJson(rule));
 

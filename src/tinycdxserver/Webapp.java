@@ -72,6 +72,7 @@ class Webapp implements Web.Handler {
             router.on(GET, "/<collection>/ap/<accesspoint>", this::query)
                     .on(GET, "/<collection>/access/rules", this::listAccessRules)
                     .on(POST, "/<collection>/access/rules", this::createAccessRule)
+                    .on(GET, "/<collection>/access/rules/new", this::getNewAccessRule)
                     .on(GET, "/<collection>/access/rules/<ruleId>", this::getAccessRule)
                     .on(DELETE, "/<collection>/access/rules/<ruleId>", this::deleteAccessRule)
                     .on(GET, "/<collection>/access/policies", this::listAccessPolicies)
@@ -227,6 +228,11 @@ class Webapp implements Web.Handler {
         if (rule == null) {
             return notFound();
         }
+        return jsonResponse(rule);
+    }
+
+    private Response getNewAccessRule(IHTTPSession request) {
+        AccessRule rule = new AccessRule();
         return jsonResponse(rule);
     }
 

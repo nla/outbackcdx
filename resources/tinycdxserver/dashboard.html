@@ -272,6 +272,15 @@
         .big-table tr {
             border-bottom: solid 1px #eeeeee;
         }
+
+        .hint {
+            color: #909090;
+            font-size: 14px;
+        }
+
+        .url-patterns-field {
+            height: 120px;
+        }
     </style>
     <link href="lib/pikaday/1.4.0/pikaday.css" rel="stylesheet">
     <script src="lib/vue/2.0.1/vue.js"></script>
@@ -456,8 +465,13 @@
             <p>
                 <label>
                     URLs matching any of these patterns
-                    <textarea class="form-field"></textarea>
+                    <textarea class="form-field url-patterns-field"
+                              v-bind:value="rule.urlPatterns ? rule.urlPatterns.join('\n') : ''"
+                              v-on:input="rule.urlPatterns = $event.target.value.split('\n')"></textarea>
                 </label>
+                <span class="hint">
+                    e.g. *.foo.org http://foo.org/path/* http://foo.org/page.html
+                </span>
             </p>
             <p>
                 <label>
@@ -472,8 +486,6 @@
                 </label>
             </p>
             <period v-model="rule.period"></period>
-        </div>
-        <div class="form">
             <p>
                 <label>
                     Access Policy
@@ -498,7 +510,7 @@
             </p>
             <p>
                 <button @click="save">Save</button>
-                <button>Cancel</button>
+                <button @click="cancel">Cancel</button>
             </p>
         </div>
 
@@ -537,6 +549,14 @@
                                 collection: this.$route.params.collection,
                             }
                         }));
+            },
+            cancel: function() {
+                this.$router.replace({
+                    name: 'access-rule-list',
+                    params: {
+                        collection: this.$route.params.collection,
+                    }
+                });
             },
             fetchData: function () {
                 // load in parallel but policy list must be populated first
@@ -583,9 +603,9 @@
             </tr>
             <tr v-for="rule in rules">
                 <td>
-                    <ul v-for="pattern in rule.patterns">
-                        <li>{{pattern}}</li>
-                    </ul>
+                    <span v-for="pattern in rule.urlPatterns">
+                        {{pattern}}<br>
+                    </span>
                 </td>
                 <td>
                     <div  v-if="rule.captured && (rule.captured.start || rule.captured.end)">

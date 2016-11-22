@@ -14,7 +14,7 @@ public class AccessRule {
     DateRange accessed;
     Period period;
     String privateComment;
-    String publicComment;
+    String publicMessage;
     boolean enabled;
 
     /**
@@ -47,7 +47,7 @@ public class AccessRule {
             return false;
         if (privateComment != null ? !privateComment.equals(that.privateComment) : that.privateComment != null)
             return false;
-        return publicComment != null ? publicComment.equals(that.publicComment) : that.publicComment == null;
+        return publicMessage != null ? publicMessage.equals(that.publicMessage) : that.publicMessage == null;
 
     }
 
@@ -60,12 +60,12 @@ public class AccessRule {
         result = 31 * result + (accessed != null ? accessed.hashCode() : 0);
         result = 31 * result + (period != null ? period.hashCode() : 0);
         result = 31 * result + (privateComment != null ? privateComment.hashCode() : 0);
-        result = 31 * result + (publicComment != null ? publicComment.hashCode() : 0);
+        result = 31 * result + (publicMessage != null ? publicMessage.hashCode() : 0);
         result = 31 * result + (enabled ? 1 : 0);
         return result;
     }
 
     Stream<String> ssurtPrefixes() {
-        return urlPatterns.stream().map(SSURT::prefixFromPattern);
+        return urlPatterns.stream().map(UrlPatterns::toSsurtPrefix);
     }
 }

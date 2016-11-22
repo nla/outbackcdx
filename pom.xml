@@ -126,9 +126,9 @@
             <version>2.4.0</version>
         </dependency>
         <dependency>
-            <groupId>io.mola.galimatias</groupId>
-            <artifactId>galimatias</artifactId>
-            <version>0.2.0</version>
+            <groupId>com.github.iipc</groupId>
+            <artifactId>urlcanon</artifactId>
+            <version>84d997a</version>
         </dependency>
 
         <!--
@@ -176,5 +176,12 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
 
 </project>
