@@ -1,35 +1,11 @@
 package tinycdxserver;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.Closeable;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.io.PushbackInputStream;
-import java.io.UnsupportedEncodingException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.net.URLDecoder;
+import java.io.*;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.StringTokenizer;
-import java.util.TimeZone;
+import java.util.*;
 
 /**
  * A simple, tiny, nicely embeddable HTTP server in Java
@@ -219,7 +195,6 @@ public abstract class NanoHTTPD {
                             }
                         });
                     } catch (IOException e) {
-                        e.printStackTrace();
                     }
                 } while (!myServerSocket.isClosed());
             }
@@ -549,7 +524,6 @@ public abstract class NanoHTTPD {
                 safeClose(data);
             } catch (IOException ioe) {
                 // Couldn't write? No can do.
-                ioe.printStackTrace();
             }
         }
 
@@ -635,6 +609,10 @@ public abstract class NanoHTTPD {
 
         public void setChunkedTransfer(boolean chunkedTransfer) {
             this.chunkedTransfer = chunkedTransfer;
+        }
+
+        public IStreamer getStreamer() {
+            return streamer;
         }
 
         public interface IStatus {
@@ -808,6 +786,8 @@ public abstract class NanoHTTPD {
                 parms = new HashMap<String, String>();
                 if (null == headers) {
                     headers = new HashMap<String, String>();
+                } else {
+                    headers.clear();
                 }
 
                 // Create a BufferedReader for parsing the header.
@@ -831,7 +811,9 @@ public abstract class NanoHTTPD {
                 Response r = serve(this);
 
                 // ensure body is consumed
-                bodyStream.skip(contentLength);
+                if (contentLength > 0) {
+                    bodyStream.skip(contentLength);
+                }
 
                 if (r == null) {
                     throw new ResponseException(Response.Status.INTERNAL_ERROR, "SERVER INTERNAL ERROR: Serve() returned a null response.");

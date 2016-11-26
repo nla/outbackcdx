@@ -19,6 +19,9 @@ public class CaptureTest {
 
         Capture dst = new Capture(key, value);
         assertFieldsEqual(src, dst);
+
+        assertEquals(src.date(), dst.date());
+        assertEquals(src.date().getTime(), 1388579640000L);
     }
 
     static void assertFieldsEqual(Capture src, Capture dst) {

@@ -1,21 +1,20 @@
 package tinycdxserver;
 
-import org.archive.accesscontrol.AccessControlClient;
-import org.archive.accesscontrol.RobotsUnavailableException;
-import org.archive.accesscontrol.RuleOracleUnavailableException;
-
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.nio.channels.Channel;
 import java.nio.channels.ServerSocketChannel;
-import java.util.Date;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 
 public class Main {
     public static void usage() {
-        System.err.println("Usage: java " + Server.class.getName() + " [options...]");
+        System.err.println("Usage: java " + Main.class.getName() + " [options...]");
         System.err.println("");
-        System.err.println("  -a url        Use a wayback access control oracle");
         System.err.println("  -b bindaddr   Bind to a particular IP address");
         System.err.println("  -d datadir    Directory to store index data under");
         System.err.println("  -i            Inherit the server socket via STDIN (for use with systemd, inetd etc)");
@@ -27,6 +26,7 @@ public class Main {
     public static void main(String args[]) {
         String host = null;
         int port = 8080;
+        int webThreads = Runtime.getRuntime().availableProcessors();
         boolean inheritSocket = false;
         File dataPath = new File("data");
         boolean verbose = false;
@@ -34,9 +34,6 @@ public class Main {
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
-                case "-a":
-                    filter = accessControlFilter(args[++i]);
-                    break;
                 case "-p":
                     port = Integer.parseInt(args[++i]);
                     break;
@@ -52,40 +49,43 @@ public class Main {
                 case "-v":
                     verbose = true;
                     break;
+                case "-t":
+                    webThreads = Integer.parseInt(args[++i]);
+                    break;
                 default:
                     usage();
                     break;
             }
         }
 
-        try (DataStore dataStore = new DataStore(dataPath, filter)) {
-            final Server server;
-            Channel channel = System.inheritedChannel();
-            if (inheritSocket && channel != null && channel instanceof ServerSocketChannel) {
-                server = new Server(dataStore, ((ServerSocketChannel) channel).socket());
-            } else {
-                server = new Server(dataStore, host, port);
+        try (DataStore dataStore = new DataStore(dataPath)) {
+            Webapp controller = new Webapp(dataStore, verbose);
+            ServerSocket socket = openSocket(host, port, inheritSocket);
+            Web.Server server = new Web.Server(socket, controller);
+            ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
+            try {
+                server.setAsyncRunner(threadPool::execute);
+                server.start();
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    server.stop();
+                    dataStore.close();
+                }));
+                Thread.sleep(Long.MAX_VALUE);
+            } finally {
+                threadPool.shutdown();
             }
-            server.verbose = verbose;
-            server.start();
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                server.stop();
-                dataStore.close();
-            }));
-            Thread.sleep(Long.MAX_VALUE);
         } catch (InterruptedException | IOException e) {
             e.printStackTrace();
         }
     }
 
-    private static Predicate<Capture> accessControlFilter(String oracleUrl) {
-        AccessControlClient client = new AccessControlClient(oracleUrl);
-        return capture -> {
-            try {
-                return "allow".equals(client.getPolicy(capture.original, new Date(capture.timestamp), new Date(), "public"));
-            } catch (RobotsUnavailableException | RuleOracleUnavailableException e) {
-                throw new RuntimeException(e);
-            }
-        };
+    private static ServerSocket openSocket(String host, int port, boolean inheritSocket) throws IOException {
+        ServerSocket socket;Channel channel = System.inheritedChannel();
+        if (inheritSocket && channel != null && channel instanceof ServerSocketChannel) {
+            socket = ((ServerSocketChannel) channel).socket();
+        } else {
+            socket = new ServerSocket(port, -1, InetAddress.getByName(host));
+        }
+        return socket;
     }
 }

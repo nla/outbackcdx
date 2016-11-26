@@ -1,0 +1,771 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>OutbackCDX</title>
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    <style>
+        /*
+
+        .color-primary-0 { color: #FE7119 }
+        .color-primary-1 { color: #FFA770 }
+        .color-primary-2 { color: #FF8D46 }
+        .color-primary-3 { color: #D15000 }
+        .color-primary-4 { color: #A53F00 }
+
+        .color-secondary-1-0 { color: #FEBC19 }
+        .color-secondary-1-1 { color: #FFD670 }
+        .color-secondary-1-2 { color: #FFCA46 }
+        .color-secondary-1-3 { color: #D19500 }
+        .color-secondary-1-4 { color: #A57600 }
+
+        .color-secondary-2-0 { color: #253BAE }
+        .color-secondary-2-1 { color: #6776CA }
+        .color-secondary-2-2 { color: #4356B7 }
+        .color-secondary-2-3 { color: #12268F }
+        .color-secondary-2-4 { color: #0C1C71 }
+
+        .color-complement-0 { color: #10A483 }
+        .color-complement-1 { color: #56C3AB }
+        .color-complement-2 { color: #30AE92 }
+        .color-complement-3 { color: #008769 }
+        .color-complement-4 { color: #006A53 }
+        */
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            font-family: 'Roboto', 'Noto', 'Helvetica', sans-serif;
+            height: 100%;
+        }
+
+        .status-bar {
+            background: #D15000;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 24px;
+        }
+        .bg-top{
+            height: 96px;
+            background: #FE7119;
+            position: absolute;
+            top: 24px;
+            left: 0;
+            right: 0;
+            z-index: -1;
+        }
+
+        h1 {
+            color: #A53F00;
+            margin: 16px;
+            margin-top: 0px;
+            margin-left: 16px;
+            line-height: 24px;
+            font-size: 34px;
+            font-weight: 300;
+        }
+
+        .logo {
+            display: block;
+            margin-left: 80px;
+            margin-top: 8px;
+            margin-bottom: -6px;
+        }
+
+
+        .app-bar {
+            position: absolute;
+            top: 24px;
+            left: 232px;
+            right: 56px;
+            height: 48px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+        }
+
+        main {
+            position: absolute;
+            top: 72px;
+            left: 232px;
+            right: 56px;
+            background: white;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+            border-radius: 2px;
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+
+        }
+
+        .left-nav {
+            margin-top: 120px;
+            width: 232px;
+            border-radius: 2px;
+        }
+
+        .searchbox {
+            display: block;
+            width: 100%;
+            padding-left: 12px;
+            height: 48px;
+            font-size: 20px;
+            font-weight: 500;
+            border: none;
+            border-bottom: 1px solid #ccc;
+            border-radius: 2px;
+        }
+
+        aside h2 {
+            display: block;
+            font-size: 16px;
+            font-weight: 500;
+            padding: 16px;
+            margin: 0;
+            color: #909090;
+        }
+
+        aside ul {
+            list-style: none;
+            font-size: 16px;
+            line-height: 16px;
+            font-weight: 500;
+            margin: 0;
+            padding: 0;
+        }
+
+        aside ul li a {
+            display: block;
+            height: 48px;
+            text-decoration: none;
+            color: #000;
+
+        }
+        aside ul li a.active {
+            background: #eeeeee;
+        }
+
+        .icon {
+            vertical-align: middle;
+            margin: 16px;
+        }
+
+        .tabs ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: row;
+        }
+
+        .tabs li a {
+            display: block;
+            color: #fff;
+            opacity: 0.7;
+            text-transform: uppercase;
+            font-size: 13px;
+            font-weight: 500;
+            min-width: 160px;
+            padding-left: 12px;
+            padding-right: 12px;
+            text-align: center;
+            height: 48px;
+            line-height: 48px;
+            text-decoration: none;
+        }
+
+        .tabs li a.active {
+            opacity: 1;
+            border-bottom: 3px solid #FFE3D2;
+        }
+        .tabs li a:hover {
+            opacity: 1;
+        }
+
+        .status-ok {
+            color: darkgreen;
+        }
+        .status-error {
+            color: darkred;
+        }
+        .status-redirect {
+            color: darkblue;
+        }
+
+        .table {
+            color: #000000;
+            font-weight: 300;
+            font-size: 13px;
+            border-collapse: collapse;
+        }
+
+        .table th {
+            color: #575757;
+            font-weight: 500;
+            text-align: left;
+            text-transform: uppercase;
+            margin-left: 56px;
+        }
+
+        .table tr:hover {
+            background: #eeeeee;
+        }
+
+        .form label {
+            color: #363636;
+            font-size: 12px;
+        }
+
+        .form {
+            padding-left: 16px;
+            padding-right: 16px;
+            flex: 1 1;
+        }
+
+        .form .form-field {
+            width: 100%;
+        }
+
+        .column {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .row {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .period-field {
+            display: inline-flex;
+            flex-direction: row;
+        }
+
+        .period-field label {
+            display: flex;
+            flex-direction: column;
+            margin-right: 12px;
+        }
+
+        .period-field input {
+            width: 5em;
+            padding-left: 8px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+        }
+
+        .table ul {
+            padding: 0;
+            list-style: none;
+        }
+
+        .table tr td, .table tr th {
+            padding-left: 16px;
+            padding-right: 16px;
+        }
+
+        .big-table {
+            width: 100%;
+        }
+
+        .big-table tr {
+            border-bottom: solid 1px #eeeeee;
+        }
+    </style>
+    <link href="lib/pikaday/1.4.0/pikaday.css" rel="stylesheet">
+    <script src="lib/vue/2.0.1/vue.js"></script>
+    <script src="lib/vue-router/2.0.0/vue-router.js"></script>
+    <script src="lib/lodash/4.15.0/lodash.min.js"></script>
+    <script src="lib/moment/2.15.2/moment.min.js"></script>
+    <script src="lib/pikaday/1.4.0/pikaday.js"></script>
+    <script src="api.js"></script>
+    <script>
+        function urlTemplate(template, pathParams, queryParams) {
+            var path = template;
+            for (var key in pathParams) {
+                path = path.replace('{' + key + '}', encodeURIComponent(pathParams[key]));
+            }
+            var qs = "";
+            if (queryParams) {
+                for (var key in queryParams) {
+                    if (queryParams[key]) {
+                        qs += qs ? "&" : "?";
+                        qs += encodeURIComponent(key) + "=" + encodeURIComponent(queryParams[key]);
+                    }
+                }
+            }
+            return path + qs;
+        }
+    </script>
+</head>
+<body>
+
+
+<!-----------------------------------------------------------------------
+   Query component
+------------------------------------------------------------------------->
+
+<script type="x-template" id="query-template">
+    <main id="query">
+        <input placeholder="URL query" class="searchbox" v-model="query">
+        <table v-if="rows.length > 0" class="table">
+            <tr>
+                <th v-for="field in fields">{{ field }}</th>
+            </tr>
+            <tr v-for="row in rows">
+                <td v-for="(val, i) in row"
+                    :class="classForField(i, val)">{{ val }}
+                </td>
+            </tr>
+        </table>
+
+    </main>
+</script>
+
+<script>
+    var Query = {
+        template: "#query-template",
+        data: function() { return {
+            query: "",
+            fields: ["status", "url", "timestamp"],
+            rows: []
+        }},
+        watch: {
+            '$route': 'onQueryInput',
+            query: function(value) {
+                this.$router.replace({
+                    name: 'query',
+                    params: this.$route.params,
+                    query: {
+                        url: value
+                    }
+                });
+            }
+        },
+        methods: {
+            onQueryInput: _.throttle(function () {
+                var query = {
+                    url: this.query,
+                    limit: 100,
+                    fl: this.fields.join(","),
+                    output: 'json'
+                };
+                fetch(urlTemplate("/{collection}", this.$route.params, query))
+                        .then(r => r.json())
+                        .then(rows => this.rows = rows ? rows.slice(1) : []);
+            }, 250),
+            classForField: function (i, value) {
+                if (this.fields[i] == "status") {
+                    if (value < 300) {
+                        return "status-ok";
+                    } else if (value < 400) {
+                        return "status-redirect";
+                    } else {
+                        return "status-error";
+                    }
+                }
+            }
+        }
+    };
+</script>
+
+<!-----------------------------------------------------------------------
+   Date Range component
+------------------------------------------------------------------------->
+
+<script type="x-template" id="date-range-template">
+    <div><input placeholder="Start date"> – <input placeholder="End date"></div>
+</script>
+
+<script>
+    Vue.component('date-range', {
+        template: '#date-range-template',
+        props: ['value'],
+        watch: {
+            value: function(value) {
+                this.startPicker.setDate(value && value.start ? moment(value.start).toDate() : null, true);
+                this.endPicker.setDate(value && value.start ? moment(value.end).toDate() : null, true);
+            }
+        },
+        mounted: function() {
+            var emitInput = () => {
+                var value = {
+                    start: startPicker.getMoment().startOf('day').format(),
+                    end: endPicker.getMoment().endOf('day').format()
+                };
+                this.$emit('input', value)
+            }, startPicker = new Pikaday({
+                field: this.$el.getElementsByTagName('input')[0],
+                onSelect: function() {
+                    var startDate = startPicker.getDate();
+                    startPicker.setStartRange(startDate);
+                    endPicker.setStartRange(startDate);
+                    emitInput();
+                }.bind(this)
+            }), endPicker = new Pikaday({
+                field: this.$el.getElementsByTagName('input')[1],
+                onSelect: function() {
+                    var endDate = endPicker.getDate();
+                    startPicker.setEndRange(endDate);
+                    endPicker.setEndRange(endDate);
+                    emitInput();
+                }.bind(this)
+            });
+            this.startPicker = startPicker;
+            this.endPicker = endPicker;
+        }
+    });
+</script>
+
+<!-----------------------------------------------------------------------
+   Period Component
+------------------------------------------------------------------------->
+
+<script type="x-template" id="period-template">
+    <div class="period-field">
+        <label>For a period of</label>
+        <label>years <input type="number" min="0" v-model="value.years" @input="onInput"></label>
+        <label>months <input type="number" min="0" v-model="value.months" @input="onInput"></label>
+        <label>days <input type="number" min="0" v-model="value.days" @input="onInput"></label>
+        <label>after capture</label>
+    </div>
+</script>
+
+<script>
+    Vue.component('period', {
+        template: '#period-template',
+        props: ['value'],
+        methods: {
+            onInput: function(event) {
+                if (event.target.value == '0') {
+                    event.target.value = '';
+                }
+            }
+        }
+    });
+</script>
+
+<!-----------------------------------------------------------------------
+   Access Rule Editor
+------------------------------------------------------------------------->
+
+<script type="x-template" id="access-rule-template">
+    <main id="access-rules" class="row">
+        <div class="form">
+            <p>
+                <label>
+                    URLs matching any of these patterns
+                    <textarea class="form-field"></textarea>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Captured between
+                    <date-range v-model="rule.captured"></date-range>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Accessed between
+                    <date-range v-model="rule.accessed"></date-range>
+                </label>
+            </p>
+            <period v-model="rule.period"></period>
+        </div>
+        <div class="form">
+            <p>
+                <label>
+                    Access Policy
+                    <select class="form-field" v-model="rule.policyId">
+                        <option v-for="policy in policies" :value="policy.id">
+                        {{policy.name}}
+                        </option>
+                    </select>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Public Message
+                    <textarea v-model="rule.publicMessage" class="form-field"></textarea>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Private Comment
+                    <textarea v-model="rule.privateComment" class="form-field"></textarea>
+                </label>
+            </p>
+            <p>
+                <button @click="save">Save</button>
+                <button>Cancel</button>
+            </p>
+        </div>
+
+    </main>
+</script>
+
+<script>
+    var AccessRule = {
+        template: "#access-rule-template",
+        data: function() {
+            return {
+                rule: {
+                    privateComment: "comment",
+                    publicMessage: "msg",
+                    embargo: "4Y",
+                    period: {},
+                },
+                policies: []
+            };
+        },
+        created: function() {
+            this.fetchData();
+        },
+        watch: {
+            '$route': 'fetchData'
+        },
+        methods: {
+            save: function () {
+                fetch(urlTemplate("/{collection}/access/rules", this.$route.params),
+                        {method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(this.rule)})
+                        .then(r => this.$router.replace({
+                            name: 'access-rule-list',
+                            params: {
+                                collection: this.$route.params.collection,
+                            }
+                        }));
+            },
+            fetchData: function () {
+                // load in parallel but policy list must be populated first
+                Promise.all([
+                    fetch(urlTemplate("{collection}/access/policies", this.$route.params)).then(r => r.json()),
+                    fetch(urlTemplate("{collection}/access/rules/{ruleId}", this.$route.params)).then(r => r.json())
+                ]).then(([policies, rule]) => {
+                    this.policies = policies;
+                    // the objects need to be present for the model binding
+                    if (rule.period == undefined) {
+                        rule.period = {};
+                    }
+                    if (rule.captured == undefined) {
+                        rule.captured = {};
+                    }
+                    if (rule.accessed == undefined) {
+                        rule.accessed = {};
+                    }
+                    this.rule = rule;
+                });
+            }
+        }
+    };
+</script>
+
+<!-----------------------------------------------------------------------
+   Access Rule List
+------------------------------------------------------------------------->
+
+<script type="x-template" id="access-rule-list-template">
+    <main id="access-rule-list">
+        <div class="row">
+            <input placeholder="URL" class="searchbox" :value="this.$route.query.url" @input="onQueryInput">
+
+            <router-link :to="{name: 'access-rule', params: { collection: $route.params.collection, ruleId: 'new' }}">New Rule</router-link>
+        </div>
+
+        <table class="table big-table">
+            <tr>
+                <th>URL</th>
+                <th>Date</th>
+                <th>Policy</th>
+                <th></th>
+            </tr>
+            <tr v-for="rule in rules">
+                <td>
+                    <ul v-for="pattern in rule.patterns">
+                        <li>{{pattern}}</li>
+                    </ul>
+                </td>
+                <td>
+                    <div  v-if="rule.captured && (rule.captured.start || rule.captured.end)">
+                        Captured {{formatDate(rule.captured.start)}}–{{formatDate(rule.captured.end)}}
+                    </div>
+                    <div v-if="rule.accessed && (rule.accessed.start || rule.accessed.end)">
+                        Accessed {{formatDate(rule.accessed.start)}}–{{formatDate(rule.accessed.end)}}
+                    </div>
+                    <div v-if="rule.period && (rule.period.days || rule.period.months || rule.period.years)">
+                        Period
+                        <span v-if="rule.period.years">{{rule.period.years}}y</span>
+                        <span v-if="rule.period.months">{{rule.period.months}}m</span>
+                        <span v-if="rule.period.days">{{rule.period.days}}d</span>
+                    </div>
+                </td>
+                <td>
+                    {{policyNames[rule.policyId]}}
+                </td>
+                <td>
+                    <router-link :to="{name: 'access-rule', params: {collection: $route.params.collection, ruleId: rule.id}}">Edit</router-link>
+                </td>
+            </tr>
+        </table>
+    </main>
+</script>
+
+<script>
+    var AccessRuleList = {
+        template: "#access-rule-list-template",
+        data: function() {
+            return {
+                policyNames: {},
+                rules: []
+            };
+        },
+        created: function() {
+            this.fetchData();
+        },
+        watch: {
+            '$route': 'fetchData'
+        },
+        methods: {
+            formatDate: function(date) {
+                return date ? moment(date).format('YYYY-MM-DD') : "";
+            },
+            onQueryInput: function(event) {
+                var url = event.target.value;
+                this.$router.replace({
+                    name: 'access-rule-list',
+                    params: {
+                        collection: this.$route.params.collection,
+                    },
+                    query: url ? {url} : null,
+                });
+            },
+            fetchData: _.throttle(function() {
+                Promise.all([
+                    fetch(urlTemplate('{collection}/access/policies', this.$route.params)).then(r => r.json()),
+                    fetch(urlTemplate('{collection}/access/rules', this.$route.params, this.$route.query)).then(r => r.json())
+                ]).then(([policies, rules]) => {
+                    policies.forEach(policy => this.policyNames[policy.id] = policy.name);
+                    this.rules = rules;
+                });
+            }, 250)
+        }
+    };
+</script>
+
+<!-----------------------------------------------------------------------
+    Access Policies List
+------------------------------------------------------------------------->
+
+<script type="x-template" id="access-policy-list-template">
+    <main id="access-policy-list">
+        <table class="table big-table">
+            <tr>
+                <th>Name</th>
+                <th>Access Points</th>
+            </tr>
+            <tr v-for="policy in policies">
+                <td>{{policy.name}}</td>
+                <td>{{policy.accessPoints.join(", ")}}</td>
+            </tr>
+        </table>
+    </main>
+</script>
+
+<script>
+    var AccessPolicyList = {
+        template: "#access-policy-list-template",
+        data: function() {
+            return {
+                policies: []
+            };
+        },
+        created: function() {
+            this.fetchData();
+        },
+        watch: {
+            '$route': 'fetchData'
+        },
+        methods: {
+            fetchData: _.throttle(function() {
+                fetch(urlTemplate('{collection}/access/policies', this.$route.params,
+                        this.$route.query)).then(r => r.json())
+                        .then(policies => this.policies = policies);
+            }, 250)
+        }
+    };
+</script>
+
+
+<!-----------------------------------------------------------------------
+   Main app
+------------------------------------------------------------------------->
+<div id="app" class="row">
+    <div class="status-bar">
+    </div>
+    <div class="bg-top">
+        <img src="outback.svg" width="55px" height="54px" class="logo">
+        <h1>OutbackCDX</h1>
+    </div>
+
+    <div class="app-bar">
+        <nav class="tabs" v-if="$route && $route.params.collection">
+            <ul>
+                <li><router-link :to="'/' + $route.params.collection" exact>Query</router-link></li>
+                <li v-if="featureFlags.experimentalAccessControl"><router-link :to="'/' + $route.params.collection + '/access/rules'">Access Rules</router-link></li>
+                <li v-if="featureFlags.experimentalAccessControl"><router-link :to="'/' + $route.params.collection + '/access/policies'">Access Policies</router-link></li>
+            </ul>
+        </nav>
+    </div>
+
+    <aside class="left-nav">
+        <h2>Collections <img src="add.svg" width="18px" height="18px" style="vertical-align: top" alt="Add"></h2>
+        <ul>
+            <li v-for="col in collections">
+                <router-link :to="'/' + col">
+                    <img class="icon" src="database.svg" width="20px" height="20px">{{ col }}
+                </router-link>
+            </li>
+        </ul>
+    </aside>
+    <router-view></router-view>
+</div>
+
+<script>
+
+    var router = new VueRouter({
+        linkActiveClass: "active",
+        routes: [
+            {path: '/:collection', name: 'query', component: Query},
+            {path: '/:collection/access/rules', name: 'access-rule-list', component: AccessRuleList},
+            {path: '/:collection/access/rules/:ruleId', name: 'access-rule', component: AccessRule},
+            {path: '/:collection/access/policies', name: 'access-policy-list', component: AccessPolicyList},
+        ]
+    });
+
+    var app = new Vue({
+        router,
+        el: "#app",
+        data: {
+            collection: null,
+            collections: {},
+            stats: null,
+            featureFlags: {}
+        },
+        created: function() {
+            var self = this;
+            fetch("api/featureflags").then(r => r.json())
+                    .then(featureFlags => this.featureFlags = featureFlags);
+            fetch("api/collections").then(r => r.json()).then(collections => {
+                this.collections = collections;
+                if (collections && !self.activeCollection) {
+                    self.activeCollection = collections[0];
+                }
+            });
+        }
+    });
+</script>
+
+</body>
+</html>

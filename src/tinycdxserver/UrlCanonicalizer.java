@@ -33,7 +33,7 @@ public class UrlCanonicalizer {
     private static final Pattern CF_SESSIONID = Pattern.compile("(?:^|&)cfid=[0-9]+&cftoken=[0-9a-z-]+");
     private static final Pattern TABS_OR_LINEFEEDS = Pattern.compile("[\t\r\n]");
     private static final Pattern UNDOTTED_IP = Pattern.compile("(?:0x)?[0-9]{1,12}");
-    private static final Pattern DOTTED_IP = Pattern.compile("[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}");
+    static final Pattern DOTTED_IP = Pattern.compile("[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}");
 
     private static URL makeUrl(String rawUrl) throws MalformedURLException {
         rawUrl = TABS_OR_LINEFEEDS.matcher(rawUrl).replaceAll("");
@@ -126,7 +126,7 @@ public class UrlCanonicalizer {
         return scheme;
     }
 
-    private static String canonicalizeQuery(String query) {
+    static String canonicalizeQuery(String query) {
         if (query != null) {
             query = query.toLowerCase();
             String fields[] = query.split("&");
@@ -163,7 +163,6 @@ public class UrlCanonicalizer {
     private static String canonicalizeHost(String host) {
         host = host.replace("..", ".");
         if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
-        host = host.replaceFirst("\\.$", "");
         host = IDN.toASCII(host);
         host = host.toLowerCase();
         host = canonicalizeUrlEncoding(host);
@@ -173,7 +172,7 @@ public class UrlCanonicalizer {
         return host;
     }
 
-    private static String canonicalizePathSegments(String path) {
+    static String canonicalizePathSegments(String path) {
         ArrayList<String> out = new ArrayList<String>();
         for (String segment : path.split("/")) {
             if (segment.equals("..")) {
@@ -205,7 +204,10 @@ public class UrlCanonicalizer {
         return host; // not an IP
     }
 
-    private static String canonicalizeUrlEncoding(String s) {
+    static String canonicalizeUrlEncoding(String s) {
+        if (s == null) {
+            return null;
+        }
         return urlEncodeIllegals(fullyUrlDecode(s));
     }
 

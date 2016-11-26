@@ -9,7 +9,9 @@ import java.net.URLDecoder;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.logging.Logger;
 
 /**
@@ -20,18 +22,20 @@ public class XmlQuery {
     final static String DEFAULT_ENCODING = "UTF-8";
 
     final Index index;
+    final String accessPoint;
     final String queryUrl;
     final long offset;
     final long limit;
     final String queryType;
 
-    public XmlQuery(NanoHTTPD.IHTTPSession session, final Index index) {
+    public XmlQuery(NanoHTTPD.IHTTPSession session, Index index) {
         this.index = index;
 
         Map<String, String> params = session.getParms();
         Map<String, String> query = decodeQueryString(params.get("q"));
 
-        queryType = query.get("type").toLowerCase();
+        accessPoint = params.get("accesspoint");
+        queryType = query.getOrDefault("type", "urlquery").toLowerCase();
         queryUrl = UrlCanonicalizer.surtCanonicalize(query.get("url"));
 
         offset = Long.parseLong(query.getOrDefault("offset", "0"));
@@ -97,7 +101,7 @@ public class XmlQuery {
         boolean wroteHeader = false;
         int results = 0;
         int i = 0;
-        for (Capture capture : index.query(queryUrl)) {
+        for (Capture capture : index.query(queryUrl, accessPoint)) {
             if (i < offset) {
                 i++;
                 continue;
@@ -113,6 +117,7 @@ public class XmlQuery {
             }
             out.writeStartElement("result");
             writeElement(out, "compressedoffset", capture.compressedoffset);
+            writeElement(out, "compressedendoffset", capture.length);
             writeElement(out, "mimetype", capture.mimetype);
             writeElement(out, "file", capture.file);
             writeElement(out, "redirecturl", capture.redirecturl);
@@ -138,7 +143,9 @@ public class XmlQuery {
     private void prefixQuery(XMLStreamWriter out) throws XMLStreamException {
         boolean wroteHeader = false;
         int i = 0;
-        for (Resource resource : index.prefixQuery(queryUrl)) {
+        Resources it = new Resources(index.prefixQuery(queryUrl, accessPoint).iterator());
+        while (it.hasNext()) {
+            Resource resource = it.next();
             if (i < offset) {
                 i++;
                 continue;
@@ -190,5 +197,56 @@ public class XmlQuery {
 
     public static NanoHTTPD.Response query(NanoHTTPD.IHTTPSession session, Index index) {
         return new XmlQuery(session, index).streamResults();
+    }
+
+    /**
+     * Groups together all captures of the same URL.
+     */
+    private static class Resources implements Iterator<Resource> {
+        private final Iterator<Capture> captures;
+        private Capture capture = null;
+
+        Resources(Iterator<Capture> captures) {
+            this.captures = captures;
+        }
+
+        public boolean hasNext() {
+            return capture != null || captures.hasNext();
+        }
+
+        public Resource next() {
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
+            Resource result = new Resource();
+            String previousDigest = null;
+            if (capture == null) {
+                capture = captures.next();
+            }
+            result.firstCapture = capture;
+            result.lastCapture = capture;
+            while (capture.urlkey.equals(result.firstCapture.urlkey)) {
+                if (previousDigest == null || !previousDigest.equals(capture.digest)) {
+                    result.versions++;
+                    previousDigest = capture.digest;
+                }
+                result.captures++;
+                result.lastCapture = capture;
+                if (!captures.hasNext()) {
+                    capture = null;
+                    break;
+                }
+                capture = captures.next();
+            }
+
+            return result;
+        }
+    }
+
+    static class Resource {
+        long captures;
+        long versions;
+        Capture firstCapture;
+        Capture lastCapture;
     }
 }

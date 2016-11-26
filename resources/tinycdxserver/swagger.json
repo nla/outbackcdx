@@ -1,0 +1,342 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "OutbackCDX API",
+    "version": "unstable",
+    "license": {
+      "name": "Apache 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "x-logo": {
+      "url": "outback.svg"
+    }
+  },
+  "parameters": {
+    "collection": {
+      "name": "collection",
+      "in": "path",
+      "description": "Name of a collection",
+      "required": true,
+      "type": "string"
+    }
+  },
+  "paths": {
+    "/{collection}": {
+      "get": {
+        "tags": [
+          "collection"
+        ],
+        "summary": "CDX Query (pywb)",
+        "operationId": "query",
+        "parameters": [
+          {"$ref": "#/parameters/collection"},
+          {
+            "name": "url",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "matchType",
+            "in": "query",
+            "type": "string",
+            "enum": [
+              "exact",
+              "prefix",
+              "host",
+              "domain"
+            ]
+          }
+        ]
+      }
+    },
+    "/{collection}#xmlquery": {
+      "get": {
+        "tags": [
+          "collection"
+        ],
+        "summary": "XML Query (Wayback)",
+        "description": "Queries a collection using Java Wayback's RemoteResourceIndex \"xmlquery\" protocol.\n\n**Note:** The string '#xmlquery' should not actually appear in the request URL. It's a workaround for a limitation in this documentation format.",
+        "operationId": "query",
+        "parameters": [
+          {"$ref": "#/parameters/collection"},
+          {
+            "name": "q",
+            "in": "query",
+            "type": "string",
+            "description": "Query string. Supported fields are url, type (urlquery/prefixquery), offset and limit. Example: \"url:http://www.example.org/ type:urlquery limit:100\""
+          }
+        ]
+      }
+    },
+    "/{collection}/access/policies": {
+      "post": {
+        "tags": [
+          "access control"
+        ],
+        "summary": "Create or update access policy",
+        "description": "If the given id matches an existing policy then the policy will be updated. If the policy id is omitted a new id will be generated and returned.",
+        "operationId": "putPolicy",
+        "parameters": [
+          {
+            "$ref": "#/parameters/collection"
+          },
+          {
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AccessPolicy"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "201": {
+            "description": "OK and an id was generated",
+            "schema": {
+              "$ref": "#/definitions/GeneratedId"
+            }
+          }
+        }
+      }
+    },
+    "/{collection}/access/policies/{id}": {
+      "get": {
+        "tags": [
+          "access control"
+        ],
+        "summary": "Get access policy",
+        "operationId": "getPolicy",
+        "parameters": [
+          {"$ref": "#/parameters/collection"},
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Identifier of an existing policy"
+          }
+
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/AccessPolicy"
+            }
+          }
+
+        }
+      }
+    },
+    "/{collection}/access/rules": {
+      "post": {
+        "tags": [
+          "access control"
+        ],
+        "summary": "Create or update access rule",
+        "description": "If the given rule id matches an existing rule then the rule will be updated. If the rule id is omitted a new id will be generated and returned.",
+        "operationId": "putRule",
+        "parameters": [
+          {
+            "$ref": "#/parameters/collection"
+          },
+          {
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AccessRule"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "201": {
+            "description": "OK and an id was generated",
+            "schema": {
+              "$ref": "#/definitions/GeneratedId"
+            }
+          }
+        }
+      }
+    },
+    "/{collection}/access/rules/{id}": {
+      "get": {
+        "tags": [
+          "access control"
+        ],
+        "summary": "Get access rule",
+        "operationId": "getRule",
+        "parameters": [
+          {"$ref": "#/parameters/collection"},
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "schema": {
+              "$ref": "#/definitions/AccessRule"
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "access control"
+        ],
+        "summary": "Delete access rule",
+        "operationId": "deleteRule",
+        "parameters": [
+          {
+            "$ref": "#/parameters/collection"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "Identifier of rule to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "GeneratedId": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64",
+          "example": 42,
+          "description": "The id generated for the new record"
+        }
+      }
+    },
+    "AccessPolicy": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "int64",
+          "description": "Unique identifier for this rule. Generated if omitted.",
+          "example": 42
+        },
+        "name": {
+          "type": "string",
+          "description": "Human readable name of this policy",
+          "example": "Public"
+        },
+        "accessPoints": {
+          "description": "Access points permitted to view captures under this policy",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "example": ["public", "staff"]
+        }
+      }
+    },
+    "AccessRule": {
+      "type": "object",
+      "required": [
+        "policyId", "surts"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64",
+          "description": "Unique identifier for this rule. Generated if omitted.",
+          "example": 42
+        },
+        "policyId": {
+          "type": "integer",
+          "format": "int64",
+          "description": "Access policy to apply to captures this rule matches",
+          "example": 2
+        },
+        "publicMessage": {
+          "type": "string",
+          "description": "Access denied message to be shown to users",
+          "example": "Access restricted"
+        },
+        "privateComment": {
+          "type": "string",
+          "description": "Private notes for curators managing this rule",
+          "example": "See correspondence"
+        },
+        "surts": {
+          "type": "array",
+          "description": "Matches captures with URLs that fit any of the given patterns",
+          "items": {
+            "type": "string",
+            "example": "org,example)/"
+          },
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "captured": {
+          "type": "object",
+          "description": "Matches captures collected during this date range",
+          "properties": {
+            "start": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "end": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "accessed": {
+          "type": "object",
+          "description": "Matches captures accessed during this date range",
+          "properties": {
+            "start": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "end": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "period": {
+          "type": "object",
+          "description": "Matches captures accessed during this period after their capture date",
+          "properties": {
+            "years": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "months": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "days": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}

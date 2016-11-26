@@ -5,7 +5,10 @@ import org.apache.commons.codec.binary.Base32;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.Map;
 
 /**
@@ -134,7 +137,10 @@ public class Capture {
         encodeValue(bb);
         return bb.array();
     }
-    
+
+    /**
+     * Format as a CDX11 line.
+     */
     public String toString() {
         StringBuilder out = new StringBuilder();
         out.append(urlkey).append(' ');
@@ -143,7 +149,11 @@ public class Capture {
         out.append(mimetype).append(' ');
         out.append(Integer.toString(status)).append(' ');
         out.append(digest).append(' ');
-        out.append(Long.toString(length));
+        out.append(redirecturl).append(' ');
+        out.append("- "); // TODO robots
+        out.append(Long.toString(length)).append(' ');
+        out.append(compressedoffset).append(' ');
+        out.append(file);
         return out.toString();
     }
 
@@ -168,5 +178,13 @@ public class Capture {
             capture.file = fields[8];
         }
         return capture;
+    }
+
+    public Date date() {
+        return parseTimestamp(timestamp);
+    }
+
+    public static Date parseTimestamp(long timestamp) {
+        return Date.from(LocalDateTime.parse(Long.toString(timestamp), arcTimeFormat).toInstant(ZoneOffset.UTC));
     }
 }

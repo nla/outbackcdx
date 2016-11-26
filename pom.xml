@@ -6,7 +6,7 @@
 
     <groupId>au.gov.nla</groupId>
     <artifactId>tinycdxserver</artifactId>
-    <version>0.3.1</version>
+    <version>0.3.2</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -39,6 +39,43 @@
                                     <mainClass>tinycdxserver.Main</mainClass>
                                 </transformer>
                             </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>org.webjars.npm:vue</artifact>
+                                    <includes>
+                                        <include>META-INF/resources/webjars/vue/2.0.1/dist/vue.js</include>
+                                        <include>META-INF/resources/webjars/vue/2.0.1/LICENSE</include>
+                                    </includes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.webjars.npm:pikaday</artifact>
+                                    <includes>
+                                        <include>META-INF/resources/webjars/pikaday/1.4.0/pikaday.js</include>
+                                        <include>META-INF/resources/webjars/pikaday/1.4.0/css/pikaday.css</include>
+                                        <include>META-INF/resources/webjars/pikaday/1.4.0/LICENSE</include>
+                                    </includes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.webjars.npm:moment</artifact>
+                                    <includes>
+                                        <include>META-INF/resources/webjars/moment/2.15.2/min/moment.min.js</include>
+                                        <include>META-INF/resources/webjars/moment/2.15.2/LICENSE</include>
+                                    </includes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.webjars:lodash</artifact>
+                                    <includes>
+                                        <include>META-INF/resources/webjars/lodash/4.15.0/lodash.min.js</include>
+                                    </includes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.webjars.bower:redoc</artifact>
+                                    <includes>
+                                        <include>META-INF/resources/webjars/redoc/1.4.1/dist/redoc.min.js</include>
+                                        <include>META-INF/resources/webjars/redoc/1.4.1/LICENSE</include>
+                                    </includes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>
@@ -69,42 +106,74 @@
 
     <dependencies>
         <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.10</version>
+        </dependency>
+        <dependency>
+            <groupId>org.rocksdb</groupId>
+            <artifactId>rocksdbjni</artifactId>
+            <version>4.11.2</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.7</version>
+        </dependency>
+        <dependency>
+            <groupId>com.googlecode.concurrent-trees</groupId>
+            <artifactId>concurrent-trees</artifactId>
+            <version>2.4.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.mola.galimatias</groupId>
+            <artifactId>galimatias</artifactId>
+            <version>0.2.0</version>
+        </dependency>
+
+        <!--
+          JavaScript for dashboard
+        -->
+        <dependency>
+            <groupId>org.webjars.npm</groupId>
+            <artifactId>vue</artifactId>
+            <version>2.0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.webjars.npm</groupId>
+            <artifactId>pikaday</artifactId>
+            <version>1.4.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.webjars</groupId>
+            <artifactId>lodash</artifactId>
+            <version>4.15.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.webjars.bower</groupId>
+            <artifactId>redoc</artifactId>
+            <version>1.4.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.webjars.npm</groupId>
+            <artifactId>moment</artifactId>
+            <version>2.15.2</version>
+        </dependency>
+
+        <!--
+          Test dependencies
+          -->
+        <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <version>4.12</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>commons-codec</groupId>
-            <artifactId>commons-codec</artifactId>
-            <version>1.10</version>
-        </dependency>
-        <!--
-        The official java release on Maven central appears to be missing compression support
-        (it just silently doesn't compress). So we have to use our own build of rocksdb. :(
-        -->
-        <dependency>
-            <groupId>org.rocksdb</groupId>
-            <artifactId>rocksdbjni</artifactId>
-            <version>3.13.1</version>
-        </dependency>
-<!--
-        <dependency>
-            <groupId>au.gov.nla.rocksdb</groupId>
-            <artifactId>rocksdbjni</artifactId>
-            <version>3.9.1</version>
-            <classifier>linux64</classifier>
-        </dependency>
--->
-        <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-            <version>2.4</version>
-        </dependency>
-        <dependency>
-            <groupId>org.netpreserve.openwayback</groupId>
-            <artifactId>openwayback-access-control-core</artifactId>
-            <version>1.0.2</version>
+            <groupId>commons-lang</groupId>
+            <artifactId>commons-lang</artifactId>
+            <version>2.6</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

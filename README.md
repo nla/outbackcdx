@@ -1,5 +1,5 @@
-tinycdxserver
-=============
+OutbackCDX (nee tinycdxserver)
+==============================
 
 A [RocksDB]-based web archive index server which can serve records using Wayback's
 RemoteResourceIndex (xmlquery) protocol.
@@ -26,28 +26,40 @@ relatively light traffic load.
 Usage
 -----
 
-If you wish to use Snappy compression you will need to build RocksDB from source.
-The Maven central releases silently ignore the Snappy option.
-
-Edit pom.xml and change the rocksdb dependency to point at your build or
-uncomment the official release.
+Build:
 
     mvn package
-    java -jar target/tinycdxserver.jar -d /data -p 8080
+
+Run:
+
+    java -jar target/tinycdxserver*.jar
+
+Command line options:
+
+    $ java -jar target/tinycdxserver-0.3.2.jar -h
+    Usage: java tinycdxserver.Server [options...]
+
+      -a url        Use a wayback access control oracle
+      -b bindaddr   Bind to a particular IP address
+      -d datadir    Directory to store index data under
+      -i            Inherit the server socket via STDIN (for use with systemd, inetd etc)
+      -p port       Local port to listen on
+      -v            Verbose logging
 
 The server supports multiple named indexes as subdirectories.  You can
 load records into the index by POSTing them in the (11-field) CDX format Wayback uses:
 
     curl -X POST --data-binary @records.cdx http://localhost:8080/myindex
 
-The canonicalized URL (first field) is ignored, tinycdxserver performs its own
+The canonicalized URL (first field) is ignored, OutbackCDX performs its own
 canonicalization.
+
 
 Exclusions
 ----------
 
 Wayback's RemoteResourceIndex currently bypasses some of its access control
-configuration.  For this reason tinycdxserver currently supports
+configuration.  For this reason OutbackCDX currently supports
 filtering query results using an [exclusions oracle].  Set the URL of
 exclusions oracle using the `-a` command-line option.
 
@@ -61,10 +73,17 @@ Canonicalisation Aliases
 
 Alias records allow the grouping of URLs so they will deliver as if they are different snapshots of the same page.
 
+    @alias <source-url> <target-url>
+    
+For example:
+
     @alias http://legacy.example.org/page-one http://www.example.org/page1
+    @alias http://legacy.example.org/page-two http://www.example.org/page2
 
 Aliases do not currently work with url prefix queries. Aliases are resolved after normal canonicalisation rules
 are applied.
+
+Aliases can be mixed with regular CDX lines either in the same file or separate files and in any order. Any existing records that the alias rule affects the canonicalised URL for will be updated when the alias is added to the index.
 
 Future Work
 -----------
