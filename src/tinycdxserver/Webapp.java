@@ -140,7 +140,9 @@ class Webapp implements Web.Handler {
                     }
                     added++;
                 } catch (Exception e) {
-                    return new Response(Response.Status.BAD_REQUEST, "text/plain", e.toString() + "\nAt line: " + line);
+                    StringWriter stacktrace = new StringWriter();
+                    e.printStackTrace(new PrintWriter(stacktrace));
+                    return new Response(Response.Status.BAD_REQUEST, "text/plain", "At line: " + line + "\n" + stacktrace);
                 }
             }
 
