@@ -66,6 +66,6 @@ public class AccessRule {
     }
 
     Stream<String> ssurtPrefixes() {
-        return urlPatterns.stream().map(UrlPatterns::toSsurtPrefix);
+        return urlPatterns.stream().map(AccessControl::toSsurtPrefix);
     }
 }

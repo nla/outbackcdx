@@ -3,6 +3,7 @@ package tinycdxserver;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import com.googlecode.concurrenttrees.radixinverted.ConcurrentInvertedRadixTree;
 import com.googlecode.concurrenttrees.radixinverted.InvertedRadixTree;
+import org.netpreserve.urlcanon.ByteString;
 import org.netpreserve.urlcanon.Canonicalizer;
 import org.netpreserve.urlcanon.ParsedUrl;
 import org.rocksdb.ColumnFamilyHandle;
@@ -144,9 +145,52 @@ class AccessControl {
      */
     List<AccessRule> rulesForUrl(String url) {
         ParsedUrl parsed = ParsedUrl.parseUrl(url);
-        Canonicalizer.WHATWG.canonicalize(parsed);
+        canonicalize(parsed);
         String ssurt = parsed.ssurt().toString();
         return rulesBySurt.prefixing(ssurt);
+    }
+
+    static void canonicalize(ParsedUrl url) {
+        Canonicalizer.WHATWG.canonicalize(url);
+        url.setPath(url.getPath().asciiLowerCase());
+        url.setFragment(ByteString.EMPTY);
+        url.setHashSign(ByteString.EMPTY);
+    }
+
+    private static void reverseDomain(String host, StringBuilder out) {
+        int i = host.lastIndexOf('.');
+        int j = host.length();
+        while (i != -1) {
+            out.append(host, i + 1, j);
+            out.append(',');
+            j = i;
+            i = host.lastIndexOf('.', i - 1);
+        }
+        out.append(host, 0, j);
+        out.append(',');
+    }
+
+    /**
+     * Converts an exact URL, a URL containing pywb-style "*" wildcards to a SSURT prefix.
+     * SSURTs are passed through unaltered. Exact matches are suffixed with a space.
+     */
+     static String toSsurtPrefix(String pattern) {
+        if (pattern.startsWith("*.")) {
+            if (pattern.contains("/")) {
+                throw new IllegalArgumentException("can't use a domain wildcard with a path");
+            }
+            StringBuilder out = new StringBuilder();
+            reverseDomain(pattern.substring(2), out);
+            return out.toString().toLowerCase();
+        } else if (pattern.endsWith("*")) {
+            ParsedUrl url = ParsedUrl.parseUrl(pattern.substring(0, pattern.length() - 1));
+            AccessControl.canonicalize(url);
+            return url.ssurt().toString();
+        } else {
+            ParsedUrl url = ParsedUrl.parseUrl(pattern.substring(0, pattern.length()));
+            AccessControl.canonicalize(url);
+            return url.ssurt().toString() + " ";
+        }
     }
 
     /**
