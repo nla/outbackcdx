@@ -29,7 +29,7 @@ public class UrlPatterns {
             }
             StringBuilder out = new StringBuilder();
             reverseDomain(pattern.substring(2), out);
-            return out.toString();
+            return out.toString().toLowerCase();
         } else if (pattern.endsWith("*")) {
             ParsedUrl url = ParsedUrl.parseUrl(pattern.substring(0, pattern.length() - 1));
             Canonicalizer.WHATWG.canonicalize(url);
