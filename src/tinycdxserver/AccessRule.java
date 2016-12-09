@@ -16,6 +16,8 @@ public class AccessRule {
     String privateComment;
     String publicMessage;
     boolean enabled;
+    Date created;
+    Date modified;
 
     /**
      * True if this rule is applicable to the given capture and access times.

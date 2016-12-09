@@ -105,7 +105,11 @@ class AccessControl {
         Long generatedId = null;
         if (rule.id == null) {
             generatedId = rule.id = nextRuleId.getAndIncrement();
+            rule.created = new Date();
         }
+
+        rule.modified = new Date();
+
         byte[] value = GSON.toJson(rule).getBytes(UTF_8);
         db.put(ruleCf, encodeKey(rule.id), value);
 
