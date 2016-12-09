@@ -511,6 +511,7 @@
             <p>
                 <button @click="save">Save</button>
                 <button @click="cancel">Cancel</button>
+                <button @click="deleteRule" v-if="rule.id" style="float:right">Delete</button>
             </p>
         </div>
 
@@ -557,6 +558,10 @@
                         collection: this.$route.params.collection,
                     }
                 });
+            },
+            deleteRule: function () {
+                fetch(urlTemplate("/{collection}/access/rules/{ruleId}", this.$route.params), {method: 'DELETE'})
+                        .then(() => this.cancel());
             },
             fetchData: function () {
                 // load in parallel but policy list must be populated first
