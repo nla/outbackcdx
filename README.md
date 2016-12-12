@@ -10,15 +10,16 @@ RemoteResourceIndex (xmlquery) protocol.
 Status and Limitations
 ----------------------
 
-We're (National Library of Australia) using this in production but under a
-relatively light traffic load.
+A couple of institutions are using this in production.
 
+* The dashabord / admin GUI is not fully functional yet
+* Documentation could be improved a lot
 * Requires Java 8
 * No authentication (currently assumes you use a firewall)
-* No sharding (could be added relatively easily but we don't currently need it)
+* No sharding (could be added relatively easily but we don't currently need it, I would suggest maybe looking at Cassandra)
 * No replication (you could use a HTTP load balancer though)
 * Delete not yet implemented
-* RemoteResourceIndex in OpenWayback is broken in 2.1 and 2.2 and requires a [patch]. The patch will be included in OpenWayback 2.3.
+* RemoteResourceIndex in OpenWayback is broken in 2.1 and 2.2 and requires a [patch]. This has been fixed in OpenWayback 2.3.
 
 [RocksDB]: http://rocksdb.org/
 [patch]: https://github.com/iipc/openwayback/pull/239
@@ -55,18 +56,18 @@ The canonicalized URL (first field) is ignored, OutbackCDX performs its own
 canonicalization.
 
 
-Exclusions
-----------
+Access Control
+--------------
 
-Wayback's RemoteResourceIndex currently bypasses some of its access control
-configuration.  For this reason OutbackCDX currently supports
-filtering query results using an [exclusions oracle].  Set the URL of
-exclusions oracle using the `-a` command-line option.
+Experimental support for access control is under early development, experimental support for it can be
+can be enabled by setting the following environment variable:
 
-Source IP address based filtering is not currently supported. It may be
-more preferable to fix RemoteResourceIndex.
+    EXPERIMENTAL_ACCESS_CONTROL=1
 
-[exclusions oracle]: https://github.com/iipc/openwayback-access-control
+Rules can be configured through the GUI. Have Wayback or other clients query a particular named access
+point. For example to query the 'public' access point.
+
+    http://localhost:8080/myindex/ap/public
 
 Canonicalisation Aliases
 ------------------------
