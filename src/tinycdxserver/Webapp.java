@@ -7,7 +7,9 @@ import org.rocksdb.RocksDBException;
 import tinycdxserver.NanoHTTPD.IHTTPSession;
 import tinycdxserver.NanoHTTPD.Response;
 
+import javax.xml.stream.XMLStreamException;
 import java.io.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,7 +73,7 @@ class Webapp implements Web.Handler {
         if (FeatureFlags.experimentalAccessControl()) {
             router.on(GET, "/<collection>/ap/<accesspoint>", this::query)
                     .on(GET, "/<collection>/access/rules", this::listAccessRules)
-                    .on(POST, "/<collection>/access/rules", this::createAccessRule)
+                    .on(POST, "/<collection>/access/rules", this::postAccessRules)
                     .on(GET, "/<collection>/access/rules/new", this::getNewAccessRule)
                     .on(GET, "/<collection>/access/rules/<ruleId>", this::getAccessRule)
                     .on(DELETE, "/<collection>/access/rules/<ruleId>", this::deleteAccessRule)
@@ -141,15 +143,19 @@ class Webapp implements Web.Handler {
                     }
                     added++;
                 } catch (Exception e) {
-                    StringWriter stacktrace = new StringWriter();
-                    e.printStackTrace(new PrintWriter(stacktrace));
-                    return new Response(Response.Status.BAD_REQUEST, "text/plain", "At line: " + line + "\n" + stacktrace);
+                    return new Response(Response.Status.BAD_REQUEST, "text/plain", "At line: " + line + "\n" + formatStackTrace(e));
                 }
             }
 
             batch.commit();
         }
         return new Response(OK, "text/plain", "Added " + added + " records\n");
+    }
+
+    private String formatStackTrace(Exception e) {
+        StringWriter stacktrace = new StringWriter();
+        e.printStackTrace(new PrintWriter(stacktrace));
+        return stacktrace.toString();
     }
 
     Response query(IHTTPSession session) throws IOException, Web.ResponseException {
@@ -205,10 +211,24 @@ class Webapp implements Web.Handler {
         return id == null ? ok() : created(id);
     }
 
-    private Response createAccessRule(IHTTPSession session) throws IOException, Web.ResponseException, RocksDBException {
-        AccessRule rule = fromJson(session, AccessRule.class);
-        Long id = getIndex(session).accessControl.put(rule);
-        return id == null ? ok() : created(id);
+    private Response postAccessRules(IHTTPSession session) throws IOException, Web.ResponseException, RocksDBException {
+        AccessControl accessControl = getIndex(session).accessControl;
+        if ("application/xml".equals(session.getHeaders().get("content-type"))) {
+            try {
+                List<AccessRule> rules = AccessRuleXml.parseRules(session.getInputStream());
+                List<Long> ids = new ArrayList<>();
+                for (AccessRule rule : rules) {
+                    ids.add(accessControl.put(rule));
+                }
+                return jsonResponse(ids);
+            } catch (XMLStreamException e) {
+                return new Response(BAD_REQUEST, "text/plain", formatStackTrace(e));
+            }
+        } else {
+            AccessRule rule = fromJson(session, AccessRule.class);
+            Long id = accessControl.put(rule);
+            return id == null ? ok() : created(id);
+        }
     }
 
     private Response ok() {

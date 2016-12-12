@@ -70,4 +70,21 @@ public class AccessRule {
     Stream<String> ssurtPrefixes() {
         return urlPatterns.stream().map(AccessControl::toSsurtPrefix);
     }
+
+    @Override
+    public String toString() {
+        return "AccessRule{" +
+                "id=" + id +
+                ", policyId=" + policyId +
+                ", urlPatterns=" + urlPatterns +
+                ", captured=" + captured +
+                ", accessed=" + accessed +
+                ", period=" + period +
+                ", privateComment='" + privateComment + '\'' +
+                ", publicMessage='" + publicMessage + '\'' +
+                ", enabled=" + enabled +
+                ", created=" + created +
+                ", modified=" + modified +
+                '}';
+    }
 }
