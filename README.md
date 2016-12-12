@@ -10,7 +10,7 @@ RemoteResourceIndex (xmlquery) protocol.
 Status and Limitations
 ----------------------
 
-A couple of institutions are using this in production.
+A couple of institutions are using this in production. We (National Library of Australia) use it for a ~1 TB (compressed), 8 billion record index.
 
 * The dashabord / admin GUI is not fully functional yet
 * Documentation could be improved a lot
