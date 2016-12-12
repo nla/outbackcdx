@@ -1,6 +1,8 @@
 package tinycdxserver;
 
 
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -225,9 +227,21 @@ class Webapp implements Web.Handler {
                 return new Response(BAD_REQUEST, "text/plain", formatStackTrace(e));
             }
         } else {
-            AccessRule rule = fromJson(session, AccessRule.class);
-            Long id = accessControl.put(rule);
-            return id == null ? ok() : created(id);
+            JsonReader reader = GSON.newJsonReader(new InputStreamReader(session.getInputStream(), UTF_8));
+            if (reader.peek() == JsonToken.BEGIN_ARRAY) {
+                List<Long> ids = new ArrayList<>();
+                reader.beginArray();
+                while (reader.hasNext()) {
+                    AccessRule rule = GSON.fromJson(reader, AccessRule.class);
+                    ids.add(accessControl.put(rule));
+                }
+                reader.endArray();
+                return jsonResponse(ids);
+            } else {
+                AccessRule rule = GSON.fromJson(reader, AccessRule.class);
+                Long id = accessControl.put(rule);
+                return id == null ? ok() : created(id);
+            }
         }
     }
 
