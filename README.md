@@ -55,7 +55,7 @@ load records into the index by POSTing them in the (11-field) CDX format Wayback
 The canonicalized URL (first field) is ignored, OutbackCDX performs its own
 canonicalization.
 
-COnfiguring OpenWayback
+Configuring OpenWayback
 -----------------------
 
 Point Wayback at a OutbackCDX index by configuring a RemoteResourceIndex. See the example RemoteCollection.xml shipped with OpenWayback.
