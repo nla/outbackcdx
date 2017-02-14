@@ -84,23 +84,22 @@ class Web {
         return new Response(NOT_FOUND, "text/plain", "Not found\n");
     }
 
+    static Response badRequest(String message) {
+        return new Response(BAD_REQUEST, "text/plain", message);
+    }
+
     static class Router implements Handler {
         private final List<Handler> routes = new ArrayList<>();
 
         @Override
-        public Response handle(IHTTPSession request) {
-            try {
-                for (Handler route : routes) {
-                    Response result = route.handle(request);
-                    if (result != null) {
-                        return result;
-                    }
+        public Response handle(IHTTPSession request) throws Exception {
+            for (Handler route : routes) {
+                Response result = route.handle(request);
+                if (result != null) {
+                    return result;
                 }
-                return Web.notFound();
-            } catch (Exception e) {
-                e.printStackTrace();
-                return new Response(INTERNAL_ERROR, "text/plain", e.toString() + "\n");
             }
+            return Web.notFound();
         }
 
         public Router on(Method method, String pathPattern, Handler handler) {

@@ -292,8 +292,8 @@ class Webapp implements Web.Handler {
 
     Response checkAccess(IHTTPSession request) throws IOException, ResponseException {
         String accesspoint = request.getParms().get("accesspoint");
-        String url = request.getParms().get("url");
-        String timestamp = request.getParms().get("timestamp");
+        String url = getMandatoryParam(request, "url");
+        String timestamp = getMandatoryParam(request, "timestamp");
 
         Date captureTime = Date.from(LocalDateTime.parse(timestamp, Capture.arcTimeFormat).toInstant(ZoneOffset.UTC));
         Date accessTime = new Date();
@@ -301,8 +301,16 @@ class Webapp implements Web.Handler {
         return jsonResponse(getIndex(request).accessControl.checkAccess(accesspoint, url, captureTime, accessTime));
     }
 
+    private String getMandatoryParam(IHTTPSession request, String name) throws ResponseException {
+        String value = request.getParms().get(name);
+        if (value == null) {
+            throw new Web.ResponseException(badRequest("missing mandatory parameter: " + name));
+        }
+        return value;
+    }
+
     @Override
-    public Response handle(IHTTPSession session) throws IOException, Web.ResponseException {
+    public Response handle(IHTTPSession session) throws Exception {
         Response response = router.handle(session);
         if (response != null) {
             response.addHeader("Access-Control-Allow-Origin", "*");
