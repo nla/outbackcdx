@@ -7,9 +7,12 @@ import org.rocksdb.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Date;
 
 import static java.util.Arrays.asList;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class AccessControlTest {
 
@@ -46,31 +49,46 @@ public class AccessControlTest {
         publicPolicy.name = "Public";
         publicPolicy.accessPoints.add("public");
         publicPolicy.accessPoints.add("staff");
-        long policyId = accessControl.put(publicPolicy);
+        long publicPolicyId = accessControl.put(publicPolicy);
+
+        AccessPolicy staffOnly = new AccessPolicy();
+        staffOnly.name = "Staff Only";
+        staffOnly.accessPoints.add("staff");
+        long staffOnlyPolicyId = accessControl.put(staffOnly);
+
 
         AccessRule rule = new AccessRule();
         rule.urlPatterns.add("*.gov.au");
-        rule.policyId = policyId;
+        rule.policyId = publicPolicyId;
 
         long ruleId = accessControl.put(rule);
         assertEquals(rule, accessControl.rule(ruleId));
 
         AccessRule rule2 = new AccessRule();
         rule2.urlPatterns.add("*.nla.gov.au");
-        rule2.policyId = policyId;
+        rule2.policyId = publicPolicyId;
         accessControl.put(rule2);
 
         AccessRule rule3 = new AccessRule();
         rule3.urlPatterns.add("*.example.gov.au");
-        rule3.policyId = policyId;
+        rule3.policyId = staffOnlyPolicyId;
+        rule3.publicMessage = "Explanatory message";
         accessControl.put(rule3);
 
         assertEquals(asList(rule, rule2), accessControl.rulesForUrl("http://nla.gov.au/hello.html"));
         assertEquals(asList(rule, rule2, rule3), new ArrayList<>(accessControl.list()));
 
-
-        // patterns. *.gov.au
+        {
+            AccessDecision decision = accessControl.checkAccess("public", "http://nla.gov.au/hello.html", new Date(), new Date());
+            assertTrue(decision.isAllowed());
+        }
+        {
+            AccessDecision decision = accessControl.checkAccess("public", "http://restricted.example.gov.au/hello.html", new Date(), new Date());
+            assertFalse(decision.isAllowed());
+            assertEquals("Explanatory message", decision.getPublicMessage());
+        }
     }
+
 
     @Test
     public void testPattern() {

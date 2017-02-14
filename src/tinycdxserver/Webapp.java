@@ -11,7 +11,10 @@ import tinycdxserver.NanoHTTPD.Response;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.*;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +77,7 @@ class Webapp implements Web.Handler {
 
         if (FeatureFlags.experimentalAccessControl()) {
             router.on(GET, "/<collection>/ap/<accesspoint>", this::query)
+                    .on(GET, "/<collection>/ap/<accesspoint>/check", this::checkAccess)
                     .on(GET, "/<collection>/access/rules", this::listAccessRules)
                     .on(POST, "/<collection>/access/rules", this::postAccessRules)
                     .on(GET, "/<collection>/access/rules/new", this::getNewAccessRule)
@@ -284,6 +288,17 @@ class Webapp implements Web.Handler {
             json.close();
             out.flush();
         });
+    }
+
+    Response checkAccess(IHTTPSession request) throws IOException, ResponseException {
+        String accesspoint = request.getParms().get("accesspoint");
+        String url = request.getParms().get("url");
+        String timestamp = request.getParms().get("timestamp");
+
+        Date captureTime = Date.from(LocalDateTime.parse(timestamp, Capture.arcTimeFormat).toInstant(ZoneOffset.UTC));
+        Date accessTime = new Date();
+
+        return jsonResponse(getIndex(request).accessControl.checkAccess(accesspoint, url, captureTime, accessTime));
     }
 
     @Override

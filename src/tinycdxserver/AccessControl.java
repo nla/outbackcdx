@@ -218,21 +218,34 @@ class AccessControl {
                     previousRules = rules = rulesForUrl(capture.original);
                 }
 
-                for (AccessRule rule : rules) {
-                    if (rule.matchesDates(capture.date(), accessTime)) {
-                        matching = rule;
-                    }
-                }
-
-                if (matching != null) {
-                    AccessPolicy policy = policies.get(matching.policyId);
-                    if (policy != null && !policy.accessPoints.contains(accessPoint)) {
-                        return false;
-                    }
-                }
-                return true;
+                return checkAccess(accessPoint, capture.date(), accessTime, rules).isAllowed();
             }
         };
+    }
+
+    public AccessDecision checkAccess(String accessPoint, String url, Date captureTime, Date accessTime) {
+        List<AccessRule> rules = rulesForUrl(url);
+        return checkAccess(accessPoint, captureTime, accessTime, rules);
+    }
+
+    private AccessDecision checkAccess(String accessPoint, Date captureTime, Date accessTime, List<AccessRule> rules) {
+        AccessRule matching = null;
+
+        for (AccessRule rule : rules) {
+            if (rule.matchesDates(captureTime, accessTime)) {
+                matching = rule;
+            }
+        }
+
+        if (matching != null) {
+            AccessPolicy policy = policies.get(matching.policyId);
+            boolean allowed = true;
+            if (policy != null && !policy.accessPoints.contains(accessPoint)) {
+                allowed = false;
+            }
+            return new AccessDecision(allowed, matching, policy);
+        }
+        return new AccessDecision(true, null, null);
     }
 
     /**
