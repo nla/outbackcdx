@@ -1,6 +1,8 @@
 package tinycdxserver;
 
+import java.time.LocalDateTime;
 import java.time.Period;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -25,7 +27,14 @@ public class AccessRule {
     public boolean matchesDates(Date captureTime, Date accessTime) {
         return (captured == null || captured.contains(captureTime)) &&
                 (accessed == null || accessed.contains(accessTime)) &&
-                (period == null || captureTime.toInstant().plus(period).isBefore(accessTime.toInstant()));
+                (period == null || isWithinPeriod(captureTime, accessTime));
+    }
+
+    private boolean isWithinPeriod(Date captureTime, Date accessTime) {
+        // do the period calculation in the local timezone so that 'years' periods work
+        LocalDateTime localCaptureTime = LocalDateTime.ofInstant(captureTime.toInstant(), ZoneId.systemDefault());
+        LocalDateTime localAccessTime = LocalDateTime.ofInstant(accessTime.toInstant(), ZoneId.systemDefault());
+        return localCaptureTime.plus(period).isBefore(localAccessTime);
     }
 
     @Override
