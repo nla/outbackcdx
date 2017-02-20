@@ -34,7 +34,7 @@ public class AccessRule {
         // do the period calculation in the local timezone so that 'years' periods work
         LocalDateTime localCaptureTime = LocalDateTime.ofInstant(captureTime.toInstant(), ZoneId.systemDefault());
         LocalDateTime localAccessTime = LocalDateTime.ofInstant(accessTime.toInstant(), ZoneId.systemDefault());
-        return localCaptureTime.plus(period).isBefore(localAccessTime);
+            return localAccessTime.isBefore(localCaptureTime.plus(period));
     }
 
     @Override
