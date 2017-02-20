@@ -78,6 +78,7 @@ class Webapp implements Web.Handler {
         if (FeatureFlags.experimentalAccessControl()) {
             router.on(GET, "/<collection>/ap/<accesspoint>", this::query)
                     .on(GET, "/<collection>/ap/<accesspoint>/check", this::checkAccess)
+                    .on(POST, "/<collection>/ap/<accesspoint>/check", this::checkAccessBulk)
                     .on(GET, "/<collection>/access/rules", this::listAccessRules)
                     .on(POST, "/<collection>/access/rules", this::postAccessRules)
                     .on(GET, "/<collection>/access/rules/new", this::getNewAccessRule)
@@ -300,6 +301,28 @@ class Webapp implements Web.Handler {
 
         return jsonResponse(getIndex(request).accessControl.checkAccess(accesspoint, url, captureTime, accessTime));
     }
+
+    public static class AccessQuery {
+        public String url;
+        public String timestamp;
+    }
+
+    Response checkAccessBulk(IHTTPSession request) throws IOException, ResponseException {
+        String accesspoint = request.getParms().get("accesspoint");
+        Index index = getIndex(request);
+
+        AccessQuery[] queries = fromJson(request, AccessQuery[].class);
+        List<AccessDecision> responses = new ArrayList<>();
+
+        for (AccessQuery query: queries) {
+            Date captureTime = Date.from(LocalDateTime.parse(query.timestamp, Capture.arcTimeFormat).toInstant(ZoneOffset.UTC));
+            Date accessTime = new Date();
+            responses.add(index.accessControl.checkAccess(accesspoint, query.url, captureTime, accessTime));
+        }
+
+        return jsonResponse(responses);
+    }
+
 
     private String getMandatoryParam(IHTTPSession request, String name) throws ResponseException {
         String value = request.getParms().get(name);
