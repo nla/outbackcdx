@@ -3,6 +3,9 @@ package tinycdxserver;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import com.googlecode.concurrenttrees.radixinverted.ConcurrentInvertedRadixTree;
 import com.googlecode.concurrenttrees.radixinverted.InvertedRadixTree;
+import org.netpreserve.urlcanon.ByteString;
+import org.netpreserve.urlcanon.Canonicalizer;
+import org.netpreserve.urlcanon.ParsedUrl;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -102,7 +105,11 @@ class AccessControl {
         Long generatedId = null;
         if (rule.id == null) {
             generatedId = rule.id = nextRuleId.getAndIncrement();
+            rule.created = new Date();
         }
+
+        rule.modified = new Date();
+
         byte[] value = GSON.toJson(rule).getBytes(UTF_8);
         db.put(ruleCf, encodeKey(rule.id), value);
 
@@ -138,6 +145,59 @@ class AccessControl {
     }
 
     /**
+     * Find all rules that may apply to the given URL.
+     */
+    List<AccessRule> rulesForUrl(String url) {
+        ParsedUrl parsed = ParsedUrl.parseUrl(url);
+        canonicalize(parsed);
+        String ssurt = parsed.ssurt().toString();
+        return rulesBySurt.prefixing(ssurt);
+    }
+
+    static void canonicalize(ParsedUrl url) {
+        Canonicalizer.WHATWG.canonicalize(url);
+        url.setPath(url.getPath().asciiLowerCase());
+        url.setFragment(ByteString.EMPTY);
+        url.setHashSign(ByteString.EMPTY);
+    }
+
+    private static void reverseDomain(String host, StringBuilder out) {
+        int i = host.lastIndexOf('.');
+        int j = host.length();
+        while (i != -1) {
+            out.append(host, i + 1, j);
+            out.append(',');
+            j = i;
+            i = host.lastIndexOf('.', i - 1);
+        }
+        out.append(host, 0, j);
+        out.append(',');
+    }
+
+    /**
+     * Converts an exact URL, a URL containing pywb-style "*" wildcards to a SSURT prefix.
+     * SSURTs are passed through unaltered. Exact matches are suffixed with a space.
+     */
+     static String toSsurtPrefix(String pattern) {
+        if (pattern.startsWith("*.")) {
+            if (pattern.contains("/")) {
+                throw new IllegalArgumentException("can't use a domain wildcard with a path");
+            }
+            StringBuilder out = new StringBuilder();
+            reverseDomain(pattern.substring(2), out);
+            return out.toString().toLowerCase();
+        } else if (pattern.endsWith("*")) {
+            ParsedUrl url = ParsedUrl.parseUrl(pattern.substring(0, pattern.length() - 1));
+            AccessControl.canonicalize(url);
+            return url.ssurt().toString();
+        } else {
+            ParsedUrl url = ParsedUrl.parseUrl(pattern.substring(0, pattern.length()));
+            AccessControl.canonicalize(url);
+            return url.ssurt().toString() + " ";
+        }
+    }
+
+    /**
      * Returns a predicate which can be used to filter a list of captures.
      */
     public Predicate<Capture> filter(String accessPoint, Date accessTime) {
@@ -154,26 +214,38 @@ class AccessControl {
                 if (Objects.equals(previousUrl, capture.original)) {
                     rules = previousRules;
                 } else {
-                    String ssurt = SSURT.fromUrl(capture.original);
                     previousUrl = capture.original;
-                    previousRules = rules = rulesForSsurt(ssurt);
+                    previousRules = rules = rulesForUrl(capture.original);
                 }
 
-                for (AccessRule rule : rules) {
-                    if (rule.matchesDates(capture.date(), accessTime)) {
-                        matching = rule;
-                    }
-                }
-
-                if (matching != null) {
-                    AccessPolicy policy = policies.get(matching.policyId);
-                    if (policy != null && !policy.accessPoints.contains(accessPoint)) {
-                        return false;
-                    }
-                }
-                return true;
+                return checkAccess(accessPoint, capture.date(), accessTime, rules).isAllowed();
             }
         };
+    }
+
+    public AccessDecision checkAccess(String accessPoint, String url, Date captureTime, Date accessTime) {
+        List<AccessRule> rules = rulesForUrl(url);
+        return checkAccess(accessPoint, captureTime, accessTime, rules);
+    }
+
+    private AccessDecision checkAccess(String accessPoint, Date captureTime, Date accessTime, List<AccessRule> rules) {
+        AccessRule matching = null;
+
+        for (AccessRule rule : rules) {
+            if (rule.matchesDates(captureTime, accessTime)) {
+                matching = rule;
+            }
+        }
+
+        if (matching != null) {
+            AccessPolicy policy = policies.get(matching.policyId);
+            boolean allowed = true;
+            if (policy != null && !policy.accessPoints.contains(accessPoint)) {
+                allowed = false;
+            }
+            return new AccessDecision(allowed, matching, policy);
+        }
+        return new AccessDecision(true, null, null);
     }
 
     /**

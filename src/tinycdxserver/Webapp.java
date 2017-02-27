@@ -1,13 +1,20 @@
 package tinycdxserver;
 
 
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import tinycdxserver.NanoHTTPD.IHTTPSession;
 import tinycdxserver.NanoHTTPD.Response;
 
+import javax.xml.stream.XMLStreamException;
 import java.io.*;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,8 +77,11 @@ class Webapp implements Web.Handler {
 
         if (FeatureFlags.experimentalAccessControl()) {
             router.on(GET, "/<collection>/ap/<accesspoint>", this::query)
+                    .on(GET, "/<collection>/ap/<accesspoint>/check", this::checkAccess)
+                    .on(POST, "/<collection>/ap/<accesspoint>/check", this::checkAccessBulk)
                     .on(GET, "/<collection>/access/rules", this::listAccessRules)
-                    .on(POST, "/<collection>/access/rules", this::createAccessRule)
+                    .on(POST, "/<collection>/access/rules", this::postAccessRules)
+                    .on(GET, "/<collection>/access/rules/new", this::getNewAccessRule)
                     .on(GET, "/<collection>/access/rules/<ruleId>", this::getAccessRule)
                     .on(DELETE, "/<collection>/access/rules/<ruleId>", this::deleteAccessRule)
                     .on(GET, "/<collection>/access/policies", this::listAccessPolicies)
@@ -140,13 +150,19 @@ class Webapp implements Web.Handler {
                     }
                     added++;
                 } catch (Exception e) {
-                    return new Response(Response.Status.BAD_REQUEST, "text/plain", e.toString() + "\nAt line: " + line);
+                    return new Response(Response.Status.BAD_REQUEST, "text/plain", "At line: " + line + "\n" + formatStackTrace(e));
                 }
             }
 
             batch.commit();
         }
         return new Response(OK, "text/plain", "Added " + added + " records\n");
+    }
+
+    private String formatStackTrace(Exception e) {
+        StringWriter stacktrace = new StringWriter();
+        e.printStackTrace(new PrintWriter(stacktrace));
+        return stacktrace.toString();
     }
 
     Response query(IHTTPSession session) throws IOException, Web.ResponseException {
@@ -202,10 +218,36 @@ class Webapp implements Web.Handler {
         return id == null ? ok() : created(id);
     }
 
-    private Response createAccessRule(IHTTPSession session) throws IOException, Web.ResponseException, RocksDBException {
-        AccessRule rule = fromJson(session, AccessRule.class);
-        Long id = getIndex(session).accessControl.put(rule);
-        return id == null ? ok() : created(id);
+    private Response postAccessRules(IHTTPSession session) throws IOException, Web.ResponseException, RocksDBException {
+        AccessControl accessControl = getIndex(session).accessControl;
+        if ("application/xml".equals(session.getHeaders().get("content-type"))) {
+            try {
+                List<AccessRule> rules = AccessRuleXml.parseRules(session.getInputStream());
+                List<Long> ids = new ArrayList<>();
+                for (AccessRule rule : rules) {
+                    ids.add(accessControl.put(rule));
+                }
+                return jsonResponse(ids);
+            } catch (XMLStreamException e) {
+                return new Response(BAD_REQUEST, "text/plain", formatStackTrace(e));
+            }
+        } else {
+            JsonReader reader = GSON.newJsonReader(new InputStreamReader(session.getInputStream(), UTF_8));
+            if (reader.peek() == JsonToken.BEGIN_ARRAY) {
+                List<Long> ids = new ArrayList<>();
+                reader.beginArray();
+                while (reader.hasNext()) {
+                    AccessRule rule = GSON.fromJson(reader, AccessRule.class);
+                    ids.add(accessControl.put(rule));
+                }
+                reader.endArray();
+                return jsonResponse(ids);
+            } else {
+                AccessRule rule = GSON.fromJson(reader, AccessRule.class);
+                Long id = accessControl.put(rule);
+                return id == null ? ok() : created(id);
+            }
+        }
     }
 
     private Response ok() {
@@ -228,6 +270,11 @@ class Webapp implements Web.Handler {
         return jsonResponse(rule);
     }
 
+    private Response getNewAccessRule(IHTTPSession request) {
+        AccessRule rule = new AccessRule();
+        return jsonResponse(rule);
+    }
+
     private Response listAccessRules(IHTTPSession request) throws IOException, Web.ResponseException {
         Index index = getIndex(request);
         Iterable<AccessRule> rules = index.accessControl.list();
@@ -244,8 +291,49 @@ class Webapp implements Web.Handler {
         });
     }
 
+    Response checkAccess(IHTTPSession request) throws IOException, ResponseException {
+        String accesspoint = request.getParms().get("accesspoint");
+        String url = getMandatoryParam(request, "url");
+        String timestamp = getMandatoryParam(request, "timestamp");
+
+        Date captureTime = Date.from(LocalDateTime.parse(timestamp, Capture.arcTimeFormat).toInstant(ZoneOffset.UTC));
+        Date accessTime = new Date();
+
+        return jsonResponse(getIndex(request).accessControl.checkAccess(accesspoint, url, captureTime, accessTime));
+    }
+
+    public static class AccessQuery {
+        public String url;
+        public String timestamp;
+    }
+
+    Response checkAccessBulk(IHTTPSession request) throws IOException, ResponseException {
+        String accesspoint = request.getParms().get("accesspoint");
+        Index index = getIndex(request);
+
+        AccessQuery[] queries = fromJson(request, AccessQuery[].class);
+        List<AccessDecision> responses = new ArrayList<>();
+
+        for (AccessQuery query: queries) {
+            Date captureTime = Date.from(LocalDateTime.parse(query.timestamp, Capture.arcTimeFormat).toInstant(ZoneOffset.UTC));
+            Date accessTime = new Date();
+            responses.add(index.accessControl.checkAccess(accesspoint, query.url, captureTime, accessTime));
+        }
+
+        return jsonResponse(responses);
+    }
+
+
+    private String getMandatoryParam(IHTTPSession request, String name) throws ResponseException {
+        String value = request.getParms().get(name);
+        if (value == null) {
+            throw new Web.ResponseException(badRequest("missing mandatory parameter: " + name));
+        }
+        return value;
+    }
+
     @Override
-    public Response handle(IHTTPSession session) throws IOException, Web.ResponseException {
+    public Response handle(IHTTPSession session) throws Exception {
         Response response = router.handle(session);
         if (response != null) {
             response.addHeader("Access-Control-Allow-Origin", "*");

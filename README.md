@@ -10,15 +10,16 @@ RemoteResourceIndex (xmlquery) protocol.
 Status and Limitations
 ----------------------
 
-We're (National Library of Australia) using this in production but under a
-relatively light traffic load.
+A couple of institutions are using this in production. We (National Library of Australia) use it for a ~1 TB (compressed), 8 billion record index.
 
+* The dashabord / admin GUI is not fully functional yet
+* Documentation could be improved a lot
 * Requires Java 8
 * No authentication (currently assumes you use a firewall)
-* No sharding (could be added relatively easily but we don't currently need it)
+* No sharding (could be added relatively easily but we don't currently need it, I would suggest maybe looking at Cassandra)
 * No replication (you could use a HTTP load balancer though)
 * Delete not yet implemented
-* RemoteResourceIndex in OpenWayback is broken in 2.1 and 2.2 and requires a [patch]. The patch will be included in OpenWayback 2.3.
+* RemoteResourceIndex in OpenWayback is broken in 2.1 and 2.2 and requires a [patch]. This has been fixed in OpenWayback 2.3.
 
 [RocksDB]: http://rocksdb.org/
 [patch]: https://github.com/iipc/openwayback/pull/239
@@ -54,19 +55,32 @@ load records into the index by POSTing them in the (11-field) CDX format Wayback
 The canonicalized URL (first field) is ignored, OutbackCDX performs its own
 canonicalization.
 
+Configuring OpenWayback
+-----------------------
 
-Exclusions
-----------
+Point Wayback at a OutbackCDX index by configuring a RemoteResourceIndex. See the example RemoteCollection.xml shipped with OpenWayback.
 
-Wayback's RemoteResourceIndex currently bypasses some of its access control
-configuration.  For this reason OutbackCDX currently supports
-filtering query results using an [exclusions oracle].  Set the URL of
-exclusions oracle using the `-a` command-line option.
+```xml
+    <property name="resourceIndex">
+      <bean class="org.archive.wayback.resourceindex.RemoteResourceIndex">
+        <property name="searchUrlBase" value="http://localhost:8080/myindex" />
+      </bean>
+    </property>
+```
 
-Source IP address based filtering is not currently supported. It may be
-more preferable to fix RemoteResourceIndex.
 
-[exclusions oracle]: https://github.com/iipc/openwayback-access-control
+Access Control
+--------------
+
+Experimental support for access control is under early development, experimental support for it can be
+can be enabled by setting the following environment variable:
+
+    EXPERIMENTAL_ACCESS_CONTROL=1
+
+Rules can be configured through the GUI. Have Wayback or other clients query a particular named access
+point. For example to query the 'public' access point.
+
+    http://localhost:8080/myindex/ap/public
 
 Canonicalisation Aliases
 ------------------------

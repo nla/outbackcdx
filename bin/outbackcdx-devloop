@@ -1,0 +1,20 @@
+#!/bin/bash
+
+(while true; do
+  ./bin/outbackcdx
+done) &
+
+LOOP_PID=$!
+
+function cleanup() {
+  kill $LOOP_PID
+  pkill -f tinycdxserver.Main
+  exit 0
+}
+
+trap cleanup EXIT INT
+
+while true; do
+  inotifywait -e modify target/classes/tinycdxserver
+  pkill -f tinycdxserver.Main
+done

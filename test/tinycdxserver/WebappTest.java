@@ -84,7 +84,7 @@ public class WebappTest {
         assertEquals(5, GSON.fromJson(GET("/testap/access/policies"), AccessPolicy[].class).length);
 
         createRule(publicPolicyId, "");
-        long ruleId = createRule(staffPolicyId, "(org,ex,a,)");
+        long ruleId = createRule(staffPolicyId, "*.a.ex.org");
 
         assertEquals(2, GSON.fromJson(GET("/testap/access/rules"), AccessRule[].class).length);
 
@@ -114,7 +114,7 @@ public class WebappTest {
 
         AccessRule rule = GSON.fromJson(GET("/testap/access/rules/" + ruleId), AccessRule.class);
         rule.urlPatterns.clear();
-        rule.urlPatterns.add("(org,ex,b,)");
+        rule.urlPatterns.add("*.b.ex.org");
 
         POST("/testap/access/rules", GSON.toJson(rule));
 
@@ -141,7 +141,7 @@ public class WebappTest {
         return urls;
     }
 
-    private long createRule(long policyId, String... surts) throws IOException, Web.ResponseException {
+    private long createRule(long policyId, String... surts) throws Exception {
         AccessRule rule = new AccessRule();
         rule.policyId = policyId;
         rule.urlPatterns.addAll(asList(surts));
@@ -149,7 +149,7 @@ public class WebappTest {
         return GSON.fromJson(response, Id.class).id;
     }
 
-    private long createPolicy(String name, String... accessPoints) throws IOException, Web.ResponseException {
+    private long createPolicy(String name, String... accessPoints) throws Exception {
         AccessPolicy publicPolicy = new AccessPolicy();
         publicPolicy.name = name;
         publicPolicy.accessPoints.addAll(asList(accessPoints));
@@ -162,10 +162,10 @@ public class WebappTest {
         public long id;
     }
 
-    private String POST(String url, String data) throws IOException, Web.ResponseException {
+    private String POST(String url, String data) throws Exception {
         return POST(url, data, OK);
     }
-    private String POST(String url, String data, NanoHTTPD.Response.Status expectedStatus) throws IOException, Web.ResponseException {
+    private String POST(String url, String data, NanoHTTPD.Response.Status expectedStatus) throws Exception {
         DummySession session = new DummySession(POST, url);
         session.data(data);
         NanoHTTPD.Response response = webapp.handle(session);
@@ -173,7 +173,7 @@ public class WebappTest {
         return slurp(response);
     }
 
-    private String GET(String url, String... parmKeysAndValues) throws IOException, Web.ResponseException {
+    private String GET(String url, String... parmKeysAndValues) throws Exception {
         DummySession session = new DummySession(GET, url);
         for (int i = 0; i < parmKeysAndValues.length; i += 2) {
             session.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
@@ -183,7 +183,7 @@ public class WebappTest {
         return slurp(response);
     }
 
-    private String DELETE(String url) throws IOException, Web.ResponseException {
+    private String DELETE(String url) throws Exception {
         DummySession session = new DummySession(DELETE, url);
         NanoHTTPD.Response response = webapp.handle(session);
         assertEquals(OK, response.getStatus());

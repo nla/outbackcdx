@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if [ pom.xml -nt target/classpath ]; then
+    mvn dependency:build-classpath -q -Dmdep.outputFile=target/classpath
+fi
+
+if [ ! -e target/classes ]; then
+    mvn compile
+fi
+
+exec java -cp "resources:target/classes:$(cat target/classpath)" tinycdxserver.Main "$@"

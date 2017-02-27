@@ -217,6 +217,10 @@
             font-size: 12px;
         }
 
+        .rule-metadata {
+            font-size: 12px;
+        }
+
         .form {
             padding-left: 16px;
             padding-right: 16px;
@@ -271,6 +275,15 @@
 
         .big-table tr {
             border-bottom: solid 1px #eeeeee;
+        }
+
+        .hint {
+            color: #909090;
+            font-size: 14px;
+        }
+
+        .url-patterns-field {
+            height: 120px;
         }
     </style>
     <link href="lib/pikaday/1.4.0/pikaday.css" rel="stylesheet">
@@ -456,8 +469,13 @@
             <p>
                 <label>
                     URLs matching any of these patterns
-                    <textarea class="form-field"></textarea>
+                    <textarea class="form-field url-patterns-field"
+                              v-bind:value="rule.urlPatterns ? rule.urlPatterns.join('\n') : ''"
+                              v-on:input="rule.urlPatterns = $event.target.value.split('\n')"></textarea>
                 </label>
+                <span class="hint">
+                    e.g. *.foo.org http://foo.org/path/* http://foo.org/page.html
+                </span>
             </p>
             <p>
                 <label>
@@ -472,8 +490,6 @@
                 </label>
             </p>
             <period v-model="rule.period"></period>
-        </div>
-        <div class="form">
             <p>
                 <label>
                     Access Policy
@@ -496,9 +512,14 @@
                     <textarea v-model="rule.privateComment" class="form-field"></textarea>
                 </label>
             </p>
+            <p v-if="rule.created" class="rule-metadata">
+                <label>Created:</label> {{prettyDate(rule.created)}}<br>
+                <label>Last modified: </label> {{prettyDate(rule.modified)}}
+            </p>
             <p>
                 <button @click="save">Save</button>
-                <button>Cancel</button>
+                <button @click="cancel">Cancel</button>
+                <button @click="deleteRule" v-if="rule.id" style="float:right">Delete</button>
             </p>
         </div>
 
@@ -526,6 +547,10 @@
             '$route': 'fetchData'
         },
         methods: {
+            prettyDate: function (date) {
+                var t = moment(date);
+                return t.format("llll") + " (" + t.fromNow() + ")";
+            },
             save: function () {
                 fetch(urlTemplate("/{collection}/access/rules", this.$route.params),
                         {method: 'POST',
@@ -537,6 +562,18 @@
                                 collection: this.$route.params.collection,
                             }
                         }));
+            },
+            cancel: function() {
+                this.$router.replace({
+                    name: 'access-rule-list',
+                    params: {
+                        collection: this.$route.params.collection,
+                    }
+                });
+            },
+            deleteRule: function () {
+                fetch(urlTemplate("/{collection}/access/rules/{ruleId}", this.$route.params), {method: 'DELETE'})
+                        .then(() => this.cancel());
             },
             fetchData: function () {
                 // load in parallel but policy list must be populated first
@@ -583,9 +620,9 @@
             </tr>
             <tr v-for="rule in rules">
                 <td>
-                    <ul v-for="pattern in rule.patterns">
-                        <li>{{pattern}}</li>
-                    </ul>
+                    <span v-for="pattern in rule.urlPatterns">
+                        {{pattern}}<br>
+                    </span>
                 </td>
                 <td>
                     <div  v-if="rule.captured && (rule.captured.start || rule.captured.end)">

@@ -1,6 +1,8 @@
 package tinycdxserver;
 
+import java.time.LocalDateTime;
 import java.time.Period;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -14,8 +16,10 @@ public class AccessRule {
     DateRange accessed;
     Period period;
     String privateComment;
-    String publicComment;
+    String publicMessage;
     boolean enabled;
+    Date created;
+    Date modified;
 
     /**
      * True if this rule is applicable to the given capture and access times.
@@ -23,7 +27,14 @@ public class AccessRule {
     public boolean matchesDates(Date captureTime, Date accessTime) {
         return (captured == null || captured.contains(captureTime)) &&
                 (accessed == null || accessed.contains(accessTime)) &&
-                (period == null || captureTime.toInstant().plus(period).isBefore(accessTime.toInstant()));
+                (period == null || isWithinPeriod(captureTime, accessTime));
+    }
+
+    private boolean isWithinPeriod(Date captureTime, Date accessTime) {
+        // do the period calculation in the local timezone so that 'years' periods work
+        LocalDateTime localCaptureTime = LocalDateTime.ofInstant(captureTime.toInstant(), ZoneId.systemDefault());
+        LocalDateTime localAccessTime = LocalDateTime.ofInstant(accessTime.toInstant(), ZoneId.systemDefault());
+            return localAccessTime.isBefore(localCaptureTime.plus(period));
     }
 
     @Override
@@ -47,7 +58,7 @@ public class AccessRule {
             return false;
         if (privateComment != null ? !privateComment.equals(that.privateComment) : that.privateComment != null)
             return false;
-        return publicComment != null ? publicComment.equals(that.publicComment) : that.publicComment == null;
+        return publicMessage != null ? publicMessage.equals(that.publicMessage) : that.publicMessage == null;
 
     }
 
@@ -60,12 +71,29 @@ public class AccessRule {
         result = 31 * result + (accessed != null ? accessed.hashCode() : 0);
         result = 31 * result + (period != null ? period.hashCode() : 0);
         result = 31 * result + (privateComment != null ? privateComment.hashCode() : 0);
-        result = 31 * result + (publicComment != null ? publicComment.hashCode() : 0);
+        result = 31 * result + (publicMessage != null ? publicMessage.hashCode() : 0);
         result = 31 * result + (enabled ? 1 : 0);
         return result;
     }
 
     Stream<String> ssurtPrefixes() {
-        return urlPatterns.stream().map(SSURT::prefixFromPattern);
+        return urlPatterns.stream().map(AccessControl::toSsurtPrefix);
+    }
+
+    @Override
+    public String toString() {
+        return "AccessRule{" +
+                "id=" + id +
+                ", policyId=" + policyId +
+                ", urlPatterns=" + urlPatterns +
+                ", captured=" + captured +
+                ", accessed=" + accessed +
+                ", period=" + period +
+                ", privateComment='" + privateComment + '\'' +
+                ", publicMessage='" + publicMessage + '\'' +
+                ", enabled=" + enabled +
+                ", created=" + created +
+                ", modified=" + modified +
+                '}';
     }
 }
