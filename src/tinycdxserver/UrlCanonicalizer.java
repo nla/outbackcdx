@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  * wild.
  */
 public class UrlCanonicalizer {
-    private static final Pattern WWW_PREFIX = Pattern.compile("^www\\d*\\.");
+    static final Pattern WWW_PREFIX = Pattern.compile("^www\\d*\\.");
     private static final Pattern PATH_SESSIONIDS[] = {
             Pattern.compile("/\\([0-9a-z]{24}\\)(/[^\\?]+.aspx)"),
             Pattern.compile(";jsessionid=[0-9a-z]{32}()$")

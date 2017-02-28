@@ -15,6 +15,7 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -148,17 +149,37 @@ class AccessControl {
      * Find all rules that may apply to the given URL.
      */
     List<AccessRule> rulesForUrl(String url) {
-        ParsedUrl parsed = ParsedUrl.parseUrl(url);
-        canonicalize(parsed);
-        String ssurt = parsed.ssurt().toString();
-        return rulesBySurt.prefixing(ssurt);
+        return rulesBySurt.prefixing(canonSsurt(url));
     }
 
-    static void canonicalize(ParsedUrl url) {
-        Canonicalizer.WHATWG.canonicalize(url);
-        url.setPath(url.getPath().asciiLowerCase());
-        url.setFragment(ByteString.EMPTY);
-        url.setHashSign(ByteString.EMPTY);
+    /**
+     * Canonicalize and return the SURT form.
+     *
+     * - perform WHATWG canonicalization
+     * - lowercase the path
+     * - remove the fragment
+     * - remove www. prefix from hostname
+     * - replace https scheme with http
+     *
+     * These rules are a little aggressive to make defining rules less error prone.
+     *
+     * TODO: query string?
+     *
+     * TODO: reconcile this with UrlCanonicalizer. We should probably switch over to urlcanon as its a more robust
+     * canonicalizer but a change will require rebuilding the index. Maybe keep both implementations and allow an
+     * offline upgrade to be run?
+     */
+    static String canonSsurt(String url) {
+        ParsedUrl parsed = ParsedUrl.parseUrl(url);
+        Canonicalizer.WHATWG.canonicalize(parsed);
+        parsed.setPath(parsed.getPath().asciiLowerCase());
+        parsed.setFragment(ByteString.EMPTY);
+        parsed.setHashSign(ByteString.EMPTY);
+        parsed.setHost(parsed.getHost().replaceAll(UrlCanonicalizer.WWW_PREFIX, ""));
+        if (parsed.getScheme().toString().equals("https")) {
+            parsed.setScheme(new ByteString("http"));
+        }
+        return parsed.ssurt().toString();
     }
 
     private static void reverseDomain(String host, StringBuilder out) {
@@ -187,13 +208,9 @@ class AccessControl {
             reverseDomain(pattern.substring(2), out);
             return out.toString().toLowerCase();
         } else if (pattern.endsWith("*")) {
-            ParsedUrl url = ParsedUrl.parseUrl(pattern.substring(0, pattern.length() - 1));
-            AccessControl.canonicalize(url);
-            return url.ssurt().toString();
+            return AccessControl.canonSsurt(pattern.substring(0, pattern.length() - 1));
         } else {
-            ParsedUrl url = ParsedUrl.parseUrl(pattern.substring(0, pattern.length()));
-            AccessControl.canonicalize(url);
-            return url.ssurt().toString() + " ";
+            return AccessControl.canonSsurt(pattern.substring(0, pattern.length())) + " ";
         }
     }
 
