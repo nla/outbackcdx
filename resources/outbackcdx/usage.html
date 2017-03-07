@@ -1,0 +1,19 @@
+<h3>Wayback RemoteResourceIndex XML protocol</h3>
+
+<pre>GET /[collection]?q=type:urlquery+url:[url]</pre>
+
+Queries all available snapshots for the given URL.
+
+<pre>GET /[collection]?q=type:prefixquery+url:[urlPrefix]</pre>
+
+Queries all records with the given URL prefix.
+
+<h3>outbackcdx extensions</h3>
+
+<pre>POST /[collection]</pre>
+
+Adds records to the collection. Post body should be in 9 or 11 field CDX format. Creates the collection if it doesn't already exist.
+
+<pre>GET /[collection]?url=[url]</pre>
+
+Plain text URL query.

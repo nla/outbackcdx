@@ -33,12 +33,13 @@ Build:
 
 Run:
 
-    java -jar target/tinycdxserver*.jar
+    java -jar target/outbackcdx*.jar
 
 Command line options:
 
-    $ java -jar target/tinycdxserver-0.3.2.jar -h
-    Usage: java tinycdxserver.Server [options...]
+    $ java -jar target/outbackcdx-0.3.2.jar -h
+    Usage: java outbackcdx.Server [options...]
+    
 
       -a url        Use a wayback access control oracle
       -b bindaddr   Bind to a particular IP address

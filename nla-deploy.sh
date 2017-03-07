@@ -1,3 +1,3 @@
 #!/bin/bash
 mvn package
-cp target/tiny*.jar $1/tinycdxserver.jar
+cp target/outbackcdx*.jar $1/outbackcdx.jar
