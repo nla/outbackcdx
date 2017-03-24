@@ -8,13 +8,13 @@ LOOP_PID=$!
 
 function cleanup() {
   kill $LOOP_PID
-  pkill -f tinycdxserver.Main
+  pkill -f outbackcdx.Main
   exit 0
 }
 
 trap cleanup EXIT INT
 
 while true; do
-  inotifywait -e modify target/classes/tinycdxserver
-  pkill -f tinycdxserver.Main
+  inotifywait -e modify target/classes/outbackcdx
+  pkill -f outbackcdx.Main
 done
