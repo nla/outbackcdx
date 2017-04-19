@@ -4,6 +4,7 @@ import com.google.gson.stream.JsonWriter;
 import outbackcdx.NanoHTTPD.Response;
 
 import java.io.*;
+import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static outbackcdx.Json.GSON;
@@ -20,7 +21,7 @@ import static outbackcdx.NanoHTTPD.Response.Status.OK;
  */
 public class WbCdxApi {
     public static Response query(NanoHTTPD.IHTTPSession session, Index index) {
-        Query query = new Query(session);
+        Query query = new Query(session.getParms());
         Iterable<Capture> captures = query.execute(index);
 
         boolean outputJson = "json".equals(session.getParms().get("output"));
@@ -54,21 +55,20 @@ public class WbCdxApi {
         boolean outputJson;
         long limit;
 
+        Query(Map<String,String> params) {
+            accessPoint = params.get("accesspoint");
+            url = params.get("url");
+            matchType = MatchType.valueOf(params.getOrDefault("matchType", "exact").toUpperCase());
+            sort = SortType.valueOf(params.getOrDefault("sort", "default").toUpperCase());
+            closest = params.get("closest");
 
-        Query(NanoHTTPD.IHTTPSession session) {
-            accessPoint = session.getParms().get("accesspoint");
-            url = session.getParms().get("url");
-            matchType = MatchType.valueOf(session.getParms().getOrDefault("matchType", "exact").toUpperCase());
-            sort = SortType.valueOf(session.getParms().getOrDefault("sort", "default").toUpperCase());
-            closest = session.getParms().get("closest");
-
-            String fl = session.getParms().getOrDefault("fl", "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename");
+            String fl = params.getOrDefault("fl", "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename");
             fields = fl.split(",");
 
-            String limitParam = session.getParms().get("limit");
+            String limitParam = params.get("limit");
             limit = limitParam == null ? Long.MAX_VALUE : Long.parseLong(limitParam);
 
-            outputJson = "json".equals(session.getParms().get("output"));
+            outputJson = "json".equals(params.get("output"));
         }
 
         void expandWildcards() {
@@ -124,6 +124,8 @@ public class WbCdxApi {
                 case DOMAIN:
                     String host = hostFromSurt(surt);
                     return index.rangeQuery(host, host + "-", accessPoint);
+                case RANGE:
+                    return index.rangeQuery(surt, "~", accessPoint);
                 default:
                     throw new IllegalArgumentException("unknown matchType: " + matchType);
             }
@@ -220,7 +222,7 @@ public class WbCdxApi {
     }
 
     enum MatchType {
-        EXACT, PREFIX, HOST, DOMAIN
+        EXACT, PREFIX, HOST, DOMAIN, RANGE;
     }
 
     enum SortType {
