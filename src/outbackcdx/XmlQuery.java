@@ -23,7 +23,7 @@ public class XmlQuery {
 
     final Index index;
     final String accessPoint;
-    final String queryUrl;
+    String queryUrl;
     final long offset;
     final long limit;
     final String queryType;
@@ -133,6 +133,14 @@ public class XmlQuery {
 
         if (wroteHeader) {
             out.writeEndElement(); // </results>
+        } else if ("1".equals(System.getenv("CDX_PLUS_WORKAROUND")) && queryUrl.contains("%20")) {
+            /*
+             * XXX: NLA has a bunch of bad WARC files that contain + instead of %20 in the URLs. This is a dirty
+             * workaround until we can fix them. If we found no results try again with + in place of %20.
+             */
+            queryUrl = queryUrl.replaceAll("%20", "+");
+            urlQuery(out);
+            return;
         } else {
             writeNotFoundError(out);
         }
