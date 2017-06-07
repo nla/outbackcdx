@@ -27,7 +27,7 @@ public class AccessRule {
     public boolean matchesDates(Date captureTime, Date accessTime) {
         return (captured == null || captured.contains(captureTime)) &&
                 (accessed == null || accessed.contains(accessTime)) &&
-                (period == null || isWithinPeriod(captureTime, accessTime));
+                (period == null || period.isZero() || isWithinPeriod(captureTime, accessTime));
     }
 
     private boolean isWithinPeriod(Date captureTime, Date accessTime) {
