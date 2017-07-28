@@ -75,6 +75,7 @@ public class AccessControlTest {
         rule3.publicMessage = "Explanatory message";
         accessControl.put(rule3);
 
+
         assertEquals(asList(rule, rule2), accessControl.rulesForUrl("http://nla.gov.au/hello.html"));
         assertEquals(asList(rule, rule2, rule3), new ArrayList<>(accessControl.list()));
 
@@ -86,6 +87,17 @@ public class AccessControlTest {
             AccessDecision decision = accessControl.checkAccess("public", "http://restricted.example.gov.au/hello.html", new Date(), new Date());
             assertFalse(decision.isAllowed());
             assertEquals("Explanatory message", decision.getPublicMessage());
+        }
+
+
+        AccessRule rule4 = new AccessRule();
+        rule4.urlPatterns.add("http://www.example.org/particular/page.htm");
+        rule4.policyId = staffOnlyPolicyId;
+        accessControl.put(rule4);
+
+        {
+            AccessDecision decision = accessControl.checkAccess("public", "http://www.example.org:80/particular/page.htm", new Date(), new Date());
+            assertFalse(decision.isAllowed());
         }
     }
 
