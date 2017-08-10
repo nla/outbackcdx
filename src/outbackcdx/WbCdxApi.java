@@ -3,10 +3,8 @@ package outbackcdx;
 import com.google.gson.stream.JsonWriter;
 import outbackcdx.NanoHTTPD.Response;
 
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
+import java.io.*;
+import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static outbackcdx.Json.GSON;
@@ -23,46 +21,17 @@ import static outbackcdx.NanoHTTPD.Response.Status.OK;
  */
 public class WbCdxApi {
     public static Response query(NanoHTTPD.IHTTPSession session, Index index) {
-        String accessPoint = session.getParms().get("accesspoint");
-        String url = session.getParms().get("url");
-        String matchType = session.getParms().getOrDefault("matchType", "exact");
-        String limitParam = session.getParms().get("limit");
-        String sort = session.getParms().get("sort");
-        String fl = session.getParms().get("fl");
-        String closest = session.getParms().get("closest");
-        if (fl == null) {
-            fl = "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename";
-        }
-        String[] fields = fl.split(",");
-        long limit = limitParam == null ? Long.MAX_VALUE : Long.parseLong(limitParam);
-
-        Iterable<Capture> captures;
-
-        if ("closest".equals(sort)) {
-            if (!"exact".equals(matchType)) {
-                throw new IllegalArgumentException("sort=closest is currently only implemented for exact matches");
-            }
-            if (closest == null) {
-                throw new IllegalArgumentException("closest={timestamp} is mandatory when using sort=closest");
-            }
-            captures = index.closestQuery(UrlCanonicalizer.surtCanonicalize(url), Long.parseLong(closest), accessPoint);
-        } else if ("reverse".equals(sort)) {
-            if (!"exact".equals(matchType)) {
-                throw new IllegalArgumentException("sort=closest is currently only implemented for exact matches");
-            }
-            captures = index.reverseQuery(UrlCanonicalizer.surtCanonicalize(url), accessPoint);
-        } else {
-            captures = queryForMatchType(index, matchType, url, accessPoint);
-        }
+        Query query = new Query(session.getParms());
+        Iterable<Capture> captures = query.execute(index);
 
         boolean outputJson = "json".equals(session.getParms().get("output"));
         Response response = new Response(OK, outputJson ? "application/json" : "text/plain", outputStream -> {
             Writer out = new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8));
-            OutputFormat outf = outputJson ? new JsonFormat(out, fields) : new TextFormat(out, fields);
+            OutputFormat outf = outputJson ? new JsonFormat(out, query.fields) : new TextFormat(out, query.fields);
 
             long row = 0;
             for (Capture capture : captures) {
-                if (row >= limit) {
+                if (row >= query.limit) {
                     break;
                 }
                 outf.writeCapture(capture);
@@ -74,6 +43,93 @@ public class WbCdxApi {
         });
         response.addHeader("Access-Control-Allow-Origin", "*");
         return response;
+    }
+
+    static class Query {
+        String accessPoint;
+        MatchType matchType;
+        SortType sort;
+        String url;
+        String closest;
+        String[] fields;
+        boolean outputJson;
+        long limit;
+
+        Query(Map<String,String> params) {
+            accessPoint = params.get("accesspoint");
+            url = params.get("url");
+            matchType = MatchType.valueOf(params.getOrDefault("matchType", "exact").toUpperCase());
+            sort = SortType.valueOf(params.getOrDefault("sort", "default").toUpperCase());
+            closest = params.get("closest");
+
+            String fl = params.getOrDefault("fl", "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename");
+            fields = fl.split(",");
+
+            String limitParam = params.get("limit");
+            limit = limitParam == null ? Long.MAX_VALUE : Long.parseLong(limitParam);
+
+            outputJson = "json".equals(params.get("output"));
+        }
+
+        void expandWildcards() {
+            if (matchType == MatchType.EXACT) {
+                if (url.endsWith("*")) {
+                    matchType = MatchType.PREFIX;
+                    url = url.substring(url.length() - 1);
+                } else if (url.startsWith("*.")) {
+                    matchType = MatchType.DOMAIN;
+                    url = url.substring(2);
+                }
+            }
+        }
+
+        void validate() {
+            if (sort == SortType.CLOSEST) {
+                if (matchType != MatchType.EXACT) {
+                    throw new IllegalArgumentException("sort=closest is currently only implemented for exact matches");
+                }
+                if (closest == null) {
+                    throw new IllegalArgumentException("closest={timestamp} is mandatory when using sort=closest");
+                }
+            } else if (sort == SortType.REVERSE) {
+                if (matchType != MatchType.EXACT) {
+                    throw new IllegalArgumentException("sort=reverse is currently only implemented for exact matches");
+                }
+            }
+        }
+
+        Iterable<Capture> execute(Index index) {
+            expandWildcards();
+            validate();
+
+            String surt = UrlCanonicalizer.surtCanonicalize(url);
+
+            switch (matchType) {
+                case EXACT:
+                    switch (sort) {
+                        case DEFAULT:
+                            return index.query(surt, accessPoint);
+                        case CLOSEST:
+                            return index.closestQuery(UrlCanonicalizer.surtCanonicalize(url), Long.parseLong(closest), accessPoint);
+                        case REVERSE:
+                            return index.reverseQuery(UrlCanonicalizer.surtCanonicalize(url), accessPoint);
+                    }
+                case PREFIX:
+                    if (url.endsWith("/") && !surt.endsWith("/")) {
+                        surt += "/";
+                    }
+                    return index.prefixQuery(surt, accessPoint);
+                case HOST:
+                    return index.prefixQuery(hostFromSurt(surt) + ")/", accessPoint);
+                case DOMAIN:
+                    String host = hostFromSurt(surt);
+                    return index.rangeQuery(host, host + "-", accessPoint);
+                case RANGE:
+                    return index.rangeQuery(surt, "~", accessPoint);
+                default:
+                    throw new IllegalArgumentException("unknown matchType: " + matchType);
+            }
+        }
     }
 
     interface OutputFormat {
@@ -165,33 +221,12 @@ public class WbCdxApi {
         }
     }
 
+    enum MatchType {
+        EXACT, PREFIX, HOST, DOMAIN, RANGE;
+    }
 
-    private static Iterable<Capture> queryForMatchType(Index index, String matchType, String url, String accessPoint) {
-        String surt = UrlCanonicalizer.surtCanonicalize(url);
-        if (matchType == null) {
-            matchType = "exact";
-        }
-        switch (matchType) {
-            case "exact":
-                if (url.endsWith("*")) {
-                    return queryForMatchType(index, "prefix", url.substring(0, url.length() - 1), accessPoint);
-                } else if (url.startsWith("*.")) {
-                    return queryForMatchType(index, "domain", url.substring(2), accessPoint);
-                }
-                return index.query(surt, accessPoint);
-            case "prefix":
-                if (url.endsWith("/") && !surt.endsWith("/")) {
-                    surt += "/";
-                }
-                return index.prefixQuery(surt, accessPoint);
-            case "host":
-                return index.prefixQuery(hostFromSurt(surt) + ")/", accessPoint);
-            case "domain":
-                String host = hostFromSurt(surt);
-                return index.rangeQuery(host, host + "-", accessPoint);
-            default:
-                throw new IllegalArgumentException("unknown matchType: " + matchType);
-        }
+    enum SortType {
+        DEFAULT, CLOSEST, REVERSE
     }
 
     /**
