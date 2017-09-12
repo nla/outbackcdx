@@ -105,6 +105,11 @@ class AccessControl {
             throw new IllegalArgumentException("no such policyId: " + rule.policyId);
         }
 
+        List<AccessRuleError> errors = rule.validate();
+        if (!errors.isEmpty()) {
+            throw new IllegalArgumentException("invalid rule");
+        }
+
         Long generatedId = null;
         if (rule.id == null) {
             generatedId = rule.id = nextRuleId.getAndIncrement();

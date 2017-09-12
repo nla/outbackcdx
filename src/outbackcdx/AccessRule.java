@@ -80,6 +80,17 @@ public class AccessRule {
         return urlPatterns.stream().map(AccessControl::toSsurtPrefix);
     }
 
+    List<AccessRuleError> validate() {
+        List<AccessRuleError> errors = new ArrayList<>();
+        for (int i = 0; i < urlPatterns.size(); i++) {
+            String pattern = urlPatterns.get(i);
+            if (pattern.startsWith("*.") && pattern.contains("/")) {
+                errors.add(new AccessRuleError(id, i, "can't use a domain wildcard with path"));
+            }
+        }
+        return errors;
+    }
+
     @Override
     public String toString() {
         return "AccessRule{" +

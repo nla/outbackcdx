@@ -556,12 +556,28 @@
                         {method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify(this.rule)})
-                        .then(r => this.$router.replace({
-                            name: 'access-rule-list',
-                            params: {
-                                collection: this.$route.params.collection,
+                        .then(response => {
+                            if (response.ok) {
+                                this.$router.replace({
+                                    name: 'access-rule-list',
+                                    params: {
+                                        collection: this.$route.params.collection,
+                                    }
+                                });
+                            } else {
+                                response.json()
+                                    .catch(function (reason) {
+                                        alert("Unnown error saving rule");
+                                    })
+                                    .then(function (errors) {
+                                        var messages = "Invalid rule:\n";
+                                        errors.forEach(function (error) {
+                                            messages += "[" + error.patternIndex + "] " + error.message + "\n";
+                                        });
+                                        alert(messages);
+                                    });
                             }
-                        }));
+                        });
             },
             cancel: function() {
                 this.$router.replace({
@@ -591,6 +607,9 @@
                     }
                     if (rule.accessed == undefined) {
                         rule.accessed = {};
+                    }
+                    if (rule.policyId == undefined) {
+                        rule.policyId = policies[0].id;
                     }
                     this.rule = rule;
                 });
