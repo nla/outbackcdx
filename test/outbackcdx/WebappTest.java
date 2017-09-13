@@ -84,7 +84,7 @@ public class WebappTest {
 
         assertEquals(5, GSON.fromJson(GET("/testap/access/policies"), AccessPolicy[].class).length);
 
-        createRule(publicPolicyId, "");
+        createRule(publicPolicyId, "*");
         long ruleId = createRule(staffPolicyId, "*.a.ex.org");
 
         assertEquals(2, GSON.fromJson(GET("/testap/access/rules"), AccessRule[].class).length);
@@ -137,9 +137,18 @@ public class WebappTest {
         //
 
         AccessRule badRule = new AccessRule();
+        badRule.policyId = staffPolicyId;
         badRule.urlPatterns.add("*.example.org/with/a/path");
-
         POST("/testap/access/rules", GSON.toJson(badRule), BAD_REQUEST);
+
+        AccessRule badRule2 = new AccessRule();
+        badRule2.policyId = staffPolicyId;
+        badRule2.urlPatterns.add("");
+        POST("/testap/access/rules", GSON.toJson(badRule2), BAD_REQUEST);
+
+        AccessRule badRule3 = new AccessRule();
+        badRule3.policyId = staffPolicyId;
+        POST("/testap/access/rules", GSON.toJson(badRule3), BAD_REQUEST);
 
     }
 

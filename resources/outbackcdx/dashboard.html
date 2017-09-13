@@ -552,6 +552,7 @@
                 return t.format("llll") + " (" + t.fromNow() + ")";
             },
             save: function () {
+                this.rule.urlPatterns = this.rule.urlPatterns.filter(function(pattern) { return pattern != ""; });
                 fetch(urlTemplate("/{collection}/access/rules", this.$route.params),
                         {method: 'POST',
                         headers: {'Content-Type': 'application/json'},
