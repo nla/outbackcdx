@@ -15,6 +15,8 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import static java.nio.ByteOrder.BIG_ENDIAN;
@@ -101,6 +103,11 @@ class AccessControl {
     public Long put(AccessRule rule) throws RocksDBException {
         if (rule.policyId == null || policies.get(rule.policyId) == null) {
             throw new IllegalArgumentException("no such policyId: " + rule.policyId);
+        }
+
+        List<AccessRuleError> errors = rule.validate();
+        if (!errors.isEmpty()) {
+            throw new IllegalArgumentException("invalid rule");
         }
 
         Long generatedId = null;
@@ -307,12 +314,17 @@ class AccessControl {
      * by " " to allow for a default rule.
      */
     static class RulesBySsurt {
+        private static final Logger log = Logger.getLogger(RulesBySsurt.class.getName());
         private final InvertedRadixTree<List<AccessRule>> tree;
 
         RulesBySsurt(Collection<AccessRule> rules) {
             tree = new ConcurrentInvertedRadixTree<>(new DefaultCharArrayNodeFactory());
             for (AccessRule rule: rules) {
-                put(rule);
+                try {
+                    put(rule);
+                } catch (IllegalArgumentException e) {
+                    log.log(Level.WARNING, "Skipping invalid access rule: " + rule.id, e);
+                }
             }
         }
 

@@ -80,6 +80,23 @@ public class AccessRule {
         return urlPatterns.stream().map(AccessControl::toSsurtPrefix);
     }
 
+    List<AccessRuleError> validate() {
+        List<AccessRuleError> errors = new ArrayList<>();
+        for (int i = 0; i < urlPatterns.size(); i++) {
+            String pattern = urlPatterns.get(i);
+            if (pattern.startsWith("*.") && pattern.contains("/")) {
+                errors.add(new AccessRuleError(id, i, "can't use a domain wildcard with path"));
+            } else if (pattern.isEmpty()) {
+                errors.add(new AccessRuleError(id, i, "URL pattern can't be blank"));
+            }
+        }
+
+        if (urlPatterns.isEmpty()) {
+            errors.add(new AccessRuleError(id, -1, "rule must have at least one URL pattern"));
+        }
+        return errors;
+    }
+
     @Override
     public String toString() {
         return "AccessRule{" +

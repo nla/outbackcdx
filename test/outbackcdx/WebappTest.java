@@ -16,6 +16,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static outbackcdx.Json.GSON;
 import static outbackcdx.NanoHTTPD.Method.*;
+import static outbackcdx.NanoHTTPD.Response.Status.BAD_REQUEST;
 import static outbackcdx.NanoHTTPD.Response.Status.CREATED;
 import static outbackcdx.NanoHTTPD.Response.Status.OK;
 
@@ -83,7 +84,7 @@ public class WebappTest {
 
         assertEquals(5, GSON.fromJson(GET("/testap/access/policies"), AccessPolicy[].class).length);
 
-        createRule(publicPolicyId, "");
+        createRule(publicPolicyId, "*");
         long ruleId = createRule(staffPolicyId, "*.a.ex.org");
 
         assertEquals(2, GSON.fromJson(GET("/testap/access/rules"), AccessRule[].class).length);
@@ -130,6 +131,24 @@ public class WebappTest {
         assertEquals(asList("http://a.ex.org/", "http://a.ex.org/", "http://b.ex.org/"),
                 cdxUrls(GET("/testap/ap/public", "url", "*.ex.org")));
 
+
+        //
+        // invalid rules should be rejected
+        //
+
+        AccessRule badRule = new AccessRule();
+        badRule.policyId = staffPolicyId;
+        badRule.urlPatterns.add("*.example.org/with/a/path");
+        POST("/testap/access/rules", GSON.toJson(badRule), BAD_REQUEST);
+
+        AccessRule badRule2 = new AccessRule();
+        badRule2.policyId = staffPolicyId;
+        badRule2.urlPatterns.add("");
+        POST("/testap/access/rules", GSON.toJson(badRule2), BAD_REQUEST);
+
+        AccessRule badRule3 = new AccessRule();
+        badRule3.policyId = staffPolicyId;
+        POST("/testap/access/rules", GSON.toJson(badRule3), BAD_REQUEST);
 
     }
 

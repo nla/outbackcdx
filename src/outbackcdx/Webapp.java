@@ -13,11 +13,7 @@ import javax.xml.stream.XMLStreamException;
 import java.io.*;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -220,33 +216,57 @@ class Webapp implements Web.Handler {
 
     private Response postAccessRules(IHTTPSession session) throws IOException, Web.ResponseException, RocksDBException {
         AccessControl accessControl = getIndex(session).accessControl;
+
+        // parse rules
+        List<AccessRule> rules;
+        boolean single = false;
         if ("application/xml".equals(session.getHeaders().get("content-type"))) {
             try {
-                List<AccessRule> rules = AccessRuleXml.parseRules(session.getInputStream());
-                List<Long> ids = new ArrayList<>();
-                for (AccessRule rule : rules) {
-                    ids.add(accessControl.put(rule));
-                }
-                return jsonResponse(ids);
+                rules = AccessRuleXml.parseRules(session.getInputStream());
             } catch (XMLStreamException e) {
                 return new Response(BAD_REQUEST, "text/plain", formatStackTrace(e));
             }
-        } else {
+        } else { // JSON format
             JsonReader reader = GSON.newJsonReader(new InputStreamReader(session.getInputStream(), UTF_8));
             if (reader.peek() == JsonToken.BEGIN_ARRAY) {
-                List<Long> ids = new ArrayList<>();
                 reader.beginArray();
+                rules = new ArrayList<>();
                 while (reader.hasNext()) {
                     AccessRule rule = GSON.fromJson(reader, AccessRule.class);
-                    ids.add(accessControl.put(rule));
+                    rules.add(rule);
                 }
                 reader.endArray();
-                return jsonResponse(ids);
-            } else {
-                AccessRule rule = GSON.fromJson(reader, AccessRule.class);
-                Long id = accessControl.put(rule);
-                return id == null ? ok() : created(id);
+            } else { // single rule
+                rules = Arrays.asList((AccessRule)GSON.fromJson(reader, AccessRule.class));
+                single = true;
             }
+        }
+
+        // validate rules
+        List<AccessRuleError> errors = new ArrayList<>();
+        for (AccessRule rule: rules) {
+            errors.addAll(rule.validate());
+        }
+
+        // return an error response if any failed
+        if (!errors.isEmpty()) {
+            Response response = jsonResponse(errors);
+            response.setStatus(Response.Status.BAD_REQUEST);
+            return response;
+        }
+
+        // save all the rules
+        List<Long> ids = new ArrayList<>();
+        for (AccessRule rule : rules) {
+            ids.add(accessControl.put(rule));
+        }
+
+        // return succesful response
+        if (single) {
+            Long id = ids.get(0);
+            return id == null ? ok() : created(id);
+        } else {
+            return jsonResponse(ids);
         }
     }
 
