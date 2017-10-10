@@ -35,4 +35,8 @@ public class FeatureFlags {
         map.put("pandoraHacks", pandoraHacks());
         return map;
     }
+
+    public static void setPandoraHacks(boolean pandoraHacks) {
+        FeatureFlags.pandoraHacks = pandoraHacks;
+    }
 }

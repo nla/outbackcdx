@@ -131,9 +131,9 @@
             <version>2.4.0</version>
         </dependency>
         <dependency>
-            <groupId>com.github.iipc</groupId>
+            <groupId>org.netpreserve</groupId>
             <artifactId>urlcanon</artifactId>
-            <version>84d997a</version>
+            <version>0.1.0</version>
         </dependency>
 
         <!--

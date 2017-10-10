@@ -64,6 +64,7 @@ public class UrlCanonicalizerTest {
 
     @Test
     public void pandoraUrlsShouldHaveQueryStringStripped() throws MalformedURLException, URISyntaxException {
+        FeatureFlags.setPandoraHacks(true);
         t("http://pandora.nla.gov.au/pan/10075/20150801-0000/www.nlc.org.au/assets/CSS/style62ea.css?ver=1.2", "http://pandora.nla.gov.au/pan/10075/20150801-0000/www.nlc.org.au/assets/css/style62ea.css");
     }
 }
