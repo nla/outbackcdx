@@ -78,7 +78,9 @@ public class UrlCanonicalizer {
          * For example: "style.php?ver=1.2" was rewritten to "style62ea.css" but the HTML links to
          * "style62ea.css?ver=1.2".
          */
-        return url.getHost().equalsIgnoreCase("pandora.nla.gov.au") && url.getPath().startsWith("/pan/");
+        return FeatureFlags.pandoraHacks()
+                && url.getHost().equalsIgnoreCase("pandora.nla.gov.au")
+                && url.getPath().startsWith("/pan/");
     }
 
     public static URL canonicalize(URL url) throws MalformedURLException {

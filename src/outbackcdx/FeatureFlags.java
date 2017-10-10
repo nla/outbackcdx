@@ -10,9 +10,15 @@ import java.util.Map;
  */
 public class FeatureFlags {
     private static boolean experimentalAccessControl;
+    private static boolean pandoraHacks;
 
     static {
         experimentalAccessControl = "1".equals(System.getenv("EXPERIMENTAL_ACCESS_CONTROL"));
+        pandoraHacks = "1".equals(System.getenv("PANDORA_HACKS"));
+    }
+
+    public static boolean pandoraHacks() {
+        return pandoraHacks;
     }
 
     public static boolean experimentalAccessControl() {
@@ -26,6 +32,7 @@ public class FeatureFlags {
     public static Map<String, Boolean> asMap() {
         Map<String,Boolean> map = new HashMap<>();
         map.put("experimentalAccessControl", experimentalAccessControl());
+        map.put("pandoraHacks", pandoraHacks());
         return map;
     }
 }
