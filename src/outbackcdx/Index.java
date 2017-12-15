@@ -302,10 +302,24 @@ public class Index {
     }
 
     public class Batch implements AutoCloseable {
+        private final static long batchSizeLimit = 32768;
+        private long batchSize = 0;
         private WriteBatch dbBatch = new WriteBatch();
         private final Map<String, String> newAliases = new HashMap<>();
 
         private Batch() {
+        }
+
+        private void incrementBatchSize() {
+            batchSize++;
+
+            // limit the number of records written in a single RocksDB batch to cap memory usage
+            if (batchSize > batchSizeLimit) {
+                commitBatch(dbBatch);
+                dbBatch.close();
+                dbBatch = new WriteBatch();
+                batchSize = 0;
+            }
         }
 
         /**
@@ -318,6 +332,7 @@ public class Index {
             } else {
                 capture.urlkey = resolveAlias(capture.urlkey);
             }
+            incrementBatchSize();
             dbBatch.put(capture.encodeKey(), capture.encodeValue());
         }
 
@@ -328,6 +343,7 @@ public class Index {
             if (aliasSurt.equals(targetSurt)) {
                 return; // a self-referential alias is equivalent to no alias so don't bother storing it
             }
+            incrementBatchSize();
             dbBatch.put(aliasCF, aliasSurt.getBytes(US_ASCII), targetSurt.getBytes(US_ASCII));
             newAliases.put(aliasSurt, targetSurt);
             updateExistingRecordsWithNewAlias(dbBatch, aliasSurt, targetSurt);
