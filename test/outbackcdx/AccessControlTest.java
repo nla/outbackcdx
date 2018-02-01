@@ -106,8 +106,14 @@ public class AccessControlTest {
     public void testPattern() {
         assertEquals("au,gov,", AccessControl.toSsurtPrefix("*.gov.au"));
         assertEquals("au,gov,", AccessControl.toSsurtPrefix("*.GOV.AU"));
-        assertEquals("com,example,//:http/foo/", AccessControl.toSsurtPrefix("http://EXAMPLE.com/foo/*"));
-        assertEquals("com,example,//:http/foo/ ", AccessControl.toSsurtPrefix("http://example.com/foo/"));
+        assertEquals("com,example,//http:/foo/", AccessControl.toSsurtPrefix("http://EXAMPLE.com/foo/*"));
+        assertEquals("com,example,//http:/foo/ ", AccessControl.toSsurtPrefix("http://example.com/foo/"));
+    }
+
+    @Test
+    public void testCanon() {
+        FeatureFlags.setPandoraHacks(true);
+        assertEquals("org,example,//http:/index.html?hello", AccessControl.canonSsurt("http://PANDORA.nla.gov.au/pan/12345/20160101-1234/www.example.org/INDEX.html?hello#world"));
     }
 
 }

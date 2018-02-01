@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.nio.ByteOrder.BIG_ENDIAN;
@@ -159,6 +160,8 @@ class AccessControl {
         return rulesBySurt.prefixing(canonSsurt(url));
     }
 
+    private static final Pattern PANDORA_REGEX = Pattern.compile("(?i)http://pandora.nla.gov.au/pan/[0-9]+/[0-9-]+/([^/.]+\\.[^/]+/.*)");
+
     /**
      * Canonicalize and return the SURT form.
      *
@@ -177,15 +180,20 @@ class AccessControl {
      * offline upgrade to be run?
      */
     static String canonSsurt(String url) {
-        ParsedUrl parsed = ParsedUrl.parseUrl(url);
-        Canonicalizer.WHATWG.canonicalize(parsed);
-        parsed.setPath(parsed.getPath().asciiLowerCase());
-        parsed.setFragment(ByteString.EMPTY);
-        parsed.setHashSign(ByteString.EMPTY);
-        parsed.setHost(parsed.getHost().replaceAll(UrlCanonicalizer.WWW_PREFIX, ""));
-        if (parsed.getScheme().toString().equals("https")) {
-            parsed.setScheme(new ByteString("http"));
+        if (FeatureFlags.pandoraHacks()) {
+            /*
+             * Strip PANDORA prefix from URLs so rules so a single rule can match both PANDORA and non-PANDORA
+             * content.
+             */
+            Matcher m = PANDORA_REGEX.matcher(url);
+            if (m.matches()) {
+                String hackedOffUrl = "http://" + m.group(1);
+                url = hackedOffUrl;
+            }
         }
+
+        ParsedUrl parsed = ParsedUrl.parseUrl(url);
+        Canonicalizer.AGGRESSIVE.canonicalize(parsed);
         return parsed.ssurt().toString();
     }
 
