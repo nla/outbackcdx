@@ -56,7 +56,7 @@ load records into the index by POSTing them in the (11-field) CDX format Wayback
 The canonicalized URL (first field) is ignored, OutbackCDX performs its own
 canonicalization.
 
-Configuring OpenWayback
+Using with OpenWayback
 -----------------------
 
 Point Wayback at a OutbackCDX index by configuring a RemoteResourceIndex. See the example RemoteCollection.xml shipped with OpenWayback.
@@ -69,6 +69,24 @@ Point Wayback at a OutbackCDX index by configuring a RemoteResourceIndex. See th
     </property>
 ```
 
+Using with pywb
+---------------
+
+Create a pywb config.yaml file containing:
+
+```yaml
+collections:
+  testcol:
+    archive_paths: /tmp/warcs/
+    #archive_paths: http://remote.example.org/warcs/
+    index:
+      type: cdx
+      api_url: http://localhost:8080/myindex?url={url}&closest={closest}&sort=closest
+    
+      # outbackcdx doesn't serve warc records 
+      # so we blank replay_url to force pywb to read the warc file itself
+      replay_url: ""
+```
 
 Access Control
 --------------

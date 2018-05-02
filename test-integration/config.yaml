@@ -6,5 +6,4 @@ collections:
         replay_url: ""
       archive_paths: ./
 
-archive_paths: ./
 enable_http_proxy: true
