@@ -1,1 +1,4 @@
-http://data.webarchive.org.uk/crawl-test-site/ 20161016214133 http://data.webarchive.org.uk/crawl-test-site/ text/html 200 CZBHCHHR4IFLFUDLNLKGN5MTNTAA4DV6 - 862 test1.warc.gz
+ CDX N b a m s k r M S V g
+uk,org,webarchive,data)/crawl-test-site 20161016214133 http://data.webarchive.org.uk/crawl-test-site/ text/html 200 CZBHCHHR4IFLFUDLNLKGN5MTNTAA4DV6 - - 3113 862 test1.warc.gz
+org,gnu)/software/wget/warc/manifest.txt 20161016214133 metadata://gnu.org/software/wget/warc/MANIFEST.txt text/plain - X63IVY2EKNTJAPHYZ2YBMNITX2JGEC22 - - 314 3975 test1.warc.gz
+org,gnu)/software/wget/warc/wget_arguments.txt 20161016214133 metadata://gnu.org/software/wget/warc/wget_arguments.txt text/plain - BV6CT6WYNAZS6YKP4SQCN2R3WJPXGGF7 - - 419 4289 test1.warc.gz

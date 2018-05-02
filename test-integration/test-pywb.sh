@@ -40,4 +40,4 @@ PAGE=http://data.webarchive.org.uk/crawl-test-site/
 
 check "$WAYBACK_URL/cdx?url=$PAGE" 20161016214133
 check "$WAYBACK_URL/cdx?url=$PAGE" 20161016214156
-#check $WAYBACK_URL/20161016214133/$PAGE 'Simple Text Documents'
+check "$WAYBACK_URL/20161016214133mp_/http://data.webarchive.org.uk/crawl-test-site/" 'Simple Text Documents'
