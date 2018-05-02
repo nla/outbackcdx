@@ -99,6 +99,7 @@ public class WbCdxApi {
         }
 
         Iterable<Capture> execute(Index index) {
+            compatibilityHacks();
             expandWildcards();
             validate();
 
@@ -128,6 +129,15 @@ public class WbCdxApi {
                     return index.rangeQuery(surt, "~", accessPoint);
                 default:
                     throw new IllegalArgumentException("unknown matchType: " + matchType);
+            }
+        }
+
+        private void compatibilityHacks() {
+            /*
+             * Cope pywb 2.0 sending nonsensical closest queries like ?url=foo&closest=&sort=closest.
+             */
+            if (sort == SortType.CLOSEST && (closest == null || closest.isEmpty())) {
+                sort = SortType.DEFAULT;
             }
         }
     }
