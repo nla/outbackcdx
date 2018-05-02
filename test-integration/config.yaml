@@ -1,5 +1,5 @@
 collections:
-    testcol: http://localhost:8081/testcol
+    testcol: cdx+http://localhost:8081/testcol
 
 archive_paths: ./
 enable_http_proxy: true
