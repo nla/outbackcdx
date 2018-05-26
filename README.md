@@ -1,7 +1,7 @@
 OutbackCDX (nee tinycdxserver)
 ==============================
 
-A [RocksDB]-based capture index (CDX) server for web archives.
+A [RocksDB](https://rocksdb.org/)-based capture index (CDX) server for web archives.
 
 * [API Documentation](https://nla.github.io/outbackcdx/api.html)
 
