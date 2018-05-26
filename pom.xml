@@ -21,6 +21,9 @@
             <resource>
                 <directory>${basedir}/resources</directory>
             </resource>
+            <resource>
+                <directory>${basedir}/docs/resources</directory>
+            </resource>
         </resources>
         <testResources>
             <testResource>
