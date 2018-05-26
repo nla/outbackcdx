@@ -33,7 +33,8 @@
           {
             "name": "url",
             "in": "query",
-            "type": "string"
+            "type": "string",
+            "description": "URL or SURT to look for"
           },
           {
             "name": "matchType",
@@ -43,8 +44,43 @@
               "exact",
               "prefix",
               "host",
-              "domain"
+              "domain",
+              "range"
             ]
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "type": "string",
+            "enum": [
+              "default",
+              "closest",
+              "reverse"
+            ]
+          },
+          {
+            "name": "closest",
+            "in": "query",
+            "type": "integer",
+            "description": "Timestamp for sort=closest mode",
+            "example": "20030402172120"
+          },
+          {
+            "name": "output",
+            "in": "query",
+            "type": "string",
+            "enum": [
+              "cdx",
+              "json"
+            ],
+            "description": "Output format"
+          },
+          {
+            "name": "fl",
+            "in": "query",
+            "type": "string",
+            "description": "Comma-separated list of fields to include in output",
+            "example": "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename"
           }
         ]
       }

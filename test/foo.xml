@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wayback>
+    <request>
+        <startdate>19960101000000</startdate>
+        <enddate>20180526162512</enddate>
+        <type>urlquery</type>
+        <firstreturned>0</firstreturned>
+        <url>org,example)/</url>
+        <resultsrequested>10000</resultsrequested>
+        <resultstype>resultstypecapture</resultstype>
+    </request>
+    <results>
+        <result>
+            <compressedoffset>396</compressedoffset>
+            <compressedendoffset>2248</compressedendoffset>
+            <mimetype>text/html</mimetype>
+            <file>mycrawl.warc.gz</file>
+            <redirecturl>-</redirecturl>
+            <urlkey>org,example)/</urlkey>
+            <digest>MOH7IEN2JAEJOHYXIEPEEGHOHG5VI===</digest>
+            <httpresponsecode>200</httpresponsecode>
+            <robotflags>-</robotflags>
+            <url>http://example.org/</url>
+            <capturedate>20030402160014</capturedate>
+        </result>
+    </results>
+</wayback>
