@@ -1,28 +1,26 @@
 OutbackCDX (nee tinycdxserver)
 ==============================
 
-A [RocksDB]-based web archive index server which can serve records using Wayback's
-RemoteResourceIndex (xmlquery) protocol.
+A [RocksDB]-based capture index (CDX) server for web archives.
 
+* [API Documentation](https://nla.github.io/outbackcdx/api.html)
+
+Features:
+
+* Speaks both [OpenWayback](https://github.com/iipc/openwayback/) (XML) and [PyWb](https://github.com/webrecorder/pywb) (JSON) CDX protocols
 * Realtime, incremental updates
 * Compressed indexes (varint packing + snappy), typically 1/4 - 1/5 the size of CDX files.
+* Access control (experimental, see below)
 
-Status and Limitations
-----------------------
+Things it doesn't do (yet):
 
-A couple of institutions are using this in production. We (National Library of Australia) use it for a ~1 TB (compressed), 8 billion record index.
+* Authentication (use a firewall or reverse proxy for now)
+* Deletes
+* Sharding, replication
+* CDXJ
 
-* The dashabord / admin GUI is not fully functional yet
-* Documentation could be improved a lot
-* Requires Java 8
-* No authentication (currently assumes you use a firewall)
-* No sharding (could be added relatively easily but we don't currently need it, I would suggest maybe looking at Cassandra)
-* No replication (you could use a HTTP load balancer though)
-* Delete not yet implemented
-* RemoteResourceIndex in OpenWayback is broken in 2.1 and 2.2 and requires a [patch]. This has been fixed in OpenWayback 2.3.
-
-[RocksDB]: http://rocksdb.org/
-[patch]: https://github.com/iipc/openwayback/pull/239
+Used in production at the National Library of Australia and British Library with
+8-9 billion record indexes.
 
 Usage
 -----
@@ -48,16 +46,102 @@ Command line options:
       -p port       Local port to listen on
       -v            Verbose logging
 
-The server supports multiple named indexes as subdirectories.  You can
-load records into the index by POSTing them in the (11-field) CDX format Wayback uses:
+The server supports multiple named indexes as subdirectories.  Currently indexes
+are created automatically when you first write records to them.
 
-    curl -X POST --data-binary @records.cdx http://localhost:8080/myindex
+OutbackCDX does not include a CDX indexing tool for reading WARC or ARC files. Use
+the `cdx-indexer` scripts included with OpenWayback or PyWb.
+
+You can load records into the index by POSTing them in the (11-field) CDX format
+Wayback uses:
+
+    $ cdx-indexer mycrawlw.warc.gz > records.cdx
+    $ curl -X POST --data-binary @records.cdx http://localhost:8080/myindex
+    Added 542 records
 
 The canonicalized URL (first field) is ignored, OutbackCDX performs its own
 canonicalization.
 
-Using with OpenWayback
------------------------
+Records can be queried in CDX format:
+
+    $ curl 'http://localhost:8080/myindex?url=example.org'
+    org,example)/ 20030402160014 http://example.org/ text/html 200 MOH7IEN2JAEJOHYXIEPEEGHOHG5VI=== - - 2248 396 mycrawl.warc.gz
+
+CDX formatted as JSON arrays:
+    
+    $ curl 'http://localhost:8080/myindex?url=example.org&output=json'
+    [
+      [
+        "org,example)/",
+        20030402160014,
+        "http://example.org/",
+        "text/html",
+        200,
+        "MOH7IEN2JAEJOHYXIEPEEGHOHG5VI===",
+        2248,
+        396,
+        "mycrawl.warc.gz"
+      ]
+    ]
+
+OpenWayback "OpenSearch" XML:
+
+    $ curl 'http://localhost:8080/myindex?q=type:urlquery+url:http%3A%2F%2Fexample.org%2F'
+    <?xml version="1.0" encoding="UTF-8"?>
+    <wayback>
+       <request>
+           <startdate>19960101000000</startdate>
+           <enddate>20180526162512</enddate>
+           <type>urlquery</type>
+           <firstreturned>0</firstreturned>
+           <url>org,example)/</url>
+           <resultsrequested>10000</resultsrequested>
+           <resultstype>resultstypecapture</resultstype>
+       </request>
+       <results>
+           <result>
+               <compressedoffset>396</compressedoffset>
+               <compressedendoffset>2248</compressedendoffset>
+               <mimetype>text/html</mimetype>
+               <file>mycrawl.warc.gz</file>
+               <redirecturl>-</redirecturl>
+               <urlkey>org,example)/</urlkey>
+               <digest>MOH7IEN2JAEJOHYXIEPEEGHOHG5VI===</digest>
+               <httpresponsecode>200</httpresponsecode>
+               <robotflags>-</robotflags>
+               <url>http://example.org/</url>
+               <capturedate>20030402160014</capturedate>
+           </result>
+       </results>
+    </wayback>
+
+Query URLs that match a given SURT prefix:
+
+    $ curl 'http://localhost:8080/myindex?url=(org,example&matchType=prefix'
+    
+Find the first 5 URLs with a given domain:
+
+    $ curl 'http://localhost:8080/myindex?url=example.org&matchType=domain&limit=5'
+
+Find the next 10 URLs in the index starting from the given SURT:
+
+    $ curl 'http://localhost:8080/myindex?url=(org,example,&matchType=range&limit=10'
+
+Return results in reverse order:
+ 
+    $ curl 'http://localhost:8080/myindex?url=example.org&sort=reverse'
+ 
+Return results ordered closest to furthest from a given timestamp:
+
+    $ curl 'http://localhost:8080/myindex?url=example.org&sort=closest&closest=20030402172120'
+
+See the [API Documentation](https://nla.github.io/outbackcdx/api.html) for more details
+about the available options.
+        
+Configuring replay tools
+------------------------
+
+### OpenWayback
 
 Point Wayback at a OutbackCDX index by configuring a RemoteResourceIndex. See the example RemoteCollection.xml shipped with OpenWayback.
 
@@ -69,8 +153,7 @@ Point Wayback at a OutbackCDX index by configuring a RemoteResourceIndex. See th
     </property>
 ```
 
-Using with pywb
----------------
+### PyWb
 
 Create a pywb config.yaml file containing:
 
@@ -87,6 +170,11 @@ collections:
       # so we blank replay_url to force pywb to read the warc file itself
       replay_url: ""
 ```
+
+### Heritrix
+
+The ukwa-heritrix project includes [some classes](https://github.com/ukwa/ukwa-heritrix/blob/21d31329065f2a6a68186309757a5644af00daec/src/main/java/uk/bl/wap/modules/uriuniqfilters/OutbackCDXRecentlySeenUriUniqFilter.java)
+that allow OutbackCDX to be used as a source of deduplication data for Heritrix crawls.
 
 Access Control
 --------------
@@ -117,13 +205,3 @@ Aliases do not currently work with url prefix queries. Aliases are resolved afte
 are applied.
 
 Aliases can be mixed with regular CDX lines either in the same file or separate files and in any order. Any existing records that the alias rule affects the canonicalised URL for will be updated when the alias is added to the index.
-
-Future Work
------------
-
-Other than fixing the above limitations, index size could be further reduced by:
-
-* Representing WARC files using a numeric ID
-* Truncating or omitting the SHA1 digests (Wayback only uses them to asterisk changed records)
-
-It may be handy to have a secondary index for looking up records by digest.
