@@ -65,9 +65,9 @@ The canonicalized URL (first field) is ignored, OutbackCDX performs its own
 canonicalization.
 
 **Limitation:** Loading an extremely large number of CDX records in one POST request
-can cause an out of memory error (see #13). Until this is fixed you may need to
-break your request up into several smaller ones. Most users send one POST per WARC 
-file.
+can cause an [out of memory error](https://github.com/nla/outbackcdx/issues/13). 
+Until this is fixed you may need to break your request up into several smaller ones. 
+Most users send one POST per WARC file.
 
 ### Querying
 
