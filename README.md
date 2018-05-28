@@ -49,6 +49,8 @@ Command line options:
 The server supports multiple named indexes as subdirectories.  Currently indexes
 are created automatically when you first write records to them.
 
+### Loading Records
+
 OutbackCDX does not include a CDX indexing tool for reading WARC or ARC files. Use
 the `cdx-indexer` scripts included with OpenWayback or PyWb.
 
@@ -61,6 +63,13 @@ Wayback uses:
 
 The canonicalized URL (first field) is ignored, OutbackCDX performs its own
 canonicalization.
+
+**Limitation:** Loading an extremely large number of CDX records in one POST request
+can cause an out of memory error (see #13). Until this is fixed you may need to
+break your request up into several smaller ones. Most users send one POST per WARC 
+file.
+
+### Querying
 
 Records can be queried in CDX format:
 
