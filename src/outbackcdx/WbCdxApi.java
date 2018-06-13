@@ -58,7 +58,7 @@ public class WbCdxApi {
         Query(Map<String,String> params) {
             accessPoint = params.get("accesspoint");
             url = params.get("url");
-            matchType = MatchType.valueOf(params.getOrDefault("matchType", "exact").toUpperCase());
+            matchType = MatchType.valueOf(params.getOrDefault("matchType", "default").toUpperCase());
             sort = SortType.valueOf(params.getOrDefault("sort", "default").toUpperCase());
             closest = params.get("closest");
 
@@ -72,13 +72,15 @@ public class WbCdxApi {
         }
 
         void expandWildcards() {
-            if (matchType == MatchType.EXACT) {
+            if (matchType == MatchType.DEFAULT) {
                 if (url.endsWith("*")) {
                     matchType = MatchType.PREFIX;
-                    url = url.substring(url.length() - 1);
+                    url = url.substring(0, url.length() - 1);
                 } else if (url.startsWith("*.")) {
                     matchType = MatchType.DOMAIN;
                     url = url.substring(2);
+                } else {
+                    matchType = MatchType.EXACT;
                 }
             }
         }
@@ -232,7 +234,7 @@ public class WbCdxApi {
     }
 
     enum MatchType {
-        EXACT, PREFIX, HOST, DOMAIN, RANGE;
+        DEFAULT, EXACT, PREFIX, HOST, DOMAIN, RANGE;
     }
 
     enum SortType {
