@@ -19,8 +19,8 @@ public class Main {
         System.err.println("  -d datadir    Directory to store index data under");
         System.err.println("  -i            Inherit the server socket via STDIN (for use with systemd, inetd etc)");
         System.err.println("  -p port       Local port to listen on");
+        System.err.println("  -t count      Number of web server threads");
         System.err.println("  -v            Verbose logging");
-        System.err.println("  -t count      Number of web server threads")
         System.exit(1);
     }
 
