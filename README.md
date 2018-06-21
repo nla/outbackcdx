@@ -44,6 +44,7 @@ Command line options:
       -d datadir    Directory to store index data under
       -i            Inherit the server socket via STDIN (for use with systemd, inetd etc)
       -p port       Local port to listen on
+      -t count      Number of web server threads
       -v            Verbose logging
 
 The server supports multiple named indexes as subdirectories.  Currently indexes
