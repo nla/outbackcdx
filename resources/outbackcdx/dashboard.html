@@ -519,7 +519,7 @@
             <p>
                 <button @click="save">Save</button>
                 <button @click="cancel">Cancel</button>
-                <button @click="deleteRule" v-if="rule.id" style="float:right">Delete</button>
+                <button @click="deleteRule" v-if="rule.id != null" style="float:right">Delete</button>
             </p>
         </div>
 

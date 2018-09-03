@@ -71,6 +71,7 @@ public class Main {
                     server.stop();
                     dataStore.close();
                 }));
+                System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port);
                 Thread.sleep(Long.MAX_VALUE);
             } finally {
                 threadPool.shutdown();
