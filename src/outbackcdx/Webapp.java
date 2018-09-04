@@ -8,6 +8,8 @@ import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import outbackcdx.NanoHTTPD.IHTTPSession;
 import outbackcdx.NanoHTTPD.Response;
+import outbackcdx.auth.Authorizer;
+import outbackcdx.auth.Permission;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.*;
@@ -27,31 +29,7 @@ import static outbackcdx.Web.*;
 class Webapp implements Web.Handler {
     private final boolean verbose;
     private final DataStore dataStore;
-    final Web.Router router = new Web.Router()
-            .on(GET, "/", serve("dashboard.html"))
-            .on(GET, "/api", serve("api.html"))
-            .on(GET, "/api.js", serve("api.js"))
-            .on(GET, "/add.svg", serve("add.svg"))
-            .on(GET, "/database.svg", serve("database.svg"))
-            .on(GET, "/outback.svg",  serve("outback.svg"))
-            .on(GET, "/favicon.ico",  serve("outback.svg"))
-            .on(GET, "/swagger.json", serve("swagger.json"))
-
-            .on(GET, "/lib/vue-router/2.0.0/vue-router.js", serve("lib/vue-router/2.0.0/vue-router.js"))
-            .on(GET, "/lib/vue/2.0.1/vue.js", serve("/META-INF/resources/webjars/vue/2.0.1/dist/vue.js"))
-            .on(GET, "/lib/lodash/4.15.0/lodash.min.js", serve("/META-INF/resources/webjars/lodash/4.15.0/lodash.min.js"))
-            .on(GET, "/lib/moment/2.15.2/moment.min.js", serve("/META-INF/resources/webjars/moment/2.15.2/min/moment.min.js"))
-            .on(GET, "/lib/pikaday/1.4.0/pikaday.js", serve("/META-INF/resources/webjars/pikaday/1.4.0/pikaday.js"))
-            .on(GET, "/lib/pikaday/1.4.0/pikaday.css", serve("/META-INF/resources/webjars/pikaday/1.4.0/css/pikaday.css"))
-            .on(GET, "/lib/redoc/1.4.1/redoc.min.js", serve("/META-INF/resources/webjars/redoc/1.4.1/dist/redoc.min.js"))
-
-            .on(GET, "/api/collections", this::listCollections)
-            .on(GET, "/api/featureflags", this::featureFlags)
-            .on(GET, "/<collection>", this::query)
-            .on(POST, "/<collection>", this::post)
-            .on(GET, "/<collection>/stats", this::stats)
-            .on(GET, "/<collection>/captures", this::captures)
-            .on(GET, "/<collection>/aliases", this::aliases);
+    final Web.Router router;
 
     private Response featureFlags(IHTTPSession req) {
         return jsonResponse(FeatureFlags.asMap());
@@ -67,21 +45,47 @@ class Webapp implements Web.Handler {
         return found ? ok() : notFound();
     }
 
-    Webapp(DataStore dataStore, boolean verbose) {
+    Webapp(DataStore dataStore, boolean verbose, Authorizer authorizer) {
         this.dataStore = dataStore;
         this.verbose = verbose;
+
+        router = new Router(authorizer)
+                .on(GET, "/", serve("dashboard.html"))
+                .on(GET, "/api", serve("api.html"))
+                .on(GET, "/api.js", serve("api.js"))
+                .on(GET, "/add.svg", serve("add.svg"))
+                .on(GET, "/database.svg", serve("database.svg"))
+                .on(GET, "/outback.svg",  serve("outback.svg"))
+                .on(GET, "/favicon.ico",  serve("outback.svg"))
+                .on(GET, "/swagger.json", serve("swagger.json"))
+
+                .on(GET, "/lib/vue-router/2.0.0/vue-router.js", serve("lib/vue-router/2.0.0/vue-router.js"))
+                .on(GET, "/lib/vue/2.0.1/vue.js", serve("/META-INF/resources/webjars/vue/2.0.1/dist/vue.js"))
+                .on(GET, "/lib/lodash/4.15.0/lodash.min.js", serve("/META-INF/resources/webjars/lodash/4.15.0/lodash.min.js"))
+                .on(GET, "/lib/moment/2.15.2/moment.min.js", serve("/META-INF/resources/webjars/moment/2.15.2/min/moment.min.js"))
+                .on(GET, "/lib/pikaday/1.4.0/pikaday.js", serve("/META-INF/resources/webjars/pikaday/1.4.0/pikaday.js"))
+                .on(GET, "/lib/pikaday/1.4.0/pikaday.css", serve("/META-INF/resources/webjars/pikaday/1.4.0/css/pikaday.css"))
+                .on(GET, "/lib/redoc/1.4.1/redoc.min.js", serve("/META-INF/resources/webjars/redoc/1.4.1/dist/redoc.min.js"))
+
+                .on(GET, "/api/collections", this::listCollections)
+                .on(GET, "/api/featureflags", this::featureFlags)
+                .on(GET, "/<collection>", this::query)
+                .on(POST, "/<collection>", this::post, Permission.INDEX_EDIT)
+                .on(GET, "/<collection>/stats", this::stats)
+                .on(GET, "/<collection>/captures", this::captures)
+                .on(GET, "/<collection>/aliases", this::aliases);
 
         if (FeatureFlags.experimentalAccessControl()) {
             router.on(GET, "/<collection>/ap/<accesspoint>", this::query)
                     .on(GET, "/<collection>/ap/<accesspoint>/check", this::checkAccess)
                     .on(POST, "/<collection>/ap/<accesspoint>/check", this::checkAccessBulk)
                     .on(GET, "/<collection>/access/rules", this::listAccessRules)
-                    .on(POST, "/<collection>/access/rules", this::postAccessRules)
-                    .on(GET, "/<collection>/access/rules/new", this::getNewAccessRule)
+                    .on(POST, "/<collection>/access/rules", this::postAccessRules, Permission.RULES_EDIT)
+                    .on(GET, "/<collection>/access/rules/new", this::getNewAccessRule, Permission.RULES_EDIT)
                     .on(GET, "/<collection>/access/rules/<ruleId>", this::getAccessRule)
-                    .on(DELETE, "/<collection>/access/rules/<ruleId>", this::deleteAccessRule)
+                    .on(DELETE, "/<collection>/access/rules/<ruleId>", this::deleteAccessRule, Permission.RULES_EDIT)
                     .on(GET, "/<collection>/access/policies", this::listAccessPolicies)
-                    .on(POST, "/<collection>/access/policies", this::postAccessPolicy)
+                    .on(POST, "/<collection>/access/policies", this::postAccessPolicy, Permission.POLICIES_EDIT)
                     .on(GET, "/<collection>/access/policies/<policyId>", this::getAccessPolicy);
         }
     }

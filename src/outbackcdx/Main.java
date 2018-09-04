@@ -1,9 +1,15 @@
 package outbackcdx;
 
+import outbackcdx.auth.Authorizer;
+import outbackcdx.auth.JwtAuthorizer;
+import outbackcdx.auth.NullAuthorizer;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.MalformedURLException;
 import java.net.ServerSocket;
+import java.net.URL;
 import java.nio.channels.Channel;
 import java.nio.channels.ServerSocketChannel;
 import java.util.concurrent.Executor;
@@ -15,12 +21,13 @@ public class Main {
     public static void usage() {
         System.err.println("Usage: java " + Main.class.getName() + " [options...]");
         System.err.println("");
-        System.err.println("  -b bindaddr   Bind to a particular IP address");
-        System.err.println("  -d datadir    Directory to store index data under");
-        System.err.println("  -i            Inherit the server socket via STDIN (for use with systemd, inetd etc)");
-        System.err.println("  -p port       Local port to listen on");
-        System.err.println("  -t count      Number of web server threads");
-        System.err.println("  -v            Verbose logging");
+        System.err.println("  -b bindaddr           Bind to a particular IP address");
+        System.err.println("  -d datadir            Directory to store index data under");
+        System.err.println("  -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)");
+        System.err.println("  -j jwks-url perm-path Enable JWT authorization");
+        System.err.println("  -p port               Local port to listen on");
+        System.err.println("  -t count              Number of web server threads");
+        System.err.println("  -v                    Verbose logging");
         System.exit(1);
     }
 
@@ -31,7 +38,7 @@ public class Main {
         boolean inheritSocket = false;
         File dataPath = new File("data");
         boolean verbose = false;
-        Predicate<Capture> filter = null;
+        Authorizer authorizer = new NullAuthorizer();
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -41,11 +48,19 @@ public class Main {
                 case "-b":
                     host = args[++i];
                     break;
+                case "-d":
+                    dataPath = new File(args[++i]);
+                    break;
                 case "-i":
                     inheritSocket = true;
                     break;
-                case "-d":
-                    dataPath = new File(args[++i]);
+                case "-j":
+                    try {
+                        authorizer = new JwtAuthorizer(new URL(args[++i]), args[++i]);
+                    } catch (MalformedURLException e) {
+                        System.err.println("Malformed JWKS URL in -j option");
+                        System.exit(1);
+                    }
                     break;
                 case "-v":
                     verbose = true;
@@ -60,7 +75,7 @@ public class Main {
         }
 
         try (DataStore dataStore = new DataStore(dataPath)) {
-            Webapp controller = new Webapp(dataStore, verbose);
+            Webapp controller = new Webapp(dataStore, verbose, authorizer);
             ServerSocket socket = openSocket(host, port, inheritSocket);
             Web.Server server = new Web.Server(socket, controller);
             ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
@@ -83,7 +98,7 @@ public class Main {
 
     private static ServerSocket openSocket(String host, int port, boolean inheritSocket) throws IOException {
         ServerSocket socket;Channel channel = System.inheritedChannel();
-        if (inheritSocket && channel != null && channel instanceof ServerSocketChannel) {
+        if (inheritSocket && channel instanceof ServerSocketChannel) {
             socket = ((ServerSocketChannel) channel).socket();
         } else {
             socket = new ServerSocket(port, -1, InetAddress.getByName(host));

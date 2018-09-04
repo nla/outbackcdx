@@ -6,6 +6,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import outbackcdx.auth.NullAuthorizer;
 
 import java.io.*;
 import java.nio.charset.Charset;
@@ -31,7 +32,7 @@ public class WebappTest {
         FeatureFlags.setExperimentalAccessControl(true);
         File root = folder.newFolder();
         DataStore manager = new DataStore(root);
-        webapp = new Webapp(manager, false);
+        webapp = new Webapp(manager, false, new NullAuthorizer());
     }
 
     @After

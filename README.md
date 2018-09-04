@@ -39,13 +39,14 @@ Command line options:
     Usage: java outbackcdx.Server [options...]
     
 
-      -a url        Use a wayback access control oracle
-      -b bindaddr   Bind to a particular IP address
-      -d datadir    Directory to store index data under
-      -i            Inherit the server socket via STDIN (for use with systemd, inetd etc)
-      -p port       Local port to listen on
-      -t count      Number of web server threads
-      -v            Verbose logging
+      -a url                Use a wayback access control oracle
+      -b bindaddr           Bind to a particular IP address
+      -d datadir            Directory to store index data under
+      -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)
+      -j jwks-url perm-path Enable JWT-based authorization
+      -p port               Local port to listen on
+      -t count              Number of web server threads
+      -v                    Verbose logging
 
 The server supports multiple named indexes as subdirectories.  Currently indexes
 are created automatically when you first write records to them.
@@ -215,3 +216,28 @@ Aliases do not currently work with url prefix queries. Aliases are resolved afte
 are applied.
 
 Aliases can be mixed with regular CDX lines either in the same file or separate files and in any order. Any existing records that the alias rule affects the canonicalised URL for will be updated when the alias is added to the index.
+
+JWT-based Authorization
+-----------------------
+
+Authorization to modify the index and access control rules can be controlled using [JSON Web Tokens](https://jwt.io/).
+To enable this you will typically use some sort of separate authentication server to sign the JWTs. We use
+[KeyCloak](https://www.keycloak.org/) but other auth servers supporting JWT should theoretically also work.
+
+OutbackCDX's `-j` option takes two arguments, a JWKS URL for the public key of the auth server and a slash-delimited
+path for where to find the list of permissions in the JWT received as a HTTP bearer token.
+
+### KeyCloak setup
+
+1. In KeyCloak's dashboard create a new client for OutbackCDX with the protocol `openid-connect`.
+2. Under the client's roles tab create the following roles:
+    * index_edit
+    * rules_edit
+    * policies_edit
+3. Map your users or service accounts to these client roles as appropriate.
+4. Run OutbackCDX with this option:
+
+```
+-j https://{keycloak-server}/auth/realms/{realm}/protocol/openid-connect/certs
+   resource_access/{client-id}/roles
+```
