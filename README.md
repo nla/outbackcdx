@@ -43,7 +43,8 @@ Command line options:
       -b bindaddr           Bind to a particular IP address
       -d datadir            Directory to store index data under
       -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)
-      -j jwks-url perm-path Enable JWT-based authorization
+      -j jwks-url perm-path Use JSON Web Tokens for authorization
+      -k url realm clientid Use a Keycloak server for authorization
       -p port               Local port to listen on
       -t count              Number of web server threads
       -v                    Verbose logging
@@ -217,27 +218,40 @@ are applied.
 
 Aliases can be mixed with regular CDX lines either in the same file or separate files and in any order. Any existing records that the alias rule affects the canonicalised URL for will be updated when the alias is added to the index.
 
-JWT-based Authorization
------------------------
+Authorization
+-------------
+
+By default OutbackCDX is unsecured and assumes some external method of authorization such as firewall
+rules or a reverse proxy are used to secure it. Take care not to expose it to the public internet.
+
+Alternatively one of the following authorization methods can be enabled.
+
+### Generic JWT authorization
 
 Authorization to modify the index and access control rules can be controlled using [JSON Web Tokens](https://jwt.io/).
-To enable this you will typically use some sort of separate authentication server to sign the JWTs. We use
-[KeyCloak](https://www.keycloak.org/) but other auth servers supporting JWT should theoretically also work.
+To enable this you will typically use some sort of separate authentication server to sign the JWTs.
 
 OutbackCDX's `-j` option takes two arguments, a JWKS URL for the public key of the auth server and a slash-delimited
-path for where to find the list of permissions in the JWT received as a HTTP bearer token.
+path for where to find the list of permissions in the JWT received as a HTTP bearer token. Refer to your auth server's
+documentation for what to use.
 
-### KeyCloak setup
+Currently the OutbackCDX web dashboard does not support generic JWT/OIDC authorization. (Patches welcome.)
 
-1. In KeyCloak's dashboard create a new client for OutbackCDX with the protocol `openid-connect`.
-2. Under the client's roles tab create the following roles:
+### Keycloak authorization
+
+OutbackCDX can use (Keycloak)[https://www.keycloak.org/] as an auth server to secure both the API and dashboard.
+
+1. In your Keycloak realm's settings create a new client for OutbackCDX with the protocol `openid-connect` and
+   the URL of your OutbackCDX instance.
+3. Under the client's roles tab create the following roles:
     * index_edit
     * rules_edit
     * policies_edit
-3. Map your users or service accounts to these client roles as appropriate.
-4. Run OutbackCDX with this option:
+4. Map your users or service accounts to these client roles as appropriate.
+5. Run OutbackCDX with this option:
 
 ```
--j https://{keycloak-server}/auth/realms/{realm}/protocol/openid-connect/certs
-   resource_access/{client-id}/roles
+-k https://{keycloak-server}/auth {realm} {client-id}
 ```
+
+Note: JWT authentication will be enabled automatically when using Keycloak. You don't need to set the `-j` option.

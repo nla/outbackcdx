@@ -32,7 +32,7 @@ public class WebappTest {
         FeatureFlags.setExperimentalAccessControl(true);
         File root = folder.newFolder();
         DataStore manager = new DataStore(root);
-        webapp = new Webapp(manager, false, new NullAuthorizer());
+        webapp = new Webapp(manager, false, new NullAuthorizer(), Collections.emptyMap());
     }
 
     @After

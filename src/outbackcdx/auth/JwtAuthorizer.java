@@ -64,6 +64,7 @@ public class JwtAuthorizer implements Authorizer {
             }
             return permissions;
         } catch (ParseException | BadJOSEException | JOSEException e) {
+            e.printStackTrace();
             throw new AuthException("Invalid acccess token: " + e.getMessage(), e);
         }
     }

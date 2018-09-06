@@ -2,6 +2,7 @@ package outbackcdx;
 
 import outbackcdx.auth.Authorizer;
 import outbackcdx.auth.JwtAuthorizer;
+import outbackcdx.auth.KeycloakConfig;
 import outbackcdx.auth.NullAuthorizer;
 
 import java.io.File;
@@ -12,10 +13,10 @@ import java.net.ServerSocket;
 import java.net.URL;
 import java.nio.channels.Channel;
 import java.nio.channels.ServerSocketChannel;
-import java.util.concurrent.Executor;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.Predicate;
 
 public class Main {
     public static void usage() {
@@ -24,7 +25,8 @@ public class Main {
         System.err.println("  -b bindaddr           Bind to a particular IP address");
         System.err.println("  -d datadir            Directory to store index data under");
         System.err.println("  -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)");
-        System.err.println("  -j jwks-url perm-path Enable JWT authorization");
+        System.err.println("  -j jwks-url perm-path Use JSON Web Tokens for authorization");
+        System.err.println("  -k url realm clientid Use a Keycloak server for authorization");
         System.err.println("  -p port               Local port to listen on");
         System.err.println("  -t count              Number of web server threads");
         System.err.println("  -v                    Verbose logging");
@@ -39,6 +41,9 @@ public class Main {
         File dataPath = new File("data");
         boolean verbose = false;
         Authorizer authorizer = new NullAuthorizer();
+
+        Map<String,Object> dashboardConfig = new HashMap<>();
+        dashboardConfig.put("featureFlags", FeatureFlags.asMap());
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -62,6 +67,11 @@ public class Main {
                         System.exit(1);
                     }
                     break;
+                case "-k":
+                    KeycloakConfig keycloakConfig = new KeycloakConfig(args[++i], args[++i], args[++i]);
+                    authorizer = keycloakConfig.toAuthorizer();
+                    dashboardConfig.put("keycloak", keycloakConfig);
+                    break;
                 case "-v":
                     verbose = true;
                     break;
@@ -75,7 +85,7 @@ public class Main {
         }
 
         try (DataStore dataStore = new DataStore(dataPath)) {
-            Webapp controller = new Webapp(dataStore, verbose, authorizer);
+            Webapp controller = new Webapp(dataStore, verbose, authorizer, dashboardConfig);
             ServerSocket socket = openSocket(host, port, inheritSocket);
             Web.Server server = new Web.Server(socket, controller);
             ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);

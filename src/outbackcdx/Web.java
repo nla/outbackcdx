@@ -89,7 +89,7 @@ class Web {
     }
 
     static Response forbidden(String permission) {
-        return new Response(FORBIDDEN, "text/plain", "Permission '\" + permission + \"' is required for this action.\n");
+        return new Response(FORBIDDEN, "text/plain", "Permission '" + permission + "' is required for this action.\n");
     }
 
     static Response badRequest(String message) {
