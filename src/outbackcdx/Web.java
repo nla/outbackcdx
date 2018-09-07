@@ -3,11 +3,15 @@ package outbackcdx;
 import outbackcdx.NanoHTTPD.IHTTPSession;
 import outbackcdx.NanoHTTPD.Method;
 import outbackcdx.NanoHTTPD.Response;
+import outbackcdx.auth.Authorizer;
+import outbackcdx.auth.NullAuthorizer;
+import outbackcdx.auth.Permission;
 
 import java.net.ServerSocket;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -84,17 +88,37 @@ class Web {
         return new Response(NOT_FOUND, "text/plain", "Not found\n");
     }
 
+    static Response forbidden(String permission) {
+        return new Response(FORBIDDEN, "text/plain", "Permission '" + permission + "' is required for this action.\n");
+    }
+
     static Response badRequest(String message) {
         return new Response(BAD_REQUEST, "text/plain", message);
     }
 
     static class Router implements Handler {
-        private final List<Handler> routes = new ArrayList<>();
+        private final Authorizer authorizer;
+        private final List<Route> routes = new ArrayList<>();
+
+        public Router(Authorizer authorizer) {
+            this.authorizer = authorizer;
+        }
 
         @Override
         public Response handle(IHTTPSession request) throws Exception {
-            for (Handler route : routes) {
-                Response result = route.handle(request);
+            String authnHeader = request.getHeaders().getOrDefault("authorization", "");
+            Set<Permission> permissions = authorizer.verify(authnHeader);
+
+            for (Route route : routes) {
+                if (!route.matches(request)) {
+                    continue;
+                }
+
+                if (route.permission != null && !permissions.contains(route.permission)) {
+                    return Web.forbidden(route.permission.name().toLowerCase());
+                }
+
+                Response result = route.handler.handle(request);
                 if (result != null) {
                     return result;
                 }
@@ -102,13 +126,17 @@ class Web {
             return Web.notFound();
         }
 
-        public Router on(Method method, String pathPattern, Handler handler) {
-            routes.add(new Route(method, pathPattern, handler));
+        public Router on(Method method, String pathPattern, Handler handler, Permission permission) {
+            routes.add(new Route(method, pathPattern, handler, permission));
             return this;
+        }
+
+        public Router on(Method method, String pathPattern, Handler handler) {
+            return on(method, pathPattern, handler, null);
         }
     }
 
-    private static class Route implements Handler {
+    private static class Route {
         private final static Pattern KEY_PATTERN = Pattern.compile("<([a-z_][a-zA-Z0-9_]*)(?::([^>]*))?>");
 
         private final Method method;
@@ -116,26 +144,27 @@ class Web {
         private final String pattern;
         private final Pattern re;
         private final List<String> keys = new ArrayList<>();
+        private final Permission permission;
 
-        Route(Method method, String pattern, Handler handler) {
+        Route(Method method, String pattern, Handler handler, Permission permission) {
             this.method = method;
             this.handler = handler;
             this.pattern = pattern;
+            this.permission = permission;
             this.re = compile();
         }
 
-        @Override
-        public Response handle(IHTTPSession request) throws Exception {
+        public boolean matches(IHTTPSession request) throws Exception {
             if (method == null || method == request.getMethod()) {
                 Matcher m = re.matcher(request.getUri());
                 if (m.matches()) {
                     for (int i = 0; i < m.groupCount(); i++) {
                         request.getParms().put(keys.get(i), m.group(i + 1));
                     }
-                    return handler.handle(request);
+                    return true;
                 }
             }
-            return null;
+            return false;
         }
 
         private Pattern compile() {

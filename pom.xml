@@ -138,7 +138,11 @@
             <artifactId>urlcanon</artifactId>
             <version>0.1.0</version>
         </dependency>
-
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>6.0</version>
+        </dependency>
         <!--
           JavaScript for dashboard
         -->

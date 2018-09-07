@@ -47,7 +47,25 @@
             left: 0;
             right: 0;
             height: 24px;
+            color: #ffffffb2;
         }
+
+        .status-bar a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: bold;
+            opacity: 0.7;
+        }
+
+        .status-bar a:hover {
+            opacity: 1;
+        }
+
+        .account-link {
+            float: right;
+            margin-right: 72px;
+        }
+
         .bg-top{
             height: 96px;
             background: #FE7119;
@@ -74,7 +92,6 @@
             margin-top: 8px;
             margin-bottom: -6px;
         }
-
 
         .app-bar {
             position: absolute;
@@ -294,14 +311,23 @@
     <script src="lib/pikaday/1.4.0/pikaday.js"></script>
     <script src="api.js"></script>
     <script>
+        var keycloak = null;
+
+        function fetchApi(url, options={}) {
+            if (keycloak && keycloak.token) {
+                options.headers = {'Authorization': 'bearer ' + keycloak.token};
+            }
+            return fetch(url, options);
+        }
+
         function urlTemplate(template, pathParams, queryParams) {
             var path = template;
-            for (var key in pathParams) {
+            for (let key in pathParams) {
                 path = path.replace('{' + key + '}', encodeURIComponent(pathParams[key]));
             }
             var qs = "";
             if (queryParams) {
-                for (var key in queryParams) {
+                for (let key in queryParams) {
                     if (queryParams[key]) {
                         qs += qs ? "&" : "?";
                         qs += encodeURIComponent(key) + "=" + encodeURIComponent(queryParams[key]);
@@ -309,6 +335,28 @@
                 }
             }
             return path + qs;
+        }
+
+        function loadScript(url, success) {
+            var script = document.createElement('script');
+            script.onload = success;
+            script.src = url;
+            document.head.appendChild(script);
+        }
+
+        function initKeycloak(app, keycloakConfig) {
+            loadScript(keycloakConfig.url + "/js/keycloak.js", () => {
+                keycloak = Keycloak(keycloakConfig);
+                keycloak.init({checkLoginIframe: false, onLoad: 'login-required'}).success(authenticated => {
+                    console.log(authenticated ? 'authenticated' : 'not authenticated');
+                    if (authenticated) {
+                        app.user = {
+                            name: keycloak.tokenParsed.name,
+                            accountUrl: keycloak.createAccountUrl()
+                        };
+                    }
+                }).error(() => alert('failed to initialize Keycloak'));
+            });
         }
     </script>
 </head>
@@ -364,7 +412,7 @@
                     fl: this.fields.join(","),
                     output: 'json'
                 };
-                fetch(urlTemplate("/{collection}", this.$route.params, query))
+                fetchApi(urlTemplate("/{collection}", this.$route.params, query))
                         .then(r => r.json())
                         .then(rows => this.rows = rows ? rows.slice(1) : []);
             }, 250),
@@ -553,7 +601,7 @@
             },
             save: function () {
                 this.rule.urlPatterns = this.rule.urlPatterns.filter(function(pattern) { return pattern != ""; });
-                fetch(urlTemplate("/{collection}/access/rules", this.$route.params),
+                fetchApi(urlTemplate("/{collection}/access/rules", this.$route.params),
                         {method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify(this.rule)})
@@ -589,14 +637,14 @@
                 });
             },
             deleteRule: function () {
-                fetch(urlTemplate("/{collection}/access/rules/{ruleId}", this.$route.params), {method: 'DELETE'})
+                fetchApi(urlTemplate("/{collection}/access/rules/{ruleId}", this.$route.params), {method: 'DELETE'})
                         .then(() => this.cancel());
             },
             fetchData: function () {
                 // load in parallel but policy list must be populated first
                 Promise.all([
-                    fetch(urlTemplate("{collection}/access/policies", this.$route.params)).then(r => r.json()),
-                    fetch(urlTemplate("{collection}/access/rules/{ruleId}", this.$route.params)).then(r => r.json())
+                    fetchApi(urlTemplate("{collection}/access/policies", this.$route.params)).then(r => r.json()),
+                    fetchApi(urlTemplate("{collection}/access/rules/{ruleId}", this.$route.params)).then(r => r.json())
                 ]).then(([policies, rule]) => {
                     this.policies = policies;
                     // the objects need to be present for the model binding
@@ -700,8 +748,8 @@
             },
             fetchData: _.throttle(function() {
                 Promise.all([
-                    fetch(urlTemplate('{collection}/access/policies', this.$route.params)).then(r => r.json()),
-                    fetch(urlTemplate('{collection}/access/rules', this.$route.params, this.$route.query)).then(r => r.json())
+                    fetchApi(urlTemplate('{collection}/access/policies', this.$route.params)).then(r => r.json()),
+                    fetchApi(urlTemplate('{collection}/access/rules', this.$route.params, this.$route.query)).then(r => r.json())
                 ]).then(([policies, rules]) => {
                     policies.forEach(policy => this.policyNames[policy.id] = policy.name);
                     this.rules = rules;
@@ -746,7 +794,7 @@
         },
         methods: {
             fetchData: _.throttle(function() {
-                fetch(urlTemplate('{collection}/access/policies', this.$route.params,
+                fetchApi(urlTemplate('{collection}/access/policies', this.$route.params,
                         this.$route.query)).then(r => r.json())
                         .then(policies => this.policies = policies);
             }, 250)
@@ -760,6 +808,9 @@
 ------------------------------------------------------------------------->
 <div id="app" class="row">
     <div class="status-bar">
+        <div v-if="user" class="account-link">
+            <a :href="user.accountUrl">{{user.name}}</a>
+        </div>
     </div>
     <div class="bg-top">
         <img src="outback.svg" width="55px" height="54px" class="logo">
@@ -808,13 +859,19 @@
             collection: null,
             collections: {},
             stats: null,
-            featureFlags: {}
+            featureFlags: {},
+            user: null,
         },
         created: function() {
             var self = this;
-            fetch("api/featureflags").then(r => r.json())
-                    .then(featureFlags => this.featureFlags = featureFlags);
-            fetch("api/collections").then(r => r.json()).then(collections => {
+            fetchApi("config.json").then(r => r.json())
+                    .then(config => {
+                        this.featureFlags = config.featureFlags;
+                        if (config.keycloak) {
+                            initKeycloak(app, config.keycloak);
+                        }
+                    });
+            fetchApi("api/collections").then(r => r.json()).then(collections => {
                 this.collections = collections;
                 if (collections && !self.activeCollection) {
                     self.activeCollection = collections[0];
