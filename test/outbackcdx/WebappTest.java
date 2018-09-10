@@ -106,9 +106,25 @@ public class WebappTest {
         assertEquals(5, GSON.fromJson(GET("/testap/access/policies"), AccessPolicy[].class).length);
 
         createRule(publicPolicyId, "*");
-        long ruleId = createRule(staffPolicyId, "*.a.ex.org");
+        long ruleIdC = createRule(staffPolicyId, "*.c.ex.org");
+        long ruleIdA = createRule(staffPolicyId, "*.a.ex.org");
 
-        assertEquals(2, GSON.fromJson(GET("/testap/access/rules"), AccessRule[].class).length);
+
+        // default sort should be rule id
+        {
+            AccessRule[] actualRules = GSON.fromJson(GET("/testap/access/rules"), AccessRule[].class);
+            assertEquals(3, actualRules.length);
+            assertEquals(ruleIdC, (long) actualRules[1].id);
+            assertEquals(ruleIdA, (long) actualRules[2].id);
+        }
+
+        // check sorting by SURT
+        {
+            AccessRule[] actualRules = GSON.fromJson(GET("/testap/access/rules", "sort", "surt"), AccessRule[].class);
+            assertEquals(3, actualRules.length);
+            assertEquals(ruleIdA, (long) actualRules[1].id);
+            assertEquals(ruleIdC, (long) actualRules[2].id);
+        }
 
         assertEquals(asList("http://a.ex.org/", "http://a.ex.org/", "http://b.ex.org/"),
                 cdxUrls(GET("/testap", "url", "*.ex.org")));
@@ -134,7 +150,7 @@ public class WebappTest {
         // try modifying a rule
         //
 
-        AccessRule rule = GSON.fromJson(GET("/testap/access/rules/" + ruleId), AccessRule.class);
+        AccessRule rule = GSON.fromJson(GET("/testap/access/rules/" + ruleIdA), AccessRule.class);
         rule.urlPatterns.clear();
         rule.urlPatterns.add("*.b.ex.org");
 
@@ -147,7 +163,7 @@ public class WebappTest {
         // try deleting a rule
         //
 
-        DELETE("/testap/access/rules/" + ruleId);
+        DELETE("/testap/access/rules/" + ruleIdA);
 
         assertEquals(asList("http://a.ex.org/", "http://a.ex.org/", "http://b.ex.org/"),
                 cdxUrls(GET("/testap/ap/public", "url", "*.ex.org")));

@@ -185,6 +185,29 @@
       }
     },
     "/{collection}/access/rules": {
+      "get": {
+        "tags": [
+          "access control"
+        ],
+        "summary": "List access rules",
+        "operationId": "listRules",
+        "parameters": [
+          {
+            "$ref": "#/parameters/collection"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "type": "string",
+            "enum": ["id", "surt"]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
       "post": {
         "tags": [
           "access control"

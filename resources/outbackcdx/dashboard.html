@@ -749,7 +749,7 @@
             fetchData: _.throttle(function() {
                 Promise.all([
                     fetchApi(urlTemplate('{collection}/access/policies', this.$route.params)).then(r => r.json()),
-                    fetchApi(urlTemplate('{collection}/access/rules', this.$route.params, this.$route.query)).then(r => r.json())
+                    fetchApi(urlTemplate('{collection}/access/rules?sort=surt', this.$route.params, this.$route.query)).then(r => r.json())
                 ]).then(([policies, rules]) => {
                     policies.forEach(policy => this.policyNames[policy.id] = policy.name);
                     this.rules = rules;

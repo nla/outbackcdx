@@ -334,7 +334,11 @@ class Webapp implements Web.Handler {
 
     private Response listAccessRules(IHTTPSession request) throws IOException, Web.ResponseException {
         Index index = getIndex(request);
-        Iterable<AccessRule> rules = index.accessControl.list();
+        List<AccessRule> rules = new ArrayList<>(index.accessControl.list());
+        if (request.getParms().getOrDefault("sort", "id").equals("surt")) {
+            Comparator<AccessRule> comparator = Comparator.comparing(rule -> rule.ssurtPrefixes().findFirst().orElse(""));
+            rules.sort(comparator.thenComparingLong(rule -> rule.id));
+        }
         return new Response(OK, "application/json", outputStream -> {
             OutputStream out = new BufferedOutputStream(outputStream);
             JsonWriter json = GSON.newJsonWriter(new OutputStreamWriter(out, UTF_8));
