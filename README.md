@@ -14,8 +14,6 @@ Features:
 
 Things it doesn't do (yet):
 
-* Authentication (use a firewall or reverse proxy for now)
-* Deletes
 * Sharding, replication
 * CDXJ
 
@@ -52,7 +50,7 @@ Command line options:
 The server supports multiple named indexes as subdirectories.  Currently indexes
 are created automatically when you first write records to them.
 
-### Loading Records
+### Loading records
 
 OutbackCDX does not include a CDX indexing tool for reading WARC or ARC files. Use
 the `cdx-indexer` scripts included with OpenWayback or PyWb.
@@ -71,6 +69,17 @@ canonicalization.
 can cause an [out of memory error](https://github.com/nla/outbackcdx/issues/13). 
 Until this is fixed you may need to break your request up into several smaller ones. 
 Most users send one POST per WARC file.
+
+### Deleting records
+
+Deleting records works the same way as loading them. POST the records you wish to
+delete to /{collection}/delete:
+
+    $ curl -X POST --data-binary @records.cdx http://localhost:8080/myindex/delete
+    Deleted 542 records
+
+When deleting OutbackCDX does not check whether the records actually existed in the
+index. Deleting non-existent records has no effect and will not cause an error.
 
 ### Querying
 
@@ -218,6 +227,8 @@ are applied.
 
 Aliases can be mixed with regular CDX lines either in the same file or separate files and in any order. Any existing records that the alias rule affects the canonicalised URL for will be updated when the alias is added to the index.
 
+Deletion of aliases is not yet implemented.
+
 Authorization
 -------------
 
@@ -244,9 +255,9 @@ OutbackCDX can use (Keycloak)[https://www.keycloak.org/] as an auth server to se
 1. In your Keycloak realm's settings create a new client for OutbackCDX with the protocol `openid-connect` and
    the URL of your OutbackCDX instance.
 3. Under the client's roles tab create the following roles:
-    * index_edit
-    * rules_edit
-    * policies_edit
+    * index_edit - can create or delete index records
+    * rules_edit - can create, modify or delete access rules
+    * policies_edit - can create, modify or delete access policies
 4. Map your users or service accounts to these client roles as appropriate.
 5. Run OutbackCDX with this option:
 

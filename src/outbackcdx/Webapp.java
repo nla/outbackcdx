@@ -71,6 +71,7 @@ class Webapp implements Web.Handler {
         router.on(GET, "/config.json", this::configJson);
         router.on(GET, "/<collection>", this::query);
         router.on(POST, "/<collection>", this::post, Permission.INDEX_EDIT);
+        router.on(POST, "/<collection>/delete", this::delete, Permission.INDEX_EDIT);
         router.on(GET, "/<collection>/stats", this::stats);
         router.on(GET, "/<collection>/captures", this::captures);
         router.on(GET, "/<collection>/aliases", this::aliases);
@@ -124,6 +125,38 @@ class Webapp implements Web.Handler {
         return jsonResponse(results);
     }
 
+    Response delete(IHTTPSession session) throws IOException {
+        String collection = session.getParms().get("collection");
+        final Index index = dataStore.getIndex(collection);
+        BufferedReader in = new BufferedReader(new InputStreamReader(session.getInputStream()));
+        long deleted = 0;
+
+        try (Index.Batch batch = index.beginUpdate()) {
+            while (true) {
+                String line = in.readLine();
+                if (verbose) {
+                    out.println("DELETE " + line);
+                }
+                if (line == null) break;
+                if (line.startsWith(" CDX")) continue;
+
+                try {
+                    if (line.startsWith("@alias ")) {
+                        throw new UnsupportedOperationException("Deleting of aliases is not yet implemented");
+                    }
+
+                    batch.deleteCapture(Capture.fromCdxLine(line));
+                    deleted++;
+                } catch (Exception e) {
+                    return new Response(BAD_REQUEST, "text/plain", "At line: " + line + "\n" + formatStackTrace(e));
+                }
+            }
+
+            batch.commit();
+        }
+        return new Response(OK, "text/plain", "Deleted " + deleted + " records\n");
+    }
+
     Response post(IHTTPSession session) throws IOException {
         String collection = session.getParms().get("collection");
         final Index index = dataStore.getIndex(collection, true);
@@ -150,7 +183,7 @@ class Webapp implements Web.Handler {
                     }
                     added++;
                 } catch (Exception e) {
-                    return new Response(Response.Status.BAD_REQUEST, "text/plain", "At line: " + line + "\n" + formatStackTrace(e));
+                    return new Response(BAD_REQUEST, "text/plain", "At line: " + line + "\n" + formatStackTrace(e));
                 }
             }
 
@@ -255,7 +288,7 @@ class Webapp implements Web.Handler {
         // return an error response if any failed
         if (!errors.isEmpty()) {
             Response response = jsonResponse(errors);
-            response.setStatus(Response.Status.BAD_REQUEST);
+            response.setStatus(BAD_REQUEST);
             return response;
         }
 
