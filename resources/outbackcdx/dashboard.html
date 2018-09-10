@@ -302,6 +302,30 @@
         .url-patterns-field {
             height: 120px;
         }
+
+        .form-columns {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .form-columns > div {
+            flex: 1 1 200px;
+        }
+
+        .button {
+            padding: 2px 8px;
+            white-space: nowrap;
+            line-height: 30px;
+            background: #55a7a7;
+            margin: 8px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #fffc;
+        }
+
+        .button:hover {
+            color: #ffff;
+        }
     </style>
     <link href="lib/pikaday/1.4.0/pikaday.css" rel="stylesheet">
     <script src="lib/vue/2.0.1/vue.js"></script>
@@ -525,44 +549,55 @@
                     e.g. *.foo.org http://foo.org/path/* http://foo.org/page.html
                 </span>
             </p>
-            <p>
-                <label>
-                    Captured between
-                    <date-range v-model="rule.captured"></date-range>
-                </label>
-            </p>
-            <p>
-                <label>
-                    Accessed between
-                    <date-range v-model="rule.accessed"></date-range>
-                </label>
-            </p>
-            <period v-model="rule.period"></period>
-            <p>
-                <label>
-                    Access Policy
-                    <select class="form-field" v-model="rule.policyId">
-                        <option v-for="policy in policies" :value="policy.id">
-                        {{policy.name}}
-                        </option>
-                    </select>
-                </label>
-            </p>
-            <p>
-                <label>
-                    Public Message
-                    <textarea v-model="rule.publicMessage" class="form-field"></textarea>
-                </label>
-            </p>
-            <p>
-                <label>
-                    Private Comment
-                    <textarea v-model="rule.privateComment" class="form-field"></textarea>
-                </label>
-            </p>
-            <p v-if="rule.created" class="rule-metadata">
-                <label>Created:</label> {{prettyDate(rule.created)}}<br>
-                <label>Last modified: </label> {{prettyDate(rule.modified)}}
+            <div class="form-columns">
+                <div>
+                    <p>
+                        <label>
+                            Captured between
+                            <date-range v-model="rule.captured"></date-range>
+                        </label>
+                    </p>
+                    <p>
+                        <label>
+                            Accessed between
+                            <date-range v-model="rule.accessed"></date-range>
+                        </label>
+                    </p>
+                    <period v-model="rule.period"></period>
+                </div>
+                <div>
+                    <p>
+                        <label>
+                            Access Policy
+                            <select class="form-field" v-model="rule.policyId">
+                                <option v-for="policy in policies" :value="policy.id">
+                                    {{policy.name}}
+                                </option>
+                            </select>
+                        </label>
+                    </p>
+                    <p>
+                        <label>
+                            Public Message
+                            <textarea v-model="rule.publicMessage" class="form-field"></textarea>
+                        </label>
+                    </p>
+                    <p>
+                        <label>
+                            Private Comment
+                            <textarea v-model="rule.privateComment" class="form-field"></textarea>
+                        </label>
+                    </p>
+                </div>
+            </div>
+            <p class="rule-metadata">
+                <span v-if="rule.id != null">
+                    <label>Rule ID:</label> {{rule.id}}<br>
+                </span>
+                <span v-if="rule.created">
+                    <label>Created:</label> {{prettyDate(rule.created)}}<br>
+                    <label>Last modified: </label> {{prettyDate(rule.modified)}}
+                </span>
             </p>
             <p>
                 <button @click="save">Save</button>
@@ -676,7 +711,7 @@
         <div class="row">
             <input placeholder="URL" class="searchbox" :value="this.$route.query.url" @input="onQueryInput">
 
-            <router-link :to="{name: 'access-rule', params: { collection: $route.params.collection, ruleId: 'new' }}">New Rule</router-link>
+            <router-link :to="{name: 'access-rule', params: { collection: $route.params.collection, ruleId: 'new' }}" class="button">New Rule</router-link>
         </div>
 
         <table class="table big-table">
