@@ -35,7 +35,7 @@ public class JwtAuthorizer implements Authorizer {
         for (String segment: path.split("/")) {
             value = ((Map<String, Object>) value).get(segment);
             if (value == null) {
-                throw new AuthException("Claim path " + path + " not found in access token");
+                return Collections.emptyList();
             }
         }
         return (List<String>) value;
