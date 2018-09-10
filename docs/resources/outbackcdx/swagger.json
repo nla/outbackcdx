@@ -104,6 +104,24 @@
         ]
       }
     },
+    "/{collection}/delete": {
+      "post": {
+        "tags": [
+          "collection"
+        ],
+        "summary": "Delete CDX records",
+        "description": "Deletes the POSTed CDX records from the index. If the records do not exist they will be silently ignored.",
+        "operationId": "delete",
+        "parameters": [
+          {"$ref": "#/parameters/collection"}
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/{collection}/access/policies": {
       "post": {
         "tags": [

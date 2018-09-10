@@ -322,6 +322,14 @@ public class Index {
         }
 
         /**
+         * Deletes a capture from the index. Does not actually check if the capture exists.
+         */
+        void deleteCapture(Capture capture) {
+            capture.urlkey = resolveAlias(capture.urlkey);
+            dbBatch.remove(capture.encodeKey());
+        }
+
+        /**
          * Adds a new alias to the index.  Updates existing captures affected by the new alias.
          */
         public void putAlias(String aliasSurt, String targetSurt) {
