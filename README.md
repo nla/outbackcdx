@@ -36,8 +36,6 @@ Command line options:
     $ java -jar target/outbackcdx-0.3.2.jar -h
     Usage: java outbackcdx.Server [options...]
     
-
-      -a url                Use a wayback access control oracle
       -b bindaddr           Bind to a particular IP address
       -d datadir            Directory to store index data under
       -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)
