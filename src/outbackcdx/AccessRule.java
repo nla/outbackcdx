@@ -167,4 +167,13 @@ public class AccessRule {
         json.close();
     }
 
+    public boolean contains(String str) {
+        for (String pattern : urlPatterns) {
+            if (pattern.contains(str)) {
+                return true;
+            }
+        }
+        return (privateComment != null && privateComment.contains(str)) ||
+                (publicMessage != null && publicMessage.contains(str));
+    }
 }

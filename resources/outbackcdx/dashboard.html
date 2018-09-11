@@ -709,7 +709,7 @@
 <script type="x-template" id="access-rule-list-template">
     <main id="access-rule-list">
         <div class="row">
-            <input placeholder="URL" class="searchbox" :value="this.$route.query.url" @input="onQueryInput">
+            <input placeholder="Search" class="searchbox" :value="this.$route.query.search" @input="onQueryInput">
 
             <router-link :to="{name: 'access-rule', params: { collection: $route.params.collection, ruleId: 'new' }}" class="button">New Rule</router-link>
             <a :href="'/' + $route.params.collection + '/access/rules?output=csv'" class="button">Export CSV</a>
@@ -773,19 +773,21 @@
                 return date ? moment(date).format('YYYY-MM-DD') : "";
             },
             onQueryInput: function(event) {
-                var url = event.target.value;
+                var search = event.target.value;
                 this.$router.replace({
                     name: 'access-rule-list',
                     params: {
                         collection: this.$route.params.collection,
                     },
-                    query: url ? {url} : null,
+                    query: search ? {search} : null,
                 });
             },
             fetchData: _.throttle(function() {
+                var query = { sort: "surt" };
+                query.search = this.$route.query.search;
                 Promise.all([
                     fetchApi(urlTemplate('{collection}/access/policies', this.$route.params)).then(r => r.json()),
-                    fetchApi(urlTemplate('{collection}/access/rules?sort=surt', this.$route.params, this.$route.query)).then(r => r.json())
+                    fetchApi(urlTemplate('{collection}/access/rules', this.$route.params, query)).then(r => r.json())
                 ]).then(([policies, rules]) => {
                     policies.forEach(policy => this.policyNames[policy.id] = policy.name);
                     this.rules = rules;

@@ -334,12 +334,23 @@ class Webapp implements Web.Handler {
 
     private Response listAccessRules(IHTTPSession request) throws IOException, Web.ResponseException {
         Index index = getIndex(request);
-        List<AccessRule> rules = new ArrayList<>(index.accessControl.list());
+
+        // search filter
+        String search = request.getParms().get("search");
+        List<AccessRule> rules = new ArrayList<>();
+        for (AccessRule rule : index.accessControl.list()) {
+            if (search == null || rule.contains(search)) {
+                rules.add(rule);
+            }
+        }
+
+        // sort rules
         if (request.getParms().getOrDefault("sort", "id").equals("surt")) {
             Comparator<AccessRule> comparator = Comparator.comparing(rule -> rule.ssurtPrefixes().findFirst().orElse(""));
             rules.sort(comparator.thenComparingLong(rule -> rule.id));
         }
 
+        // output format
         String type;
         String extension;
         RuleFormatter formatter;

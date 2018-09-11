@@ -196,10 +196,22 @@
             "$ref": "#/parameters/collection"
           },
           {
+            "name": "search",
+            "description": "Searches the URL pattern, private comment and public message",
+            "in": "query",
+            "type": "string"
+          },
+          {
             "name": "sort",
             "in": "query",
             "type": "string",
             "enum": ["id", "surt"]
+          },
+          {
+            "name": "output",
+            "in": "query",
+            "type": "string",
+            "enum": ["json", "csv"]
           }
         ],
         "responses": {
