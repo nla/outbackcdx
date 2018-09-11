@@ -3,7 +3,6 @@ package outbackcdx;
 
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
-import com.google.gson.stream.JsonWriter;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import outbackcdx.NanoHTTPD.IHTTPSession;
@@ -16,6 +15,7 @@ import java.io.*;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -339,17 +339,31 @@ class Webapp implements Web.Handler {
             Comparator<AccessRule> comparator = Comparator.comparing(rule -> rule.ssurtPrefixes().findFirst().orElse(""));
             rules.sort(comparator.thenComparingLong(rule -> rule.id));
         }
-        return new Response(OK, "application/json", outputStream -> {
-            OutputStream out = new BufferedOutputStream(outputStream);
-            JsonWriter json = GSON.newJsonWriter(new OutputStreamWriter(out, UTF_8));
-            json.beginArray();
-            for (AccessRule rule : rules) {
-                GSON.toJson(rule, AccessRule.class, json);
+
+        String type;
+        String extension;
+        RuleFormatter formatter;
+        if (request.getParms().getOrDefault("output", "json").equals("csv")) {
+            type = "text/csv";
+            extension = "csv";
+            formatter = AccessRule::toCSV;
+         } else {
+            type = "application/json";
+            extension = "json";
+            formatter = AccessRule::toJSON;
+        }
+        Response response = new Response(OK, type, out -> {
+            try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out, UTF_8))) {
+                formatter.format(rules, policyId -> index.accessControl.policy(policyId).name, bw);
             }
-            json.endArray();
-            json.close();
-            out.flush();
         });
+        String filename = index.name.replace("\"", "") + "-access-rules." + extension;
+        response.addHeader("Content-Disposition", "filename=\"" + filename + "\"");
+        return response;
+    }
+
+    private interface RuleFormatter {
+        void format(Collection<AccessRule> rules, Function<Long,String> policyNames, Writer out) throws IOException;
     }
 
     Response checkAccess(IHTTPSession request) throws IOException, ResponseException {

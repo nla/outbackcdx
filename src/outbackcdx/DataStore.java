@@ -83,7 +83,7 @@ public class DataStore implements Closeable {
                 accessControl = new AccessControl(db, cfHandles.get(2), cfHandles.get(3));
             }
 
-            index = new Index(db, cfHandles.get(0), cfHandles.get(1), accessControl);
+            index = new Index(collection, db, cfHandles.get(0), cfHandles.get(1), accessControl);
             indexes.put(collection, index);
             return index;
         } catch (RocksDBException e) {

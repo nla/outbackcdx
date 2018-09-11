@@ -712,6 +712,7 @@
             <input placeholder="URL" class="searchbox" :value="this.$route.query.url" @input="onQueryInput">
 
             <router-link :to="{name: 'access-rule', params: { collection: $route.params.collection, ruleId: 'new' }}" class="button">New Rule</router-link>
+            <a :href="'/' + $route.params.collection + '/access/rules?output=csv'" class="button">Export CSV</a>
         </div>
 
         <table class="table big-table">

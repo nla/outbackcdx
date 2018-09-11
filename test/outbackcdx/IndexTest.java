@@ -28,7 +28,7 @@ public class IndexTest {
             db = RocksDB.open(options, "test");
             defaultCf = db.getDefaultColumnFamily();
             aliasCf = db.createColumnFamily(new ColumnFamilyDescriptor("alias".getBytes(StandardCharsets.UTF_8)));
-            index = new Index(db, defaultCf, aliasCf, null);
+            index = new Index("test", db, defaultCf, aliasCf, null);
         }
     }
 
