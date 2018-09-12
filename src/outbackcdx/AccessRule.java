@@ -23,11 +23,16 @@ public class AccessRule {
     DateRange captured;
     DateRange accessed;
     Period period;
-    String privateComment;
     String publicMessage;
     boolean enabled;
+
+    // metadata fields
+    String privateComment;
+    String externalId;
+    String reason;
     Date created;
     Date modified;
+
 
     /**
      * True if this rule is applicable to the given capture and access times.
@@ -124,7 +129,7 @@ public class AccessRule {
 
     static void toCSV(Collection<AccessRule> rules, Function<Long,String> policyNames, Writer out) throws IOException {
         out.write("ruleId,policyId,patterns,accessedFrom,accessedTo,capturedFrom,capturedTo,period," +
-                "publicMessage,privateComment,created,modified\r\n");
+                "publicMessage,privateComment,externalId,reason,created,modified\r\n");
         for (AccessRule rule : rules) {
             String row = rule.id + "," + quote(policyNames.apply(rule.policyId)) + "," +
                     quote(String.join(" ", rule.urlPatterns)) + "," +
@@ -132,6 +137,8 @@ public class AccessRule {
                     quote(rule.captured) + "," +
                     quote(rule.period) + "," + quote(rule.publicMessage) + "," +
                     quote(rule.privateComment) + "," +
+                    quote(rule.externalId) + "," +
+                    quote(rule.reason) + "," +
                     quote(rule.created) + "," + quote(rule.modified) + "\r\n";
             out.write(row);
         }
@@ -168,12 +175,15 @@ public class AccessRule {
     }
 
     public boolean contains(String str) {
+        str = str.toLowerCase();
         for (String pattern : urlPatterns) {
-            if (pattern.contains(str)) {
+            if (pattern.toLowerCase().contains(str)) {
                 return true;
             }
         }
-        return (privateComment != null && privateComment.contains(str)) ||
-                (publicMessage != null && publicMessage.contains(str));
+        return (privateComment != null && privateComment.toLowerCase().contains(str)) ||
+                (publicMessage != null && publicMessage.toLowerCase().contains(str)) ||
+                (externalId != null && externalId.toLowerCase().contains(str)) ||
+                (reason != null && reason.toLowerCase().contains(str));
     }
 }
