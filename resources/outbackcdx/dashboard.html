@@ -215,6 +215,7 @@
             font-weight: 300;
             font-size: 13px;
             border-collapse: collapse;
+            margin: 16px;
         }
 
         .table th {
@@ -282,11 +283,6 @@
         .table ul {
             padding: 0;
             list-style: none;
-        }
-
-        .table tr td, .table tr th {
-            padding-left: 16px;
-            padding-right: 16px;
         }
 
         .big-table {
@@ -773,39 +769,45 @@
         </div>
 
         <table class="table big-table">
-            <tr>
-                <th>URL</th>
-                <th>Date</th>
-                <th>Policy</th>
-                <th></th>
-            </tr>
-            <tr v-for="rule in rules">
-                <td>
-                    <span v-for="pattern in rule.urlPatterns">
-                        {{pattern}}<br>
-                    </span>
-                </td>
-                <td>
-                    <div  v-if="rule.captured && (rule.captured.start || rule.captured.end)">
-                        Captured {{formatDate(rule.captured.start)}}–{{formatDate(rule.captured.end)}}
-                    </div>
-                    <div v-if="rule.accessed && (rule.accessed.start || rule.accessed.end)">
-                        Accessed {{formatDate(rule.accessed.start)}}–{{formatDate(rule.accessed.end)}}
-                    </div>
-                    <div v-if="rule.period && (rule.period.days || rule.period.months || rule.period.years)">
-                        Period
-                        <span v-if="rule.period.years">{{rule.period.years}}y</span>
-                        <span v-if="rule.period.months">{{rule.period.months}}m</span>
-                        <span v-if="rule.period.days">{{rule.period.days}}d</span>
-                    </div>
-                </td>
-                <td>
-                    {{policyNames[rule.policyId]}}
-                </td>
-                <td>
-                    <router-link :to="{name: 'access-rule', params: {collection: $route.params.collection, ruleId: rule.id}}">Edit</router-link>
-                </td>
-            </tr>
+            <thead>
+                <tr>
+                    <th style="width: 3em">ID</th>
+                    <th>URL</th>
+                    <th>Date</th>
+                    <th>Policy</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="rule in rules">
+                    <td>{{rule.id}}</td>
+                    <td>
+                        <span v-for="pattern in rule.urlPatterns">
+                            {{pattern}}<br>
+                        </span>
+                    </td>
+                    <td>
+                        <div  v-if="rule.captured && (rule.captured.start || rule.captured.end)">
+                            Captured {{formatDate(rule.captured.start)}}–{{formatDate(rule.captured.end)}}
+                        </div>
+                        <div v-if="rule.accessed && (rule.accessed.start || rule.accessed.end)">
+                            Accessed {{formatDate(rule.accessed.start)}}–{{formatDate(rule.accessed.end)}}
+                        </div>
+                        <div v-if="rule.period && (rule.period.days || rule.period.months || rule.period.years)">
+                            Period
+                            <span v-if="rule.period.years">{{rule.period.years}}y</span>
+                            <span v-if="rule.period.months">{{rule.period.months}}m</span>
+                            <span v-if="rule.period.days">{{rule.period.days}}d</span>
+                        </div>
+                    </td>
+                    <td>
+                        {{policyNames[rule.policyId]}}
+                    </td>
+                    <td>
+                        <router-link :to="{name: 'access-rule', params: {collection: $route.params.collection, ruleId: rule.id}}">Edit</router-link>
+                    </td>
+                </tr>
+            </tbody>
         </table>
     </main>
 </script>
