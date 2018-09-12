@@ -27,6 +27,7 @@ public class AccessRule {
     boolean enabled;
 
     // metadata fields
+    boolean pinned;
     String privateComment;
     String externalId;
     String reason;
@@ -129,7 +130,7 @@ public class AccessRule {
 
     static void toCSV(Collection<AccessRule> rules, Function<Long,String> policyNames, Writer out) throws IOException {
         out.write("ruleId,policyId,patterns,accessedFrom,accessedTo,capturedFrom,capturedTo,period," +
-                "publicMessage,privateComment,externalId,reason,created,modified\r\n");
+                "publicMessage,privateComment,externalId,reason,pinned,created,modified\r\n");
         for (AccessRule rule : rules) {
             String row = rule.id + "," + quote(policyNames.apply(rule.policyId)) + "," +
                     quote(String.join(" ", rule.urlPatterns)) + "," +
@@ -139,6 +140,7 @@ public class AccessRule {
                     quote(rule.privateComment) + "," +
                     quote(rule.externalId) + "," +
                     quote(rule.reason) + "," +
+                    (rule.pinned ? "Y" : "N") + "," +
                     quote(rule.created) + "," + quote(rule.modified) + "\r\n";
             out.write(row);
         }

@@ -248,8 +248,12 @@
             margin: 16px 0px;
         }
 
-        .field > input, .field > select, .field > textarea {
+        .field > input:not([type='checkbox']), .field > select, .field > textarea {
             width: 100%;
+        }
+
+        .field > input[type='checkbox'] {
+            margin-left: 0px;
         }
 
         .column {
@@ -628,11 +632,11 @@
                             Private Comment
                             <textarea v-model="rule.privateComment" class="big"></textarea>
                         </label>
-                        <div class="field row">
-                            <label class="field">RefTracker question number (for takedown requests)
+                        <div class="row field">
+                            <label>RefTracker question number (for takedown requests)
                                 <input v-model="rule.externalId">
                             </label>
-                            <label class="field">Reason for takedown request
+                            <label>Reason for takedown request
                                 <select v-model="rule.reason">
                                     <option></option>
                                     <option>Copyright</option>
@@ -649,6 +653,9 @@
                                 </select>
                             </label>
                         </div>
+                        <label class="field">
+                            <input type="checkbox" v-model="rule.pinned"> Pending final decision (pinned)
+                        </label>
                     </fieldset>
                 </div>
             </div>
@@ -771,6 +778,7 @@
         <table class="table big-table">
             <thead>
                 <tr>
+                    <th style="width: 0"></th>
                     <th style="width: 3em">ID</th>
                     <th>URL</th>
                     <th>Date</th>
@@ -780,6 +788,7 @@
             </thead>
             <tbody>
                 <tr v-for="rule in rules">
+                    <td><span v-if="rule.pinned" title="Pending final decision">📌&nbsp;</span></td>
                     <td>{{rule.id}}</td>
                     <td>
                         <span v-for="pattern in rule.urlPatterns">

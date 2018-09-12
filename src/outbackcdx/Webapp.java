@@ -346,8 +346,10 @@ class Webapp implements Web.Handler {
 
         // sort rules
         if (request.getParms().getOrDefault("sort", "id").equals("surt")) {
-            Comparator<AccessRule> comparator = Comparator.comparing(rule -> rule.ssurtPrefixes().findFirst().orElse(""));
-            rules.sort(comparator.thenComparingLong(rule -> rule.id));
+            Comparator<AccessRule> cmp = Comparator.comparingInt(rule -> rule.pinned ? 0 : 1);
+            cmp = cmp.thenComparing(rule -> rule.ssurtPrefixes().findFirst().orElse(""));
+            cmp = cmp.thenComparingLong(rule -> rule.id);
+            rules.sort(cmp);
         }
 
         // output format
