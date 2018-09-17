@@ -621,11 +621,17 @@
                             </tr>
                             <tr v-if="rule.created">
                                 <td>Created:</td>
-                                <td>{{prettyDate(rule.created)}}</td>
+                                <td>
+                                    {{prettyDate(rule.created)}}
+                                    <span v-if="rule.creator">by {{rule.creator}}</span>
+                                </td>
                             </tr>
                             <tr v-if="rule.modified && rule.modified != rule.created">
                                 <td>Modified:</td>
-                                <td>{{prettyDate(rule.modified)}}</td>
+                                <td>
+                                    {{prettyDate(rule.modified)}}
+                                    <span v-if="rule.modifier">by {{rule.modifier}}</span>
+                                </td>
                             </tr>
                         </table>
                         <label class="field">

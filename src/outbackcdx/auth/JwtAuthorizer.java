@@ -42,10 +42,10 @@ public class JwtAuthorizer implements Authorizer {
     }
 
     @Override
-    public Set<Permission> verify(String authzHeader) throws AuthException {
+    public Permit verify(String authzHeader) throws AuthException {
         try {
             if (!authzHeader.regionMatches(true, 0, "bearer ", 0, "bearer ".length())) {
-                return Collections.emptySet();
+                return new Permit("anonymous", Collections.emptySet());
             }
 
             String token = authzHeader.substring("bearer ".length());
@@ -62,7 +62,7 @@ public class JwtAuthorizer implements Authorizer {
                 }
                 permissions.add(permission);
             }
-            return permissions;
+            return new Permit(claimsSet.getStringClaim("preferred_username"), permissions);
         } catch (ParseException | BadJOSEException | JOSEException e) {
             e.printStackTrace();
             throw new AuthException("Invalid acccess token: " + e.getMessage(), e);

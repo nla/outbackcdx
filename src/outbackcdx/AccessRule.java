@@ -32,7 +32,9 @@ public class AccessRule {
     String externalId;
     String reason;
     Date created;
+    String creator;
     Date modified;
+    String modifier;
 
 
     /**
@@ -130,7 +132,7 @@ public class AccessRule {
 
     static void toCSV(Collection<AccessRule> rules, Function<Long,String> policyNames, Writer out) throws IOException {
         out.write("ruleId,policyId,patterns,accessedFrom,accessedTo,capturedFrom,capturedTo,period," +
-                "publicMessage,privateComment,externalId,reason,pinned,created,modified\r\n");
+                "publicMessage,privateComment,externalId,reason,pinned,created,creator,modified,modifier\r\n");
         for (AccessRule rule : rules) {
             String row = rule.id + "," + quote(policyNames.apply(rule.policyId)) + "," +
                     quote(String.join(" ", rule.urlPatterns)) + "," +
@@ -141,7 +143,10 @@ public class AccessRule {
                     quote(rule.externalId) + "," +
                     quote(rule.reason) + "," +
                     (rule.pinned ? "Y" : "N") + "," +
-                    quote(rule.created) + "," + quote(rule.modified) + "\r\n";
+                    quote(rule.created) + "," +
+                    quote(rule.creator) + "," +
+                    quote(rule.modified) + "," +
+                    quote(rule.modifier) + "\r\n";
             out.write(row);
         }
     }

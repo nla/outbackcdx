@@ -85,9 +85,9 @@ public class Main {
         }
 
         try (DataStore dataStore = new DataStore(dataPath)) {
-            Webapp controller = new Webapp(dataStore, verbose, authorizer, dashboardConfig);
+            Webapp controller = new Webapp(dataStore, verbose, dashboardConfig);
             ServerSocket socket = openSocket(host, port, inheritSocket);
-            Web.Server server = new Web.Server(socket, controller);
+            Web.Server server = new Web.Server(socket, controller, authorizer);
             ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
             try {
                 server.setAsyncRunner(threadPool::execute);

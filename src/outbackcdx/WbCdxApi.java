@@ -20,11 +20,11 @@ import static outbackcdx.NanoHTTPD.Response.Status.OK;
  * pywb: https://github.com/ikreymer/pywb/wiki/CDX-Server-API
  */
 public class WbCdxApi {
-    public static Response query(NanoHTTPD.IHTTPSession session, Index index) {
-        Query query = new Query(session.getParms());
+    public static Response query(Web.Request request, Index index) {
+        Query query = new Query(request.params());
         Iterable<Capture> captures = query.execute(index);
 
-        boolean outputJson = "json".equals(session.getParms().get("output"));
+        boolean outputJson = "json".equals(request.param("output"));
         Response response = new Response(OK, outputJson ? "application/json" : "text/plain", outputStream -> {
             Writer out = new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8));
             OutputFormat outf = outputJson ? new JsonFormat(out, query.fields) : new TextFormat(out, query.fields);

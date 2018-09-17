@@ -51,7 +51,7 @@ public class JwtAuthorizerTest {
         String token = signedJWT.serialize();
 
         JwtAuthorizer authorizer = new JwtAuthorizer(new ImmutableJWKSet<>(new JWKSet(rsaPublicJWK)), "permissions");
-        Set<Permission> permissions = authorizer.verify("beARer " + token);
+        Set<Permission> permissions = authorizer.verify("beARer " + token).permissions;
         assertEquals(EnumSet.of(RULES_EDIT, INDEX_EDIT), permissions);
     }
 }

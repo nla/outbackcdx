@@ -61,19 +61,19 @@ public class AccessControlTest {
         rule.urlPatterns.add("*.gov.au");
         rule.policyId = publicPolicyId;
 
-        long ruleId = accessControl.put(rule);
+        long ruleId = accessControl.put(rule, "anonymous");
         assertEquals(rule, accessControl.rule(ruleId));
 
         AccessRule rule2 = new AccessRule();
         rule2.urlPatterns.add("*.nla.gov.au");
         rule2.policyId = publicPolicyId;
-        accessControl.put(rule2);
+        accessControl.put(rule2, "anonymous");
 
         AccessRule rule3 = new AccessRule();
         rule3.urlPatterns.add("*.example.gov.au");
         rule3.policyId = staffOnlyPolicyId;
         rule3.publicMessage = "Explanatory message";
-        accessControl.put(rule3);
+        accessControl.put(rule3, "anonymous");
 
 
         assertEquals(asList(rule, rule2), accessControl.rulesForUrl("http://nla.gov.au/hello.html"));
@@ -93,7 +93,7 @@ public class AccessControlTest {
         AccessRule rule4 = new AccessRule();
         rule4.urlPatterns.add("http://www.example.org/particular/page.htm");
         rule4.policyId = staffOnlyPolicyId;
-        accessControl.put(rule4);
+        accessControl.put(rule4, "anonymous");
 
         {
             AccessDecision decision = accessControl.checkAccess("public", "http://www.example.org:80/particular/page.htm", new Date(), new Date());

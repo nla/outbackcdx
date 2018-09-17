@@ -7,7 +7,7 @@ import java.util.Set;
 
 public class NullAuthorizer implements Authorizer {
     @Override
-    public Set<Permission> verify(String authzHeader) {
-        return EnumSet.allOf(Permission.class);
+    public Permit verify(String authzHeader) {
+        return Permit.full();
     }
 }

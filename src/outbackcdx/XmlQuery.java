@@ -28,10 +28,10 @@ public class XmlQuery {
     final long limit;
     final String queryType;
 
-    public XmlQuery(NanoHTTPD.IHTTPSession session, Index index) {
+    public XmlQuery(Web.Request request, Index index) {
         this.index = index;
 
-        Map<String, String> params = session.getParms();
+        Map<String, String> params = request.params();
         Map<String, String> query = decodeQueryString(params.get("q"));
 
         accessPoint = params.get("accesspoint");
@@ -203,8 +203,8 @@ public class XmlQuery {
         out.writeEndElement();
     }
 
-    public static NanoHTTPD.Response query(NanoHTTPD.IHTTPSession session, Index index) {
-        return new XmlQuery(session, index).streamResults();
+    public static NanoHTTPD.Response query(Web.Request request, Index index) {
+        return new XmlQuery(request, index).streamResults();
     }
 
     /**
