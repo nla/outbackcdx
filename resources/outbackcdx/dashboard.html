@@ -370,7 +370,10 @@
 
         function fetchApi(url, options={}) {
             if (keycloak && keycloak.token) {
-                options.headers = {'Authorization': 'bearer ' + keycloak.token};
+                return keycloak.updateToken(30).then(() => {
+                    options.headers = {'Authorization': 'bearer ' + keycloak.token};
+                    return fetch(url, options);
+                });
             }
             return fetch(url, options);
         }
