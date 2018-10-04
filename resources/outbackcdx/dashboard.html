@@ -788,8 +788,20 @@
             <thead>
                 <tr>
                     <th style="width: 0"></th>
-                    <th style="width: 3em">ID</th>
-                    <th>URL</th>
+                    <th style="width: 3em"><router-link :to="{
+                                    name: 'access-rule-list',
+                                    params: {
+                                        collection: this.$route.params.collection,
+                                    },
+                                    query: { sort: (this.$route.query.sort || '-id') == '-id' ? 'id' : '-id' }
+                                }">ID</router-link></th>
+                    <th><router-link :to="{
+                                    name: 'access-rule-list',
+                                    params: {
+                                        collection: this.$route.params.collection,
+                                    },
+                                    query: { sort: this.$route.query.sort == 'surt' ? '-surt' : 'surt' }
+                                }">URL</router-link></th>
                     <th>Date</th>
                     <th>Policy</th>
                     <th></th>
@@ -860,7 +872,7 @@
                 });
             },
             fetchData: _.throttle(function() {
-                var query = { sort: "surt" };
+                var query = { sort: this.$route.query.sort || "-id" };
                 query.search = this.$route.query.search;
                 Promise.all([
                     fetchApi(urlTemplate('{collection}/access/policies', this.$route.params)).then(r => r.json()),

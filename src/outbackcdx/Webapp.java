@@ -342,11 +342,15 @@ class Webapp implements Web.Handler {
         }
 
         // sort rules
-        if (request.param("sort", "id").equals("surt")) {
+        String sort = request.param("sort", "id");
+        if (sort.replaceFirst("^-", "").equals("surt")) {
             Comparator<AccessRule> cmp = Comparator.comparingInt(rule -> rule.pinned ? 0 : 1);
             cmp = cmp.thenComparing(rule -> rule.ssurtPrefixes().findFirst().orElse(""));
             cmp = cmp.thenComparingLong(rule -> rule.id);
             rules.sort(cmp);
+        }
+        if (sort.startsWith("-")) {
+            Collections.reverse(rules);
         }
 
         // output format

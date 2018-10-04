@@ -205,7 +205,9 @@
             "name": "sort",
             "in": "query",
             "type": "string",
-            "enum": ["id", "surt"]
+            "enum": ["id", "-id", "surt", "-surt"],
+            "default": "id",
+            "description": "Sort order. Prefix the value with '-' for reverse order."
           },
           {
             "name": "output",
