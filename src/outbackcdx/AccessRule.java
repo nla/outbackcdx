@@ -1,12 +1,20 @@
 package outbackcdx;
 
+import com.google.gson.stream.JsonWriter;
+
+import java.io.IOException;
+import java.io.Writer;
 import java.time.LocalDateTime;
 import java.time.Period;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Stream;
+
+import static outbackcdx.Json.GSON;
 
 public class AccessRule {
     Long id;
@@ -15,11 +23,19 @@ public class AccessRule {
     DateRange captured;
     DateRange accessed;
     Period period;
-    String privateComment;
     String publicMessage;
     boolean enabled;
+
+    // metadata fields
+    boolean pinned;
+    String privateComment;
+    String externalId;
+    String reason;
     Date created;
+    String creator;
     Date modified;
+    String modifier;
+
 
     /**
      * True if this rule is applicable to the given capture and access times.
@@ -112,5 +128,69 @@ public class AccessRule {
                 ", created=" + created +
                 ", modified=" + modified +
                 '}';
+    }
+
+    static void toCSV(Collection<AccessRule> rules, Function<Long,String> policyNames, Writer out) throws IOException {
+        out.write("ruleId,policyId,patterns,accessedFrom,accessedTo,capturedFrom,capturedTo,period," +
+                "publicMessage,privateComment,externalId,reason,pinned,created,creator,modified,modifier\r\n");
+        for (AccessRule rule : rules) {
+            String row = rule.id + "," + quote(policyNames.apply(rule.policyId)) + "," +
+                    quote(String.join(" ", rule.urlPatterns)) + "," +
+                    quote(rule.accessed) + "," +
+                    quote(rule.captured) + "," +
+                    quote(rule.period) + "," + quote(rule.publicMessage) + "," +
+                    quote(rule.privateComment) + "," +
+                    quote(rule.externalId) + "," +
+                    quote(rule.reason) + "," +
+                    (rule.pinned ? "Y" : "N") + "," +
+                    quote(rule.created) + "," +
+                    quote(rule.creator) + "," +
+                    quote(rule.modified) + "," +
+                    quote(rule.modifier) + "\r\n";
+            out.write(row);
+        }
+    }
+
+    private static String quote(Period period) {
+        return period == null || period.toString().equals("P") ? "" : quote(period.toString());
+    }
+
+    private static String quote(DateRange range) {
+        if (range == null) return ",";
+        return quote(range.start) + "," + quote(range.end);
+    }
+
+    private static String quote(Date date) {
+        return date == null ? "" : quote(date.toString());
+    }
+
+    private static String quote(String s) {
+        if (s == null) {
+            return "";
+        }
+        return "\"" + s.replace("\"", "\"\"") + "\"";
+    }
+
+    static void toJSON(Collection<AccessRule> rules, Function<Long,String> policyNames, Writer out) throws IOException {
+        JsonWriter json = GSON.newJsonWriter(out);
+        json.beginArray();
+        for (AccessRule rule : rules) {
+            GSON.toJson(rule, AccessRule.class, json);
+        }
+        json.endArray();
+        json.close();
+    }
+
+    public boolean contains(String str) {
+        str = str.toLowerCase();
+        for (String pattern : urlPatterns) {
+            if (pattern.toLowerCase().contains(str)) {
+                return true;
+            }
+        }
+        return (privateComment != null && privateComment.toLowerCase().contains(str)) ||
+                (publicMessage != null && publicMessage.toLowerCase().contains(str)) ||
+                (externalId != null && externalId.toLowerCase().contains(str)) ||
+                (reason != null && reason.toLowerCase().contains(str));
     }
 }

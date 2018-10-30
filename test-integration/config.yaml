@@ -1,5 +1,9 @@
 collections:
-    testcol: http://localhost:8081/testcol
+    testcol:
+      index:
+        type: cdx
+        api_url: http://localhost:8081/testcol?url={url}&closest={closest}&sort=closest
+        replay_url: ""
+      archive_paths: ./
 
-archive_paths: ./
 enable_http_proxy: true

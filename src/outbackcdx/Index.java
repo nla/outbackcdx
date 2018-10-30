@@ -12,12 +12,14 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
  * Wraps RocksDB with a higher-level query interface.
  */
 public class Index {
+    final String name;
     final RocksDB db;
     final ColumnFamilyHandle defaultCF;
     final ColumnFamilyHandle aliasCF;
     final AccessControl accessControl;
 
-    public Index(RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl) {
+    public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl) {
+        this.name = name;
         this.db = db;
         this.defaultCF = defaultCF;
         this.aliasCF = aliasCF;
@@ -319,6 +321,14 @@ public class Index {
                 capture.urlkey = resolveAlias(capture.urlkey);
             }
             dbBatch.put(capture.encodeKey(), capture.encodeValue());
+        }
+
+        /**
+         * Deletes a capture from the index. Does not actually check if the capture exists.
+         */
+        void deleteCapture(Capture capture) {
+            capture.urlkey = resolveAlias(capture.urlkey);
+            dbBatch.remove(capture.encodeKey());
         }
 
         /**

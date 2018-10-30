@@ -20,6 +20,7 @@ public class UrlCanonicalizerTest {
         t("http://intersector.wa.gov.au/current_issue?CFID=2051199&CFTOKEN=697395b12ed216e1-F6DFAF77-D433-FA57-5582BC6000844470&jsessionid=92303280691120833351543", "http://intersector.wa.gov.au/current_issue");
         t("http://jobsearch.gov.au/JobDetails/JobDetails.aspx?st=11&WHCode=0&TextOnly=0&rgn=&Occ=7991&BroadLoc=0&SessionID=uqft0ovnt3tq4rrygdt5z145&CommJobs=0&CurPage=4&TotalRec=195&JobPos=65&JobID=107556635&SortDir=1&SortField=3&", "http://jobsearch.gov.au/jobdetails/jobdetails.aspx?broadloc=0&commjobs=0&curpage=4&jobid=107556635&jobpos=65&occ=7991&rgn=&sortdir=1&sortfield=3&st=11&textonly=0&totalrec=195&whcode=0");
         t("http://www.budget.gov.au", "http://budget.gov.au/");
+        t("http://thisisthedomainthatneversendsyesitgoesonandonmyfriendsomepeoplestartedtypingitnotknowingwhatitwas.com/", "http://thisisthedomainthatneversendsyesitgoesonandonmyfriendsomepeoplestartedtypingitnotknowingwhatitwas.com/");
 
         // tests below are based on https://developers.google.com/safe-browsing/developers_guide_v2#Canonicalization
         t("http://%31%36%38%2e%31%38%38%2e%39%39%2e%32%36/%2E%73%65%63%75%72%65/%77%77%77%2E%65%62%61%79%2E%63%6F%6D/", "http://168.188.99.26/.secure/www.ebay.com");

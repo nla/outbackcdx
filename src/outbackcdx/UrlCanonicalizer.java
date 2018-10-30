@@ -165,7 +165,12 @@ public class UrlCanonicalizer {
     private static String canonicalizeHost(String host) {
         host = host.replace("..", ".");
         if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
-        host = IDN.toASCII(host);
+        try {
+            host = IDN.toASCII(host);
+        } catch (IllegalArgumentException e) {
+            // XXX: IDN.toASCII throws in the face of very long domain segments
+            // let's just try to continue
+        }
         host = host.toLowerCase();
         host = canonicalizeUrlEncoding(host);
         host = canonicalizeIP(host);

@@ -28,7 +28,7 @@ public class IndexTest {
             db = RocksDB.open(options, "test");
             defaultCf = db.getDefaultColumnFamily();
             aliasCf = db.createColumnFamily(new ColumnFamilyDescriptor("alias".getBytes(StandardCharsets.UTF_8)));
-            index = new Index(db, defaultCf, aliasCf, null);
+            index = new Index("test", db, defaultCf, aliasCf, null);
         }
     }
 
@@ -56,6 +56,38 @@ public class IndexTest {
         assertEquals(20060101000000L, results.get(1).timestamp);
         assertEquals(20070101000000L, results.get(2).timestamp);
         assertEquals(20050101000000L, results.get(3).timestamp);
+    }
+
+    @Test
+    public void testDelete() {
+        try (Index.Batch batch = index.beginUpdate()) {
+            batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://a.org/ text/html 200 - - 0 w1"));
+            batch.putCapture(Capture.fromCdxLine("- 20060101000000 http://a.org/ text/html 200 - - 0 w2"));
+            batch.putCapture(Capture.fromCdxLine("- 20070101000000 http://a.org/ text/html 200 - - 0 w3"));
+            batch.commit();
+        }
+
+        {
+            List<Capture> results = new ArrayList<>();
+            index.query("org,a)/", null).forEach(results::add);
+            assertEquals(3, results.size());
+            assertEquals(20050101000000L, results.get(0).timestamp);
+            assertEquals(20060101000000L, results.get(1).timestamp);
+            assertEquals(20070101000000L, results.get(2).timestamp);
+        }
+
+        try (Index.Batch batch = index.beginUpdate()) {
+            batch.deleteCapture(Capture.fromCdxLine("- 20060101000000 http://a.org/ text/html 200 - - 0 w2"));
+            batch.commit();
+        }
+
+        {
+            List<Capture> results = new ArrayList<>();
+            index.query("org,a)/", null).forEach(results::add);
+            assertEquals(2, results.size());
+            assertEquals(20050101000000L, results.get(0).timestamp);
+            assertEquals(20070101000000L, results.get(1).timestamp);
+        }
     }
 
     @Test

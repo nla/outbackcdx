@@ -6,6 +6,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import outbackcdx.auth.Permit;
 
 import java.io.*;
 import java.nio.charset.Charset;
@@ -31,7 +32,7 @@ public class WebappTest {
         FeatureFlags.setExperimentalAccessControl(true);
         File root = folder.newFolder();
         DataStore manager = new DataStore(root);
-        webapp = new Webapp(manager, false);
+        webapp = new Webapp(manager, false, Collections.emptyMap());
     }
 
     @After
@@ -73,6 +74,26 @@ public class WebappTest {
     }
 
     @Test
+    public void testDelete() throws Exception {
+        POST("/test", "- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n");
+        POST("/test", "- 20060614070159 http://nla.gov.au/ text/html 200 XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n");
+
+        {
+            String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F");
+            assertTrue(response.contains("20050614070159"));
+            assertTrue(response.contains("20060614070159"));
+        }
+
+        POST("/test/delete", "- 20060614070159 http://nla.gov.au/ text/html 200 XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n");
+
+        {
+            String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F");
+            assertTrue(response.contains("20050614070159"));
+            assertTrue(!response.contains("20060614070159"));
+        }
+    }
+
+    @Test
     public void testAccessPoint() throws Exception {
         POST("/testap",
                 "- 20050614070159 http://a.ex.org/ text/html 200 - - 42 wrc\n" +
@@ -85,9 +106,25 @@ public class WebappTest {
         assertEquals(5, GSON.fromJson(GET("/testap/access/policies"), AccessPolicy[].class).length);
 
         createRule(publicPolicyId, "*");
-        long ruleId = createRule(staffPolicyId, "*.a.ex.org");
+        long ruleIdC = createRule(staffPolicyId, "*.c.ex.org");
+        long ruleIdA = createRule(staffPolicyId, "*.a.ex.org");
 
-        assertEquals(2, GSON.fromJson(GET("/testap/access/rules"), AccessRule[].class).length);
+
+        // default sort should be rule id
+        {
+            AccessRule[] actualRules = GSON.fromJson(GET("/testap/access/rules"), AccessRule[].class);
+            assertEquals(3, actualRules.length);
+            assertEquals(ruleIdC, (long) actualRules[1].id);
+            assertEquals(ruleIdA, (long) actualRules[2].id);
+        }
+
+        // check sorting by SURT
+        {
+            AccessRule[] actualRules = GSON.fromJson(GET("/testap/access/rules", "sort", "surt"), AccessRule[].class);
+            assertEquals(3, actualRules.length);
+            assertEquals(ruleIdA, (long) actualRules[1].id);
+            assertEquals(ruleIdC, (long) actualRules[2].id);
+        }
 
         assertEquals(asList("http://a.ex.org/", "http://a.ex.org/", "http://b.ex.org/"),
                 cdxUrls(GET("/testap", "url", "*.ex.org")));
@@ -113,7 +150,7 @@ public class WebappTest {
         // try modifying a rule
         //
 
-        AccessRule rule = GSON.fromJson(GET("/testap/access/rules/" + ruleId), AccessRule.class);
+        AccessRule rule = GSON.fromJson(GET("/testap/access/rules/" + ruleIdA), AccessRule.class);
         rule.urlPatterns.clear();
         rule.urlPatterns.add("*.b.ex.org");
 
@@ -126,7 +163,7 @@ public class WebappTest {
         // try deleting a rule
         //
 
-        DELETE("/testap/access/rules/" + ruleId);
+        DELETE("/testap/access/rules/" + ruleIdA);
 
         assertEquals(asList("http://a.ex.org/", "http://a.ex.org/", "http://b.ex.org/"),
                 cdxUrls(GET("/testap/ap/public", "url", "*.ex.org")));
@@ -187,7 +224,7 @@ public class WebappTest {
     private String POST(String url, String data, NanoHTTPD.Response.Status expectedStatus) throws Exception {
         DummySession session = new DummySession(POST, url);
         session.data(data);
-        NanoHTTPD.Response response = webapp.handle(session);
+        NanoHTTPD.Response response = webapp.handle(new Web.Request(session, Permit.full()));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
@@ -197,14 +234,14 @@ public class WebappTest {
         for (int i = 0; i < parmKeysAndValues.length; i += 2) {
             session.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
         }
-        NanoHTTPD.Response response = webapp.handle(session);
+        NanoHTTPD.Response response = webapp.handle(new Web.Request(session, Permit.full()));
         assertEquals(OK, response.getStatus());
         return slurp(response);
     }
 
     private String DELETE(String url) throws Exception {
         DummySession session = new DummySession(DELETE, url);
-        NanoHTTPD.Response response = webapp.handle(session);
+        NanoHTTPD.Response response = webapp.handle(new Web.Request(session, Permit.full()));
         assertEquals(OK, response.getStatus());
         return slurp(response);
     }

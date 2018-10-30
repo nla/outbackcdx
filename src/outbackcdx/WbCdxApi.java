@@ -20,11 +20,11 @@ import static outbackcdx.NanoHTTPD.Response.Status.OK;
  * pywb: https://github.com/ikreymer/pywb/wiki/CDX-Server-API
  */
 public class WbCdxApi {
-    public static Response query(NanoHTTPD.IHTTPSession session, Index index) {
-        Query query = new Query(session.getParms());
+    public static Response query(Web.Request request, Index index) {
+        Query query = new Query(request.params());
         Iterable<Capture> captures = query.execute(index);
 
-        boolean outputJson = "json".equals(session.getParms().get("output"));
+        boolean outputJson = "json".equals(request.param("output"));
         Response response = new Response(OK, outputJson ? "application/json" : "text/plain", outputStream -> {
             Writer out = new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8));
             OutputFormat outf = outputJson ? new JsonFormat(out, query.fields) : new TextFormat(out, query.fields);
@@ -58,7 +58,7 @@ public class WbCdxApi {
         Query(Map<String,String> params) {
             accessPoint = params.get("accesspoint");
             url = params.get("url");
-            matchType = MatchType.valueOf(params.getOrDefault("matchType", "exact").toUpperCase());
+            matchType = MatchType.valueOf(params.getOrDefault("matchType", "default").toUpperCase());
             sort = SortType.valueOf(params.getOrDefault("sort", "default").toUpperCase());
             closest = params.get("closest");
 
@@ -72,13 +72,15 @@ public class WbCdxApi {
         }
 
         void expandWildcards() {
-            if (matchType == MatchType.EXACT) {
+            if (matchType == MatchType.DEFAULT) {
                 if (url.endsWith("*")) {
                     matchType = MatchType.PREFIX;
-                    url = url.substring(url.length() - 1);
+                    url = url.substring(0, url.length() - 1);
                 } else if (url.startsWith("*.")) {
                     matchType = MatchType.DOMAIN;
                     url = url.substring(2);
+                } else {
+                    matchType = MatchType.EXACT;
                 }
             }
         }
@@ -99,6 +101,7 @@ public class WbCdxApi {
         }
 
         Iterable<Capture> execute(Index index) {
+            compatibilityHacks();
             expandWildcards();
             validate();
 
@@ -128,6 +131,15 @@ public class WbCdxApi {
                     return index.rangeQuery(surt, "~", accessPoint);
                 default:
                     throw new IllegalArgumentException("unknown matchType: " + matchType);
+            }
+        }
+
+        private void compatibilityHacks() {
+            /*
+             * Cope pywb 2.0 sending nonsensical closest queries like ?url=foo&closest=&sort=closest.
+             */
+            if (sort == SortType.CLOSEST && (closest == null || closest.isEmpty())) {
+                sort = SortType.DEFAULT;
             }
         }
     }
@@ -222,7 +234,7 @@ public class WbCdxApi {
     }
 
     enum MatchType {
-        EXACT, PREFIX, HOST, DOMAIN, RANGE;
+        DEFAULT, EXACT, PREFIX, HOST, DOMAIN, RANGE;
     }
 
     enum SortType {

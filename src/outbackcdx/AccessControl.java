@@ -101,7 +101,7 @@ class AccessControl {
     /**
      * Save an access control rule to the database.
      */
-    public Long put(AccessRule rule) throws RocksDBException {
+    public Long put(AccessRule rule, String username) throws RocksDBException {
         if (rule.policyId == null || policies.get(rule.policyId) == null) {
             throw new IllegalArgumentException("no such policyId: " + rule.policyId);
         }
@@ -111,23 +111,31 @@ class AccessControl {
             throw new IllegalArgumentException("invalid rule");
         }
 
+        Date now = new Date();
         Long generatedId = null;
         if (rule.id == null) {
             generatedId = rule.id = nextRuleId.getAndIncrement();
-            rule.created = new Date();
+            rule.created = now;
+            rule.creator = username;
         }
 
-        rule.modified = new Date();
+        rule.modified = now;
+        rule.modifier = username;
 
-        byte[] value = GSON.toJson(rule).getBytes(UTF_8);
-        db.put(ruleCf, encodeKey(rule.id), value);
+        synchronized (this) {
+            AccessRule previous = rules.get(rule.id);
+            if (previous != null) {
+                rulesBySurt.remove(previous);
+                rule.created = previous.created;
+                rule.creator = previous.creator;
+            }
 
-        AccessRule previous = rules.put(rule.id, rule);
-        if (previous != null) {
-            rulesBySurt.remove(previous);
+            byte[] value = GSON.toJson(rule).getBytes(UTF_8);
+            db.put(ruleCf, encodeKey(rule.id), value);
+
+            rules.put(rule.id, rule);
+            rulesBySurt.put(rule);
         }
-        // XXX: race
-        rulesBySurt.put(rule);
 
         return generatedId;
     }

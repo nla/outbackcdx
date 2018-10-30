@@ -3,17 +3,17 @@ package outbackcdx;
 
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
-import com.google.gson.stream.JsonWriter;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
-import outbackcdx.NanoHTTPD.IHTTPSession;
 import outbackcdx.NanoHTTPD.Response;
+import outbackcdx.auth.Permission;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.*;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -27,70 +27,73 @@ import static outbackcdx.Web.*;
 class Webapp implements Web.Handler {
     private final boolean verbose;
     private final DataStore dataStore;
-    final Web.Router router = new Web.Router()
-            .on(GET, "/", serve("dashboard.html"))
-            .on(GET, "/api", serve("api.html"))
-            .on(GET, "/api.js", serve("api.js"))
-            .on(GET, "/add.svg", serve("add.svg"))
-            .on(GET, "/database.svg", serve("database.svg"))
-            .on(GET, "/outback.svg",  serve("outback.svg"))
-            .on(GET, "/favicon.ico",  serve("outback.svg"))
-            .on(GET, "/swagger.json", serve("swagger.json"))
+    private final Web.Router router;
+    private final Map<String,Object> dashboardConfig;
 
-            .on(GET, "/lib/vue-router/2.0.0/vue-router.js", serve("lib/vue-router/2.0.0/vue-router.js"))
-            .on(GET, "/lib/vue/2.0.1/vue.js", serve("/META-INF/resources/webjars/vue/2.0.1/dist/vue.js"))
-            .on(GET, "/lib/lodash/4.15.0/lodash.min.js", serve("/META-INF/resources/webjars/lodash/4.15.0/lodash.min.js"))
-            .on(GET, "/lib/moment/2.15.2/moment.min.js", serve("/META-INF/resources/webjars/moment/2.15.2/min/moment.min.js"))
-            .on(GET, "/lib/pikaday/1.4.0/pikaday.js", serve("/META-INF/resources/webjars/pikaday/1.4.0/pikaday.js"))
-            .on(GET, "/lib/pikaday/1.4.0/pikaday.css", serve("/META-INF/resources/webjars/pikaday/1.4.0/css/pikaday.css"))
-            .on(GET, "/lib/redoc/1.4.1/redoc.min.js", serve("/META-INF/resources/webjars/redoc/1.4.1/dist/redoc.min.js"))
-
-            .on(GET, "/api/collections", this::listCollections)
-            .on(GET, "/api/featureflags", this::featureFlags)
-            .on(GET, "/<collection>", this::query)
-            .on(POST, "/<collection>", this::post)
-            .on(GET, "/<collection>/stats", this::stats)
-            .on(GET, "/<collection>/captures", this::captures)
-            .on(GET, "/<collection>/aliases", this::aliases);
-
-    private Response featureFlags(IHTTPSession req) {
-        return jsonResponse(FeatureFlags.asMap());
+    private Response configJson(Web.Request req) {
+        return jsonResponse(dashboardConfig);
     }
 
-    private Response listAccessPolicies(IHTTPSession req) throws IOException, Web.ResponseException {
+    private Response listAccessPolicies(Web.Request req) throws IOException, Web.ResponseException {
         return jsonResponse(getIndex(req).accessControl.listPolicies());
     }
 
-    private Response deleteAccessRule(IHTTPSession req) throws IOException, Web.ResponseException, RocksDBException {
-        long ruleId = Long.parseLong(req.getParms().get("ruleId"));
+    private Response deleteAccessRule(Web.Request req) throws IOException, Web.ResponseException, RocksDBException {
+        long ruleId = Long.parseLong(req.param("ruleId"));
         boolean found = getIndex(req).accessControl.deleteRule(ruleId);
         return found ? ok() : notFound();
     }
 
-    Webapp(DataStore dataStore, boolean verbose) {
+    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig) {
         this.dataStore = dataStore;
         this.verbose = verbose;
+        this.dashboardConfig = dashboardConfig;
+
+        router = new Router();
+        router.on(GET, "/", serve("dashboard.html"));
+        router.on(GET, "/api", serve("api.html"));
+        router.on(GET, "/api.js", serve("api.js"));
+        router.on(GET, "/add.svg", serve("add.svg"));
+        router.on(GET, "/database.svg", serve("database.svg"));
+        router.on(GET, "/outback.svg", serve("outback.svg"));
+        router.on(GET, "/favicon.ico", serve("outback.svg"));
+        router.on(GET, "/swagger.json", serve("swagger.json"));
+        router.on(GET, "/lib/vue-router/2.0.0/vue-router.js", serve("lib/vue-router/2.0.0/vue-router.js"));
+        router.on(GET, "/lib/vue/2.0.1/vue.js", serve("/META-INF/resources/webjars/vue/2.0.1/dist/vue.js"));
+        router.on(GET, "/lib/lodash/4.15.0/lodash.min.js", serve("/META-INF/resources/webjars/lodash/4.15.0/lodash.min.js"));
+        router.on(GET, "/lib/moment/2.15.2/moment.min.js", serve("/META-INF/resources/webjars/moment/2.15.2/min/moment.min.js"));
+        router.on(GET, "/lib/pikaday/1.4.0/pikaday.js", serve("/META-INF/resources/webjars/pikaday/1.4.0/pikaday.js"));
+        router.on(GET, "/lib/pikaday/1.4.0/pikaday.css", serve("/META-INF/resources/webjars/pikaday/1.4.0/css/pikaday.css"));
+        router.on(GET, "/lib/redoc/1.4.1/redoc.min.js", serve("/META-INF/resources/webjars/redoc/1.4.1/dist/redoc.min.js"));
+        router.on(GET, "/api/collections", request1 -> listCollections(request1));
+        router.on(GET, "/config.json", req1 -> configJson(req1));
+        router.on(GET, "/<collection>", request -> query(request));
+        router.on(POST, "/<collection>", request -> post(request), Permission.INDEX_EDIT);
+        router.on(POST, "/<collection>/delete", request -> delete(request), Permission.INDEX_EDIT);
+        router.on(GET, "/<collection>/stats", req2 -> stats(req2));
+        router.on(GET, "/<collection>/captures", request -> captures(request));
+        router.on(GET, "/<collection>/aliases", request -> aliases(request));
 
         if (FeatureFlags.experimentalAccessControl()) {
-            router.on(GET, "/<collection>/ap/<accesspoint>", this::query)
-                    .on(GET, "/<collection>/ap/<accesspoint>/check", this::checkAccess)
-                    .on(POST, "/<collection>/ap/<accesspoint>/check", this::checkAccessBulk)
-                    .on(GET, "/<collection>/access/rules", this::listAccessRules)
-                    .on(POST, "/<collection>/access/rules", this::postAccessRules)
-                    .on(GET, "/<collection>/access/rules/new", this::getNewAccessRule)
-                    .on(GET, "/<collection>/access/rules/<ruleId>", this::getAccessRule)
-                    .on(DELETE, "/<collection>/access/rules/<ruleId>", this::deleteAccessRule)
-                    .on(GET, "/<collection>/access/policies", this::listAccessPolicies)
-                    .on(POST, "/<collection>/access/policies", this::postAccessPolicy)
-                    .on(GET, "/<collection>/access/policies/<policyId>", this::getAccessPolicy);
+            router.on(GET, "/<collection>/ap/<accesspoint>", request -> query(request));
+            router.on(GET, "/<collection>/ap/<accesspoint>/check", request1 -> checkAccess(request1));
+            router.on(POST, "/<collection>/ap/<accesspoint>/check", request -> checkAccessBulk(request));
+            router.on(GET, "/<collection>/access/rules", request -> listAccessRules(request));
+            router.on(POST, "/<collection>/access/rules", request -> postAccessRules(request), Permission.RULES_EDIT);
+            router.on(GET, "/<collection>/access/rules/new", request1 -> getNewAccessRule(request1), Permission.RULES_EDIT);
+            router.on(GET, "/<collection>/access/rules/<ruleId>", req -> getAccessRule(req));
+            router.on(DELETE, "/<collection>/access/rules/<ruleId>", req1 -> deleteAccessRule(req1), Permission.RULES_EDIT);
+            router.on(GET, "/<collection>/access/policies", req1 -> listAccessPolicies(req1));
+            router.on(POST, "/<collection>/access/policies", request -> postAccessPolicy(request), Permission.POLICIES_EDIT);
+            router.on(GET, "/<collection>/access/policies/<policyId>", req -> getAccessPolicy(req));
         }
     }
 
-    Response listCollections(IHTTPSession request) {
+    Response listCollections(Web.Request request) {
         return jsonResponse(dataStore.listCollections());
     }
 
-    Response stats(IHTTPSession req) throws IOException, Web.ResponseException {
+    Response stats(Web.Request req) throws IOException, Web.ResponseException {
         Index index = getIndex(req);
         Map<String,Object> map = new HashMap<>();
         map.put("estimatedRecordCount", index.estimatedRecordCount());
@@ -100,30 +103,62 @@ class Webapp implements Web.Handler {
         return response;
     }
 
-    Response captures(IHTTPSession session) throws IOException, Web.ResponseException {
-        Index index = getIndex(session);
-        String key = session.getParms().getOrDefault("key", "");
-        long limit = Long.parseLong(session.getParms().getOrDefault("limit", "1000"));
+    Response captures(Web.Request request) throws IOException, Web.ResponseException {
+        Index index = getIndex(request);
+        String key = request.param("key", "");
+        long limit = Long.parseLong(request.param("limit", "1000"));
         List<Capture> results = StreamSupport.stream(index.capturesAfter(key).spliterator(), false)
                 .limit(limit)
                 .collect(Collectors.<Capture>toList());
         return jsonResponse(results);
     }
 
-    Response aliases(IHTTPSession session) throws IOException, Web.ResponseException {
-        Index index = getIndex(session);
-        String key = session.getParms().getOrDefault("key", "");
-        long limit = Long.parseLong(session.getParms().getOrDefault("limit", "1000"));
+    Response aliases(Web.Request request) throws IOException, Web.ResponseException {
+        Index index = getIndex(request);
+        String key = request.param("key", "");
+        long limit = Long.parseLong(request.param("limit", "1000"));
         List<Alias> results = StreamSupport.stream(index.listAliases(key).spliterator(), false)
                 .limit(limit)
                 .collect(Collectors.<Alias>toList());
         return jsonResponse(results);
     }
 
-    Response post(IHTTPSession session) throws IOException {
-        String collection = session.getParms().get("collection");
+    Response delete(Web.Request request) throws IOException {
+        String collection = request.param("collection");
+        final Index index = dataStore.getIndex(collection);
+        BufferedReader in = new BufferedReader(new InputStreamReader(request.inputStream()));
+        long deleted = 0;
+
+        try (Index.Batch batch = index.beginUpdate()) {
+            while (true) {
+                String line = in.readLine();
+                if (verbose) {
+                    out.println("DELETE " + line);
+                }
+                if (line == null) break;
+                if (line.startsWith(" CDX")) continue;
+
+                try {
+                    if (line.startsWith("@alias ")) {
+                        throw new UnsupportedOperationException("Deleting of aliases is not yet implemented");
+                    }
+
+                    batch.deleteCapture(Capture.fromCdxLine(line));
+                    deleted++;
+                } catch (Exception e) {
+                    return new Response(BAD_REQUEST, "text/plain", "At line: " + line + "\n" + formatStackTrace(e));
+                }
+            }
+
+            batch.commit();
+        }
+        return new Response(OK, "text/plain", "Deleted " + deleted + " records\n");
+    }
+
+    Response post(Web.Request request) throws IOException {
+        String collection = request.param("collection");
         final Index index = dataStore.getIndex(collection, true);
-        BufferedReader in = new BufferedReader(new InputStreamReader(session.getInputStream()));
+        BufferedReader in = new BufferedReader(new InputStreamReader(request.inputStream()));
         long added = 0;
 
         try (Index.Batch batch = index.beginUpdate()) {
@@ -146,7 +181,7 @@ class Webapp implements Web.Handler {
                     }
                     added++;
                 } catch (Exception e) {
-                    return new Response(Response.Status.BAD_REQUEST, "text/plain", "At line: " + line + "\n" + formatStackTrace(e));
+                    return new Response(BAD_REQUEST, "text/plain", "At line: " + line + "\n" + formatStackTrace(e));
                 }
             }
 
@@ -161,21 +196,20 @@ class Webapp implements Web.Handler {
         return stacktrace.toString();
     }
 
-    Response query(IHTTPSession session) throws IOException, Web.ResponseException {
-        Index index = getIndex(session);
-        Map<String,String> params = session.getParms();
+    Response query(Web.Request request) throws IOException, Web.ResponseException {
+        Index index = getIndex(request);
+        Map<String,String> params = request.params();
         if (params.containsKey("q")) {
-            return XmlQuery.query(session, index);
+            return XmlQuery.query(request, index);
         } else if (params.containsKey("url")) {
-            return WbCdxApi.query(session, index);
+            return WbCdxApi.query(request, index);
         } else {
             return collectionDetails(index.db);
         }
-
     }
 
-    private Index getIndex(IHTTPSession session) throws IOException, Web.ResponseException {
-        String collection = session.getParms().get("collection");
+    private Index getIndex(Web.Request request) throws IOException, Web.ResponseException {
+        String collection = request.param("collection");
         final Index index = dataStore.getIndex(collection);
         if (index == null) {
             throw new Web.ResponseException(new Response(NOT_FOUND, "text/plain", "Collection does not exist"));
@@ -195,12 +229,12 @@ class Webapp implements Web.Handler {
         return new Response(OK, "text/html", page);
     }
 
-    private <T> T fromJson(IHTTPSession session, Class<T> clazz) {
-        return GSON.fromJson(new InputStreamReader(session.getInputStream(), UTF_8), clazz);
+    private <T> T fromJson(Web.Request request, Class<T> clazz) {
+        return GSON.fromJson(new InputStreamReader(request.inputStream(), UTF_8), clazz);
     }
 
-    private Response getAccessPolicy(IHTTPSession req) throws IOException, Web.ResponseException {
-        long policyId = Long.parseLong(req.getParms().get("policyId"));
+    private Response getAccessPolicy(Web.Request req) throws IOException, Web.ResponseException {
+        long policyId = Long.parseLong(req.param("policyId"));
         AccessPolicy policy = getIndex(req).accessControl.policy(policyId);
         if (policy == null) {
             return notFound();
@@ -208,26 +242,26 @@ class Webapp implements Web.Handler {
         return jsonResponse(policy);
     }
 
-    private Response postAccessPolicy(IHTTPSession session) throws IOException, Web.ResponseException, RocksDBException {
-        AccessPolicy policy = fromJson(session, AccessPolicy.class);
-        Long id = getIndex(session).accessControl.put(policy);
+    private Response postAccessPolicy(Web.Request request) throws IOException, Web.ResponseException, RocksDBException {
+        AccessPolicy policy = fromJson(request, AccessPolicy.class);
+        Long id = getIndex(request).accessControl.put(policy);
         return id == null ? ok() : created(id);
     }
 
-    private Response postAccessRules(IHTTPSession session) throws IOException, Web.ResponseException, RocksDBException {
-        AccessControl accessControl = getIndex(session).accessControl;
+    private Response postAccessRules(Web.Request request) throws IOException, Web.ResponseException, RocksDBException {
+        AccessControl accessControl = getIndex(request).accessControl;
 
         // parse rules
         List<AccessRule> rules;
         boolean single = false;
-        if ("application/xml".equals(session.getHeaders().get("content-type"))) {
+        if ("application/xml".equals(request.header("content-type"))) {
             try {
-                rules = AccessRuleXml.parseRules(session.getInputStream());
+                rules = AccessRuleXml.parseRules(request.inputStream());
             } catch (XMLStreamException e) {
                 return new Response(BAD_REQUEST, "text/plain", formatStackTrace(e));
             }
         } else { // JSON format
-            JsonReader reader = GSON.newJsonReader(new InputStreamReader(session.getInputStream(), UTF_8));
+            JsonReader reader = GSON.newJsonReader(new InputStreamReader(request.inputStream(), UTF_8));
             if (reader.peek() == JsonToken.BEGIN_ARRAY) {
                 reader.beginArray();
                 rules = new ArrayList<>();
@@ -251,14 +285,14 @@ class Webapp implements Web.Handler {
         // return an error response if any failed
         if (!errors.isEmpty()) {
             Response response = jsonResponse(errors);
-            response.setStatus(Response.Status.BAD_REQUEST);
+            response.setStatus(BAD_REQUEST);
             return response;
         }
 
         // save all the rules
         List<Long> ids = new ArrayList<>();
         for (AccessRule rule : rules) {
-            ids.add(accessControl.put(rule));
+            ids.add(accessControl.put(rule, request.username()));
         }
 
         // return succesful response
@@ -280,9 +314,9 @@ class Webapp implements Web.Handler {
         return new Response(CREATED, "application/json", GSON.toJson(map));
     }
 
-    private Response getAccessRule(IHTTPSession req) throws IOException, Web.ResponseException, RocksDBException {
+    private Response getAccessRule(Web.Request req) throws IOException, Web.ResponseException, RocksDBException {
         Index index = getIndex(req);
-        Long ruleId = Long.parseLong(req.getParms().get("ruleId"));
+        Long ruleId = Long.parseLong(req.param("ruleId"));
         AccessRule rule = index.accessControl.rule(ruleId);
         if (rule == null) {
             return notFound();
@@ -290,31 +324,66 @@ class Webapp implements Web.Handler {
         return jsonResponse(rule);
     }
 
-    private Response getNewAccessRule(IHTTPSession request) {
+    private Response getNewAccessRule(Web.Request request) {
         AccessRule rule = new AccessRule();
         return jsonResponse(rule);
     }
 
-    private Response listAccessRules(IHTTPSession request) throws IOException, Web.ResponseException {
+    private Response listAccessRules(Web.Request request) throws IOException, Web.ResponseException {
         Index index = getIndex(request);
-        Iterable<AccessRule> rules = index.accessControl.list();
-        return new Response(OK, "application/json", outputStream -> {
-            OutputStream out = new BufferedOutputStream(outputStream);
-            JsonWriter json = GSON.newJsonWriter(new OutputStreamWriter(out, UTF_8));
-            json.beginArray();
-            for (AccessRule rule : rules) {
-                GSON.toJson(rule, AccessRule.class, json);
+
+        // search filter
+        String search = request.param("search");
+        List<AccessRule> rules = new ArrayList<>();
+        for (AccessRule rule : index.accessControl.list()) {
+            if (search == null || rule.contains(search)) {
+                rules.add(rule);
             }
-            json.endArray();
-            json.close();
-            out.flush();
+        }
+
+        // sort rules
+        String sort = request.param("sort", "id");
+        if (sort.replaceFirst("^-", "").equals("surt")) {
+            Comparator<AccessRule> cmp = Comparator.comparingInt(rule -> rule.pinned ? 0 : 1);
+            cmp = cmp.thenComparing(rule -> rule.ssurtPrefixes().findFirst().orElse(""));
+            cmp = cmp.thenComparingLong(rule -> rule.id);
+            rules.sort(cmp);
+        }
+        if (sort.startsWith("-")) {
+            Collections.reverse(rules);
+        }
+
+        // output format
+        String type;
+        String extension;
+        RuleFormatter formatter;
+        if (request.param("output", "json").equals("csv")) {
+            type = "text/csv";
+            extension = "csv";
+            formatter = AccessRule::toCSV;
+         } else {
+            type = "application/json";
+            extension = "json";
+            formatter = AccessRule::toJSON;
+        }
+        Response response = new Response(OK, type, out -> {
+            try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(out, UTF_8))) {
+                formatter.format(rules, policyId -> index.accessControl.policy(policyId).name, bw);
+            }
         });
+        String filename = index.name.replace("\"", "") + "-access-rules." + extension;
+        response.addHeader("Content-Disposition", "filename=\"" + filename + "\"");
+        return response;
     }
 
-    Response checkAccess(IHTTPSession request) throws IOException, ResponseException {
-        String accesspoint = request.getParms().get("accesspoint");
-        String url = getMandatoryParam(request, "url");
-        String timestamp = getMandatoryParam(request, "timestamp");
+    private interface RuleFormatter {
+        void format(Collection<AccessRule> rules, Function<Long,String> policyNames, Writer out) throws IOException;
+    }
+
+    Response checkAccess(Web.Request request) throws IOException, ResponseException {
+        String accesspoint = request.param("accesspoint");
+        String url = request.mandatoryParam("url");
+        String timestamp = request.mandatoryParam("timestamp");
 
         Date captureTime = Date.from(LocalDateTime.parse(timestamp, Capture.arcTimeFormat).toInstant(ZoneOffset.UTC));
         Date accessTime = new Date();
@@ -327,8 +396,8 @@ class Webapp implements Web.Handler {
         public String timestamp;
     }
 
-    Response checkAccessBulk(IHTTPSession request) throws IOException, ResponseException {
-        String accesspoint = request.getParms().get("accesspoint");
+    Response checkAccessBulk(Web.Request request) throws IOException, ResponseException {
+        String accesspoint = request.param("accesspoint");
         Index index = getIndex(request);
 
         AccessQuery[] queries = fromJson(request, AccessQuery[].class);
@@ -343,18 +412,9 @@ class Webapp implements Web.Handler {
         return jsonResponse(responses);
     }
 
-
-    private String getMandatoryParam(IHTTPSession request, String name) throws ResponseException {
-        String value = request.getParms().get(name);
-        if (value == null) {
-            throw new Web.ResponseException(badRequest("missing mandatory parameter: " + name));
-        }
-        return value;
-    }
-
     @Override
-    public Response handle(IHTTPSession session) throws Exception {
-        Response response = router.handle(session);
+    public Response handle(Request request) throws Exception {
+        Response response = router.handle(request);
         if (response != null) {
             response.addHeader("Access-Control-Allow-Origin", "*");
         }

@@ -47,7 +47,25 @@
             left: 0;
             right: 0;
             height: 24px;
+            color: #ffffffb2;
         }
+
+        .status-bar a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: bold;
+            opacity: 0.7;
+        }
+
+        .status-bar a:hover {
+            opacity: 1;
+        }
+
+        .account-link {
+            float: right;
+            margin-right: 72px;
+        }
+
         .bg-top{
             height: 96px;
             background: #FE7119;
@@ -74,7 +92,6 @@
             margin-top: 8px;
             margin-bottom: -6px;
         }
-
 
         .app-bar {
             position: absolute;
@@ -198,6 +215,7 @@
             font-weight: 300;
             font-size: 13px;
             border-collapse: collapse;
+            margin: 16px;
         }
 
         .table th {
@@ -222,13 +240,20 @@
         }
 
         .form {
-            padding-left: 16px;
-            padding-right: 16px;
             flex: 1 1;
         }
 
-        .form .form-field {
+        .field {
+            display: block;
+            margin: 16px 0px;
+        }
+
+        .field > input:not([type='checkbox']), .field > select, .field > textarea {
             width: 100%;
+        }
+
+        .field > input[type='checkbox'] {
+            margin-left: 0px;
         }
 
         .column {
@@ -264,11 +289,6 @@
             list-style: none;
         }
 
-        .table tr td, .table tr th {
-            padding-left: 16px;
-            padding-right: 16px;
-        }
-
         .big-table {
             width: 100%;
         }
@@ -285,6 +305,58 @@
         .url-patterns-field {
             height: 120px;
         }
+
+        .form-columns {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: -16px; /* workaround lack of flexbox margin collapse */
+            padding: 8px;
+        }
+
+        .form-columns > div {
+            flex: 1 1 200px;
+            margin: 8px;
+        }
+
+        .container {
+            margin: 16px;
+        }
+
+        .button {
+            padding: 2px 8px;
+            white-space: nowrap;
+            line-height: 30px;
+            background: #55a7a7;
+            margin: 8px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #fffc;
+        }
+
+        .button:hover {
+            color: #ffff;
+        }
+
+        .form fieldset {
+            color: #363636;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin: 16px 0px;
+        }
+
+        .form fieldset > .field {
+            margin: 8px;
+        }
+
+        textarea.big {
+            height: 200px;
+        }
+
+        table.field {
+            border-spacing: 0;
+        }
+
+
     </style>
     <link href="lib/pikaday/1.4.0/pikaday.css" rel="stylesheet">
     <script src="lib/vue/2.0.1/vue.js"></script>
@@ -294,14 +366,26 @@
     <script src="lib/pikaday/1.4.0/pikaday.js"></script>
     <script src="api.js"></script>
     <script>
+        var keycloak = null;
+
+        function fetchApi(url, options={}) {
+            if (keycloak && keycloak.token) {
+                return keycloak.updateToken(30).then(() => {
+                    options.headers = {'Authorization': 'bearer ' + keycloak.token};
+                    return fetch(url, options);
+                });
+            }
+            return fetch(url, options);
+        }
+
         function urlTemplate(template, pathParams, queryParams) {
             var path = template;
-            for (var key in pathParams) {
+            for (let key in pathParams) {
                 path = path.replace('{' + key + '}', encodeURIComponent(pathParams[key]));
             }
             var qs = "";
             if (queryParams) {
-                for (var key in queryParams) {
+                for (let key in queryParams) {
                     if (queryParams[key]) {
                         qs += qs ? "&" : "?";
                         qs += encodeURIComponent(key) + "=" + encodeURIComponent(queryParams[key]);
@@ -309,6 +393,28 @@
                 }
             }
             return path + qs;
+        }
+
+        function loadScript(url, success) {
+            var script = document.createElement('script');
+            script.onload = success;
+            script.src = url;
+            document.head.appendChild(script);
+        }
+
+        function initKeycloak(app, keycloakConfig) {
+            loadScript(keycloakConfig.url + "/js/keycloak.js", () => {
+                keycloak = Keycloak(keycloakConfig);
+                keycloak.init({checkLoginIframe: false, onLoad: 'login-required'}).success(authenticated => {
+                    console.log(authenticated ? 'authenticated' : 'not authenticated');
+                    if (authenticated) {
+                        app.user = {
+                            name: keycloak.tokenParsed.name,
+                            accountUrl: keycloak.createAccountUrl()
+                        };
+                    }
+                }).error(() => alert('failed to initialize Keycloak'));
+            });
         }
     </script>
 </head>
@@ -364,7 +470,7 @@
                     fl: this.fields.join(","),
                     output: 'json'
                 };
-                fetch(urlTemplate("/{collection}", this.$route.params, query))
+                fetchApi(urlTemplate("/{collection}", this.$route.params, query))
                         .then(r => r.json())
                         .then(rows => this.rows = rows ? rows.slice(1) : []);
             }, 250),
@@ -436,7 +542,7 @@
 ------------------------------------------------------------------------->
 
 <script type="x-template" id="period-template">
-    <div class="period-field">
+    <div class="period-field field">
         <label>For a period of</label>
         <label>years <input type="number" min="0" v-model="value.years" @input="onInput"></label>
         <label>months <input type="number" min="0" v-model="value.months" @input="onInput"></label>
@@ -466,61 +572,107 @@
 <script type="x-template" id="access-rule-template">
     <main id="access-rules" class="row">
         <div class="form">
-            <p>
-                <label>
-                    URLs matching any of these patterns
-                    <textarea class="form-field url-patterns-field"
-                              v-bind:value="rule.urlPatterns ? rule.urlPatterns.join('\n') : ''"
-                              v-on:input="rule.urlPatterns = $event.target.value.split('\n')"></textarea>
-                </label>
-                <span class="hint">
-                    e.g. *.foo.org http://foo.org/path/* http://foo.org/page.html
-                </span>
-            </p>
-            <p>
-                <label>
-                    Captured between
-                    <date-range v-model="rule.captured"></date-range>
-                </label>
-            </p>
-            <p>
-                <label>
-                    Accessed between
-                    <date-range v-model="rule.accessed"></date-range>
-                </label>
-            </p>
-            <period v-model="rule.period"></period>
-            <p>
-                <label>
-                    Access Policy
-                    <select class="form-field" v-model="rule.policyId">
-                        <option v-for="policy in policies" :value="policy.id">
-                        {{policy.name}}
-                        </option>
-                    </select>
-                </label>
-            </p>
-            <p>
-                <label>
-                    Public Message
-                    <textarea v-model="rule.publicMessage" class="form-field"></textarea>
-                </label>
-            </p>
-            <p>
-                <label>
-                    Private Comment
-                    <textarea v-model="rule.privateComment" class="form-field"></textarea>
-                </label>
-            </p>
-            <p v-if="rule.created" class="rule-metadata">
-                <label>Created:</label> {{prettyDate(rule.created)}}<br>
-                <label>Last modified: </label> {{prettyDate(rule.modified)}}
-            </p>
-            <p>
+            <div class="form-columns">
+                <div>
+                    <fieldset>
+                        <legend>Criteria</legend>
+
+                        <label class="field">
+                            URLs matching any of these patterns
+                            <textarea class="url-patterns-field"
+                                      v-bind:value="rule.urlPatterns ? rule.urlPatterns.join('\n') : ''"
+                                      v-on:input="rule.urlPatterns = $event.target.value.split('\n')"></textarea>
+                            <span class="hint">e.g. *.foo.org http://foo.org/path/* http://foo.org/page.html</span>
+                        </label>
+                        <label class="field">
+                            Captured between
+                            <date-range v-model="rule.captured"></date-range>
+                        </label>
+
+                        <label class="field">
+                            Accessed between
+                            <date-range v-model="rule.accessed"></date-range>
+                        </label>
+
+                        <period v-model="rule.period"></period>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Action</legend>
+                        <label class="field">
+                            Access Policy
+                            <select v-model="rule.policyId">
+                                <option v-for="policy in policies" :value="policy.id">
+                                    {{policy.name}}
+                                </option>
+                            </select>
+                        </label>
+
+                        <label class="field">
+                            Public Message
+                            <textarea v-model="rule.publicMessage"></textarea>
+                        </label>
+                    </fieldset>
+                </div>
+                <div>
+                    <fieldset>
+                        <legend>Metadata</legend>
+                        <table class="field rule-metadata">
+                            <tr v-if="rule.id != null">
+                                <td>Rule ID:</td>
+                                <td>{{rule.id}}</td>
+                            </tr>
+                            <tr v-if="rule.created">
+                                <td>Created:</td>
+                                <td>
+                                    {{prettyDate(rule.created)}}
+                                    <span v-if="rule.creator">by {{rule.creator}}</span>
+                                </td>
+                            </tr>
+                            <tr v-if="rule.modified && rule.modified != rule.created">
+                                <td>Modified:</td>
+                                <td>
+                                    {{prettyDate(rule.modified)}}
+                                    <span v-if="rule.modifier">by {{rule.modifier}}</span>
+                                </td>
+                            </tr>
+                        </table>
+                        <label class="field">
+                            Private Comment
+                            <textarea v-model="rule.privateComment" class="big"></textarea>
+                        </label>
+                        <div class="row field">
+                            <label>RefTracker question number (for takedown requests)
+                                <input v-model="rule.externalId">
+                            </label>
+                            <label>Reason for takedown request
+                                <select v-model="rule.reason">
+                                    <option></option>
+                                    <option>Copyright</option>
+                                    <option>Commercial</option>
+                                    <option>Court order</option>
+                                    <option>Cultural protocols</option>
+                                    <option>Defamation</option>
+                                    <option>Illegal</option>
+                                    <option>Obscenity</option>
+                                    <option>Other</option>
+                                    <option>Privacy (other)</option>
+                                    <option>Privacy (personal data)</option>
+                                    <option>Protected government data</option>
+                                </select>
+                            </label>
+                        </div>
+                        <label class="field">
+                            <input type="checkbox" v-model="rule.pinned"> Pending final decision (pinned)
+                        </label>
+                    </fieldset>
+                </div>
+            </div>
+            <div class="container">
                 <button @click="save">Save</button>
                 <button @click="cancel">Cancel</button>
-                <button @click="deleteRule" v-if="rule.id" style="float:right">Delete</button>
-            </p>
+                <button @click="deleteRule" v-if="rule.id != null" style="float:right">Delete</button>
+            </div>
         </div>
 
     </main>
@@ -553,7 +705,7 @@
             },
             save: function () {
                 this.rule.urlPatterns = this.rule.urlPatterns.filter(function(pattern) { return pattern != ""; });
-                fetch(urlTemplate("/{collection}/access/rules", this.$route.params),
+                fetchApi(urlTemplate("/{collection}/access/rules", this.$route.params),
                         {method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify(this.rule)})
@@ -589,14 +741,14 @@
                 });
             },
             deleteRule: function () {
-                fetch(urlTemplate("/{collection}/access/rules/{ruleId}", this.$route.params), {method: 'DELETE'})
+                fetchApi(urlTemplate("/{collection}/access/rules/{ruleId}", this.$route.params), {method: 'DELETE'})
                         .then(() => this.cancel());
             },
             fetchData: function () {
                 // load in parallel but policy list must be populated first
                 Promise.all([
-                    fetch(urlTemplate("{collection}/access/policies", this.$route.params)).then(r => r.json()),
-                    fetch(urlTemplate("{collection}/access/rules/{ruleId}", this.$route.params)).then(r => r.json())
+                    fetchApi(urlTemplate("{collection}/access/policies", this.$route.params)).then(r => r.json()),
+                    fetchApi(urlTemplate("{collection}/access/rules/{ruleId}", this.$route.params)).then(r => r.json())
                 ]).then(([policies, rule]) => {
                     this.policies = policies;
                     // the objects need to be present for the model binding
@@ -626,45 +778,66 @@
 <script type="x-template" id="access-rule-list-template">
     <main id="access-rule-list">
         <div class="row">
-            <input placeholder="URL" class="searchbox" :value="this.$route.query.url" @input="onQueryInput">
+            <input placeholder="Search" class="searchbox" :value="this.$route.query.search" @input="onQueryInput">
 
-            <router-link :to="{name: 'access-rule', params: { collection: $route.params.collection, ruleId: 'new' }}">New Rule</router-link>
+            <router-link :to="{name: 'access-rule', params: { collection: $route.params.collection, ruleId: 'new' }}" class="button">New Rule</router-link>
+            <a :href="'/' + $route.params.collection + '/access/rules?output=csv'" class="button">Export CSV</a>
         </div>
 
         <table class="table big-table">
-            <tr>
-                <th>URL</th>
-                <th>Date</th>
-                <th>Policy</th>
-                <th></th>
-            </tr>
-            <tr v-for="rule in rules">
-                <td>
-                    <span v-for="pattern in rule.urlPatterns">
-                        {{pattern}}<br>
-                    </span>
-                </td>
-                <td>
-                    <div  v-if="rule.captured && (rule.captured.start || rule.captured.end)">
-                        Captured {{formatDate(rule.captured.start)}}–{{formatDate(rule.captured.end)}}
-                    </div>
-                    <div v-if="rule.accessed && (rule.accessed.start || rule.accessed.end)">
-                        Accessed {{formatDate(rule.accessed.start)}}–{{formatDate(rule.accessed.end)}}
-                    </div>
-                    <div v-if="rule.period && (rule.period.days || rule.period.months || rule.period.years)">
-                        Period
-                        <span v-if="rule.period.years">{{rule.period.years}}y</span>
-                        <span v-if="rule.period.months">{{rule.period.months}}m</span>
-                        <span v-if="rule.period.days">{{rule.period.days}}d</span>
-                    </div>
-                </td>
-                <td>
-                    {{policyNames[rule.policyId]}}
-                </td>
-                <td>
-                    <router-link :to="{name: 'access-rule', params: {collection: $route.params.collection, ruleId: rule.id}}">Edit</router-link>
-                </td>
-            </tr>
+            <thead>
+                <tr>
+                    <th style="width: 0"></th>
+                    <th style="width: 3em"><router-link :to="{
+                                    name: 'access-rule-list',
+                                    params: {
+                                        collection: this.$route.params.collection,
+                                    },
+                                    query: { sort: (this.$route.query.sort || '-id') == '-id' ? 'id' : '-id' }
+                                }">ID</router-link></th>
+                    <th><router-link :to="{
+                                    name: 'access-rule-list',
+                                    params: {
+                                        collection: this.$route.params.collection,
+                                    },
+                                    query: { sort: this.$route.query.sort == 'surt' ? '-surt' : 'surt' }
+                                }">URL</router-link></th>
+                    <th>Date</th>
+                    <th>Policy</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="rule in rules">
+                    <td><span v-if="rule.pinned" title="Pending final decision">📌&nbsp;</span></td>
+                    <td>{{rule.id}}</td>
+                    <td>
+                        <span v-for="pattern in rule.urlPatterns">
+                            {{pattern}}<br>
+                        </span>
+                    </td>
+                    <td>
+                        <div  v-if="rule.captured && (rule.captured.start || rule.captured.end)">
+                            Captured {{formatDate(rule.captured.start)}}–{{formatDate(rule.captured.end)}}
+                        </div>
+                        <div v-if="rule.accessed && (rule.accessed.start || rule.accessed.end)">
+                            Accessed {{formatDate(rule.accessed.start)}}–{{formatDate(rule.accessed.end)}}
+                        </div>
+                        <div v-if="rule.period && (rule.period.days || rule.period.months || rule.period.years)">
+                            Period
+                            <span v-if="rule.period.years">{{rule.period.years}}y</span>
+                            <span v-if="rule.period.months">{{rule.period.months}}m</span>
+                            <span v-if="rule.period.days">{{rule.period.days}}d</span>
+                        </div>
+                    </td>
+                    <td>
+                        {{policyNames[rule.policyId]}}
+                    </td>
+                    <td>
+                        <router-link :to="{name: 'access-rule', params: {collection: $route.params.collection, ruleId: rule.id}}">Edit</router-link>
+                    </td>
+                </tr>
+            </tbody>
         </table>
     </main>
 </script>
@@ -689,19 +862,21 @@
                 return date ? moment(date).format('YYYY-MM-DD') : "";
             },
             onQueryInput: function(event) {
-                var url = event.target.value;
+                var search = event.target.value;
                 this.$router.replace({
                     name: 'access-rule-list',
                     params: {
                         collection: this.$route.params.collection,
                     },
-                    query: url ? {url} : null,
+                    query: search ? {search} : null,
                 });
             },
             fetchData: _.throttle(function() {
+                var query = { sort: this.$route.query.sort || "-id" };
+                query.search = this.$route.query.search;
                 Promise.all([
-                    fetch(urlTemplate('{collection}/access/policies', this.$route.params)).then(r => r.json()),
-                    fetch(urlTemplate('{collection}/access/rules', this.$route.params, this.$route.query)).then(r => r.json())
+                    fetchApi(urlTemplate('{collection}/access/policies', this.$route.params)).then(r => r.json()),
+                    fetchApi(urlTemplate('{collection}/access/rules', this.$route.params, query)).then(r => r.json())
                 ]).then(([policies, rules]) => {
                     policies.forEach(policy => this.policyNames[policy.id] = policy.name);
                     this.rules = rules;
@@ -746,7 +921,7 @@
         },
         methods: {
             fetchData: _.throttle(function() {
-                fetch(urlTemplate('{collection}/access/policies', this.$route.params,
+                fetchApi(urlTemplate('{collection}/access/policies', this.$route.params,
                         this.$route.query)).then(r => r.json())
                         .then(policies => this.policies = policies);
             }, 250)
@@ -760,6 +935,9 @@
 ------------------------------------------------------------------------->
 <div id="app" class="row">
     <div class="status-bar">
+        <div v-if="user" class="account-link">
+            <a :href="user.accountUrl">{{user.name}}</a>
+        </div>
     </div>
     <div class="bg-top">
         <img src="outback.svg" width="55px" height="54px" class="logo">
@@ -808,13 +986,19 @@
             collection: null,
             collections: {},
             stats: null,
-            featureFlags: {}
+            featureFlags: {},
+            user: null,
         },
         created: function() {
             var self = this;
-            fetch("api/featureflags").then(r => r.json())
-                    .then(featureFlags => this.featureFlags = featureFlags);
-            fetch("api/collections").then(r => r.json()).then(collections => {
+            fetchApi("config.json").then(r => r.json())
+                    .then(config => {
+                        this.featureFlags = config.featureFlags;
+                        if (config.keycloak) {
+                            initKeycloak(app, config.keycloak);
+                        }
+                    });
+            fetchApi("api/collections").then(r => r.json()).then(collections => {
                 this.collections = collections;
                 if (collections && !self.activeCollection) {
                     self.activeCollection = collections[0];
