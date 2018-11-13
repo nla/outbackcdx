@@ -173,6 +173,10 @@ public class Capture {
             capture.length = fields[8].equals("-") ? 0 : Long.parseLong(fields[8]);
             capture.compressedoffset = Long.parseLong(fields[9]);
             capture.file = fields[10];
+        } else if (fields.length == 10) { // 10 fields:  CDX N b a m s k r M V g
+            // TODO robots = fields[7]
+            capture.compressedoffset = Long.parseLong(fields[8]);
+            capture.file = fields[9];
         } else { // 9 fields: CDX N b a m s k r V g
             capture.compressedoffset = Long.parseLong(fields[7]);
             capture.file = fields[8];
