@@ -248,7 +248,7 @@ Currently the OutbackCDX web dashboard does not support generic JWT/OIDC authori
 
 ### Keycloak authorization
 
-OutbackCDX can use (Keycloak)[https://www.keycloak.org/] as an auth server to secure both the API and dashboard.
+OutbackCDX can use [Keycloak](https://www.keycloak.org/) as an auth server to secure both the API and dashboard.
 
 1. In your Keycloak realm's settings create a new client for OutbackCDX with the protocol `openid-connect` and
    the URL of your OutbackCDX instance.
