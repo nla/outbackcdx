@@ -1,5 +1,6 @@
 package outbackcdx;
 
+import org.apache.commons.codec.binary.Base32;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -26,7 +27,7 @@ public class CaptureTest {
 
     static void assertFieldsEqual(Capture src, Capture dst) {
         assertEquals(src.compressedoffset, dst.compressedoffset);
-        assertEquals(src.digest, dst.digest);
+        assertEquals(src.digestBase32(), dst.digestBase32());
         assertEquals(src.file, dst.file);
         assertEquals(src.length, dst.length);
         assertEquals(src.mimetype, dst.mimetype);
@@ -40,7 +41,7 @@ public class CaptureTest {
     static Capture dummyRecord() {
         Capture src = new Capture();
         src.compressedoffset = 1234;
-        src.digest = "2HQQSVUDLU4NZ67TN2KS3NG5AIVBVNFB";
+        src.digest = new Base32().decode("2HQQSVUDLU4NZ67TN2KS3NG5AIVBVNFB");
         src.file = "file";
         src.length = 12345;
         src.mimetype = "mimetype";

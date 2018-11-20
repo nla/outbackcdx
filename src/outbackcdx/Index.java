@@ -16,13 +16,16 @@ public class Index {
     final RocksDB db;
     final ColumnFamilyHandle defaultCF;
     final ColumnFamilyHandle aliasCF;
+    final ColumnFamilyHandle digestCF;
     final AccessControl accessControl;
 
-    public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl) {
+    public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF,
+                 ColumnFamilyHandle digestCF, AccessControl accessControl) {
         this.name = name;
         this.db = db;
         this.defaultCF = defaultCF;
         this.aliasCF = aliasCF;
+        this.digestCF = digestCF;
         this.accessControl = accessControl;
     }
 
@@ -149,7 +152,17 @@ public class Index {
         return () -> filteredCaptures(Capture.encodeKey(start, 0), record -> true, null, false);
     }
 
-    public String resolveAlias(String surt) {
+    /**
+     * Find captures matching the a digest.
+     */
+    Iterable<Capture> digestQuery(byte[] digest, String accessPoint) {
+        if (digestCF == null) throw new IllegalStateException("DIGEST_INDEX feature is not enabled");
+        byte[] key = Capture.encodeDigestKeyPrefix(digest);
+        Predicate<Capture> scope = record -> Arrays.equals(record.digest, digest);
+        return () -> filteredCaptures(key, scope, digestCF, Capture::fromDigestKey, accessPoint, false);
+    }
+
+    private String resolveAlias(String surt) {
         try {
             byte[] resolved = db.get(aliasCF, surt.getBytes(StandardCharsets.US_ASCII));
             if (resolved != null) {
@@ -163,7 +176,14 @@ public class Index {
     }
 
     private Iterator<Capture> filteredCaptures(byte[] key, Predicate<Capture> scope, String accessPoint, boolean reverse) {
-        Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope, reverse);
+        return filteredCaptures(key, scope, defaultCF, Capture::new, accessPoint, reverse);
+    }
+
+    private Iterator<Capture> filteredCaptures(byte[] key, Predicate<Capture> scope,
+                                               ColumnFamilyHandle cf,
+                                               RecordConstructor<Capture> constructor,
+                                               String accessPoint, boolean reverse) {
+        Iterator<Capture> captures = new Records<>(db, cf, key, constructor, scope, reverse);
         if (accessPoint != null && accessControl != null) {
             captures = new FilteringIterator<>(captures, accessControl.filter(accessPoint, new Date()));
         }
@@ -320,7 +340,18 @@ public class Index {
             } else {
                 capture.urlkey = resolveAlias(capture.urlkey);
             }
-            dbBatch.put(capture.encodeKey(), capture.encodeValue());
+            rawPut(capture);
+        }
+
+        /**
+         * Adds new captures within resolving aliases.
+         */
+        private void rawPut(Capture capture) {
+            byte[] value = capture.encodeValue();
+            dbBatch.put(capture.encodeKey(), value);
+            if (digestCF != null) {
+                dbBatch.put(digestCF, capture.encodeDigestKey(), value);
+            }
         }
 
         /**
@@ -328,7 +359,17 @@ public class Index {
          */
         void deleteCapture(Capture capture) {
             capture.urlkey = resolveAlias(capture.urlkey);
+            rawDelete(capture);
+        }
+
+        /**
+         * Deletes captures without resolving aliases.
+         */
+        private void rawDelete(Capture capture) {
             dbBatch.remove(capture.encodeKey());
+            if (digestCF != null) {
+                dbBatch.remove(digestCF, capture.encodeDigestKey());
+            }
         }
 
         /**
@@ -367,9 +408,9 @@ public class Index {
 
         private void updateExistingRecordsWithNewAlias(WriteBatch wb, String aliasSurt, String targetSurt) {
             for (Capture capture : rawQuery(aliasSurt, null, false)) {
-                wb.remove(capture.encodeKey());
+                rawDelete(capture);
                 capture.urlkey = targetSurt;
-                wb.put(capture.encodeKey(), capture.encodeValue());
+                rawPut(capture);
             }
         }
 

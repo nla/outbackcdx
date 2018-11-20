@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Map;
 
@@ -37,7 +38,7 @@ public class Capture {
     public String original;
     public String mimetype;
     public int status;
-    public String digest;
+    byte[] digest;
     public long length;
     public String file;
     public long compressedoffset;
@@ -71,8 +72,42 @@ public class Capture {
         return bb.array();
     }
 
+    /**
+     * Primary key used for indexing by URL and timestamp.
+     */
     public byte[] encodeKey() {
         return encodeKey(urlkey, timestamp);
+    }
+
+    /**
+     * Key of the secondary index for lookup by digest.
+     */
+    public byte[] encodeDigestKey() {
+        byte[] primaryKey = encodeKey();
+        ByteBuffer bb = ByteBuffer.allocate(primaryKey.length + 1 + digest.length);
+        bb.put((byte) digest.length);
+        bb.put(digest);
+        bb.put(primaryKey);
+        return bb.array();
+    }
+
+    /**
+     * Key of the secondary index for lookup by digest.
+     */
+    public static byte[] encodeDigestKeyPrefix(byte[] digest) {
+        byte[] key = new byte[1 + digest.length];
+        key[0] = (byte) digest.length;
+        System.arraycopy(digest, 0, key, 1, digest.length);
+        return key;
+    }
+
+    static Capture fromDigestKey(byte[] digestKey, byte[] value) {
+        return new Capture(digestKeyToPrimaryKey(digestKey), value);
+    }
+
+    private static byte[] digestKeyToPrimaryKey(byte[] digestKey) {
+        int digestLength = digestKey[0];
+        return Arrays.copyOfRange(digestKey, 1 + digestLength, digestKey.length);
     }
 
     public void decodeValue(ByteBuffer bb) {
@@ -91,7 +126,7 @@ public class Capture {
         status = (int) VarInt.decode(bb);
         mimetype = VarInt.decodeAscii(bb);
         length = VarInt.decode(bb);
-        digest = VarInt.decodeAscii(bb);
+        digest = base32.decode(VarInt.decodeAscii(bb));
         file = VarInt.decodeAscii(bb);
         compressedoffset = VarInt.decode(bb);
         redirecturl = VarInt.decodeAscii(bb);
@@ -102,7 +137,7 @@ public class Capture {
         status = (int) VarInt.decode(bb);
         mimetype = VarInt.decodeAscii(bb);
         length = VarInt.decode(bb);
-        digest = base32.encodeAsString(VarInt.decodeBytes(bb));
+        digest = VarInt.decodeBytes(bb);
         file = VarInt.decodeAscii(bb);
         compressedoffset = VarInt.decode(bb);
         redirecturl = VarInt.decodeAscii(bb);
@@ -114,27 +149,23 @@ public class Capture {
                 VarInt.size(status) +
                 VarInt.sizeAscii(mimetype) +
                 VarInt.size(length) +
-                VarInt.sizeBytes(base32.decode(digest)) +
+                VarInt.sizeBytes(digest) +
                 VarInt.sizeAscii(file) +
                 VarInt.size(compressedoffset) +
                 VarInt.sizeAscii(redirecturl);
     }
 
-    public void encodeValue(ByteBuffer bb) {
+    public byte[] encodeValue() {
+        ByteBuffer bb = ByteBuffer.allocate(sizeValue());
         VarInt.encode(bb, CURRENT_VERSION);
         VarInt.encodeAscii(bb, original);
         VarInt.encode(bb, status);
         VarInt.encodeAscii(bb, mimetype);
         VarInt.encode(bb, length);
-        VarInt.encodeBytes(bb, base32.decode(digest));
+        VarInt.encodeBytes(bb, digest);
         VarInt.encodeAscii(bb, file);
         VarInt.encode(bb, compressedoffset);
         VarInt.encodeAscii(bb, redirecturl);
-    }
-
-    public byte[] encodeValue() {
-        ByteBuffer bb = ByteBuffer.allocate(sizeValue());
-        encodeValue(bb);
         return bb.array();
     }
 
@@ -148,7 +179,7 @@ public class Capture {
         out.append(original).append(' ');
         out.append(mimetype).append(' ');
         out.append(Integer.toString(status)).append(' ');
-        out.append(digest).append(' ');
+        out.append(digestBase32()).append(' ');
         out.append(redirecturl).append(' ');
         out.append("- "); // TODO robots
         out.append(Long.toString(length)).append(' ');
@@ -165,7 +196,7 @@ public class Capture {
         capture.urlkey = UrlCanonicalizer.surtCanonicalize(capture.original);
         capture.mimetype = fields[3];
         capture.status = fields[4].equals("-") ? 0 : Integer.parseInt(fields[4]);
-        capture.digest = fields[5];
+        capture.digest = base32.decode(fields[5]);
         capture.redirecturl = fields[6];
 
         if (fields.length >= 11) { // 11 fields: CDX N b a m s k r M S V g
@@ -186,5 +217,9 @@ public class Capture {
 
     public static Date parseTimestamp(long timestamp) {
         return Date.from(LocalDateTime.parse(Long.toString(timestamp), arcTimeFormat).toInstant(ZoneOffset.UTC));
+    }
+
+    String digestBase32() {
+        return base32.encodeAsString(digest);
     }
 }

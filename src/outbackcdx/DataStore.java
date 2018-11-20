@@ -59,18 +59,15 @@ public class DataStore implements Closeable {
             ColumnFamilyOptions cfOptions = new ColumnFamilyOptions();
             configureColumnFamily(cfOptions);
 
-            List<ColumnFamilyDescriptor> cfDescriptors;
+            List<ColumnFamilyDescriptor> cfDescriptors = new ArrayList<>();
+            cfDescriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions));
+            cfDescriptors.add(new ColumnFamilyDescriptor("alias".getBytes(UTF_8), cfOptions));
             if (FeatureFlags.experimentalAccessControl()) {
-                cfDescriptors = Arrays.asList(
-                        new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions),
-                        new ColumnFamilyDescriptor("alias".getBytes(UTF_8), cfOptions),
-                        new ColumnFamilyDescriptor("access-rule".getBytes(UTF_8), cfOptions),
-                        new ColumnFamilyDescriptor("access-policy".getBytes(UTF_8), cfOptions)
-                );
-            } else {
-                cfDescriptors = Arrays.asList(
-                        new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOptions),
-                        new ColumnFamilyDescriptor("alias".getBytes(UTF_8), cfOptions));
+                cfDescriptors.add(new ColumnFamilyDescriptor("access-rule".getBytes(UTF_8), cfOptions));
+                cfDescriptors.add(new ColumnFamilyDescriptor("access-policy".getBytes(UTF_8), cfOptions));
+            }
+            if (FeatureFlags.digestIndex()) {
+                cfDescriptors.add(new ColumnFamilyDescriptor("by-digest".getBytes(UTF_8), cfOptions));
             }
 
             createColumnFamiliesIfNotExists(options, dbOptions, path.toString(), cfDescriptors);
@@ -78,12 +75,18 @@ public class DataStore implements Closeable {
             List<ColumnFamilyHandle> cfHandles = new ArrayList<>(cfDescriptors.size());
             RocksDB db = RocksDB.open(dbOptions, path.toString(), cfDescriptors, cfHandles);
 
+            int i = 2;
             AccessControl accessControl = null;
             if (FeatureFlags.experimentalAccessControl()) {
-                accessControl = new AccessControl(db, cfHandles.get(2), cfHandles.get(3));
+                accessControl = new AccessControl(db, cfHandles.get(i++), cfHandles.get(i++));
             }
 
-            index = new Index(collection, db, cfHandles.get(0), cfHandles.get(1), accessControl);
+            ColumnFamilyHandle digestCF = null;
+            if (FeatureFlags.digestIndex()) {
+                digestCF = cfHandles.get(i++);
+            }
+
+            index = new Index(collection, db, cfHandles.get(0), cfHandles.get(1), digestCF, accessControl);
             indexes.put(collection, index);
             return index;
         } catch (RocksDBException e) {

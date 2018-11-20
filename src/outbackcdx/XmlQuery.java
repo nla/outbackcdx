@@ -122,7 +122,7 @@ public class XmlQuery {
             writeElement(out, "file", capture.file);
             writeElement(out, "redirecturl", capture.redirecturl);
             writeElement(out, "urlkey", capture.urlkey);
-            writeElement(out, "digest", capture.digest);
+            writeElement(out, "digest", capture.digestBase32());
             writeElement(out, "httpresponsecode", capture.status);
             writeElement(out, "robotflags", "-"); // TODO
             writeElement(out, "url", capture.original);
@@ -234,9 +234,9 @@ public class XmlQuery {
             result.firstCapture = capture;
             result.lastCapture = capture;
             while (capture.urlkey.equals(result.firstCapture.urlkey)) {
-                if (previousDigest == null || !previousDigest.equals(capture.digest)) {
+                if (previousDigest == null || !previousDigest.equals(capture.digestBase32())) {
                     result.versions++;
-                    previousDigest = capture.digest;
+                    previousDigest = capture.digestBase32();
                 }
                 result.captures++;
                 result.lastCapture = capture;

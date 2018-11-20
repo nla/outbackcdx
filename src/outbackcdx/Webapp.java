@@ -201,7 +201,7 @@ class Webapp implements Web.Handler {
         Map<String,String> params = request.params();
         if (params.containsKey("q")) {
             return XmlQuery.query(request, index);
-        } else if (params.containsKey("url")) {
+        } else if (params.containsKey("url") || params.containsKey("digest")) {
             return WbCdxApi.query(request, index);
         } else {
             return collectionDetails(index.db);

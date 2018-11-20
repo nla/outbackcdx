@@ -1,6 +1,7 @@
 package outbackcdx;
 
 import com.google.gson.stream.JsonWriter;
+import org.apache.commons.codec.binary.Base32;
 import outbackcdx.NanoHTTPD.Response;
 
 import java.io.*;
@@ -50,6 +51,7 @@ public class WbCdxApi {
         MatchType matchType;
         SortType sort;
         String url;
+        byte[] digest;
         String closest;
         String[] fields;
         boolean outputJson;
@@ -58,6 +60,7 @@ public class WbCdxApi {
         Query(Map<String,String> params) {
             accessPoint = params.get("accesspoint");
             url = params.get("url");
+            digest = params.containsKey("digest") ? new Base32().decode(params.get("digest")) : null;
             matchType = MatchType.valueOf(params.getOrDefault("matchType", "default").toUpperCase());
             sort = SortType.valueOf(params.getOrDefault("sort", "default").toUpperCase());
             closest = params.get("closest");
@@ -98,9 +101,30 @@ public class WbCdxApi {
                     throw new IllegalArgumentException("sort=reverse is currently only implemented for exact matches");
                 }
             }
+            if (digest != null) {
+                if (!FeatureFlags.digestIndex()) {
+                    throw new IllegalArgumentException("digest index not enabled. Set env var DIGEST_INDEX=1 to enable.");
+                }
+                if (url != null) {
+                    throw new IllegalArgumentException("url and digest queries are mutually exclusive");
+                }
+                if (sort != SortType.DEFAULT) {
+                    throw new IllegalArgumentException("only default sort order is supported for digest queries");
+                }
+                if (closest != null) {
+                    throw new IllegalArgumentException("closest is not valid for digest queries");
+                }
+                if (matchType != MatchType.DEFAULT) {
+                    throw new IllegalArgumentException("only default matchType is supported for digest queries");
+                }
+            }
         }
 
         Iterable<Capture> execute(Index index) {
+            if (digest != null) {
+                return index.digestQuery(digest, accessPoint);
+            }
+
             compatibilityHacks();
             expandWildcards();
             validate();
@@ -187,7 +211,7 @@ public class WbCdxApi {
                         out.value(capture.status);
                         break;
                     case "digest":
-                        out.value(capture.digest);
+                        out.value(capture.digestBase32());
                         break;
                     case "redirecturl":
                     case "redirect":
