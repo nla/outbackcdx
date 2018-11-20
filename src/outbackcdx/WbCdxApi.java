@@ -193,6 +193,9 @@ public class WbCdxApi {
                     case "redirect":
                         out.value(capture.redirecturl);
                         break;
+                    case "robotflags":
+                        out.value(capture.robotflags);
+                        break;
                     case "length":
                         out.value(capture.length);
                         break;
