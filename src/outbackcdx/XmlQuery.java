@@ -124,7 +124,7 @@ public class XmlQuery {
             writeElement(out, "urlkey", capture.urlkey);
             writeElement(out, "digest", capture.digest);
             writeElement(out, "httpresponsecode", capture.status);
-            writeElement(out, "robotflags", "-"); // TODO
+            writeElement(out, "robotflags", capture.robotflags);
             writeElement(out, "url", capture.original);
             writeElement(out, "capturedate", capture.timestamp);
             out.writeEndElement(); // </result>

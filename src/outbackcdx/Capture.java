@@ -28,7 +28,7 @@ import java.util.Map;
  * value is a schema version number to allow fields to be added or removed in later versions.
  */
 public class Capture {
-    private static int CURRENT_VERSION = 1;
+    private static int CURRENT_VERSION = 2;
     static final DateTimeFormatter arcTimeFormat = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     static final Base32 base32 = new Base32();
 
@@ -42,6 +42,7 @@ public class Capture {
     public String file;
     public long compressedoffset;
     public String redirecturl;
+    public String robotflags;
 
     public Capture(Map.Entry<byte[], byte[]> entry) {
         this(entry.getKey(), entry.getValue());
@@ -80,6 +81,7 @@ public class Capture {
         switch (version) {
             case 0: decodeValueV0(bb); break;
             case 1: decodeValueV1(bb); break;
+            case 2: decodeValueV2(bb); break;
             default:
                 throw new IllegalArgumentException("CDX encoding is too new (v" + version + ") only versions up to v"
                         + CURRENT_VERSION + " are supported");
@@ -95,6 +97,7 @@ public class Capture {
         file = VarInt.decodeAscii(bb);
         compressedoffset = VarInt.decode(bb);
         redirecturl = VarInt.decodeAscii(bb);
+        robotflags = "-";
     }
 
     private void decodeValueV1(ByteBuffer bb) {
@@ -106,6 +109,12 @@ public class Capture {
         file = VarInt.decodeAscii(bb);
         compressedoffset = VarInt.decode(bb);
         redirecturl = VarInt.decodeAscii(bb);
+        robotflags = "-";
+    }
+
+    private void decodeValueV2(ByteBuffer bb) {
+        decodeValueV1(bb);
+        robotflags = VarInt.decodeAscii(bb);
     }
 
     public int sizeValue() {
@@ -117,7 +126,8 @@ public class Capture {
                 VarInt.sizeBytes(base32.decode(digest)) +
                 VarInt.sizeAscii(file) +
                 VarInt.size(compressedoffset) +
-                VarInt.sizeAscii(redirecturl);
+                VarInt.sizeAscii(redirecturl) +
+                VarInt.sizeAscii(robotflags);
     }
 
     public void encodeValue(ByteBuffer bb) {
@@ -130,6 +140,7 @@ public class Capture {
         VarInt.encodeAscii(bb, file);
         VarInt.encode(bb, compressedoffset);
         VarInt.encodeAscii(bb, redirecturl);
+        VarInt.encodeAscii(bb, robotflags);
     }
 
     public byte[] encodeValue() {
@@ -150,7 +161,7 @@ public class Capture {
         out.append(Integer.toString(status)).append(' ');
         out.append(digest).append(' ');
         out.append(redirecturl).append(' ');
-        out.append("- "); // TODO robots
+        out.append(robotflags).append(' ');
         out.append(Long.toString(length)).append(' ');
         out.append(compressedoffset).append(' ');
         out.append(file);
@@ -169,15 +180,16 @@ public class Capture {
         capture.redirecturl = fields[6];
 
         if (fields.length >= 11) { // 11 fields: CDX N b a m s k r M S V g
-            // TODO robots = fields[7]
+            capture.robotflags = fields[7];
             capture.length = fields[8].equals("-") ? 0 : Long.parseLong(fields[8]);
             capture.compressedoffset = Long.parseLong(fields[9]);
             capture.file = fields[10];
         } else if (fields.length == 10) { // 10 fields:  CDX N b a m s k r M V g
-            // TODO robots = fields[7]
+            capture.robotflags = fields[7];
             capture.compressedoffset = Long.parseLong(fields[8]);
             capture.file = fields[9];
         } else { // 9 fields: CDX N b a m s k r V g
+            capture.robotflags = "-";
             capture.compressedoffset = Long.parseLong(fields[7]);
             capture.file = fields[8];
         }
