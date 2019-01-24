@@ -772,12 +772,12 @@ public abstract class NanoHTTPD {
                     }
                     while (read > 0) {
                         rlen += read;
-                        if (rlen >= BUFSIZE) {
-                            throw new ResponseException(Response.Status.PAYLOAD_TOO_LARGE, "Request too large");
-                        }
                         splitbyte = findHeaderEnd(buf, rlen);
                         if (splitbyte > 0)
                             break;
+                        if (rlen >= BUFSIZE) {
+                            throw new ResponseException(Response.Status.PAYLOAD_TOO_LARGE, "Request too large");
+                        }
                         read = inputStream.read(buf, rlen, BUFSIZE - rlen);
                     }
                 }
