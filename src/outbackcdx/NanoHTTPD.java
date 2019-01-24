@@ -718,7 +718,7 @@ public abstract class NanoHTTPD {
     }
 
     protected class HTTPSession implements IHTTPSession {
-        public static final int BUFSIZE = 8192;
+        public static final int BUFSIZE = 8192*4;
         private final OutputStream outputStream;
         private PushbackInputStream inputStream;
         private BoundedInputStream bodyStream;
