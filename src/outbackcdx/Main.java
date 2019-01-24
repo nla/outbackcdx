@@ -34,6 +34,7 @@ public class Main {
     }
 
     public static void main(String args[]) {
+        boolean undertow = false;
         String host = null;
         int port = 8080;
         int webThreads = Runtime.getRuntime().availableProcessors();
@@ -47,6 +48,9 @@ public class Main {
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
+                case "-u":
+                    undertow = true;
+                    break;
                 case "-p":
                     port = Integer.parseInt(args[++i]);
                     break;
@@ -86,20 +90,27 @@ public class Main {
 
         try (DataStore dataStore = new DataStore(dataPath)) {
             Webapp controller = new Webapp(dataStore, verbose, dashboardConfig);
-            ServerSocket socket = openSocket(host, port, inheritSocket);
-            Web.Server server = new Web.Server(socket, controller, authorizer);
-            ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
-            try {
-                server.setAsyncRunner(threadPool::execute);
+            if (undertow) {
+                UWeb.UServer server = new UWeb.UServer(host, port, controller, authorizer);
                 server.start();
-                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                    server.stop();
-                    dataStore.close();
-                }));
                 System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port);
                 Thread.sleep(Long.MAX_VALUE);
-            } finally {
-                threadPool.shutdown();
+            } else {
+                ServerSocket socket = openSocket(host, port, inheritSocket);
+                Web.Server server = new Web.Server(socket, controller, authorizer);
+                ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
+                try {
+                    server.setAsyncRunner(threadPool::execute);
+                    server.start();
+                    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                        server.stop();
+                        dataStore.close();
+                    }));
+                    System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port);
+                    Thread.sleep(Long.MAX_VALUE);
+                } finally {
+                    threadPool.shutdown();
+                }
             }
         } catch (InterruptedException | IOException e) {
             e.printStackTrace();

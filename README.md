@@ -43,6 +43,7 @@ Command line options:
       -k url realm clientid Use a Keycloak server for authorization
       -p port               Local port to listen on
       -t count              Number of web server threads
+      -u                    Use Undertow as the HTTP server instead of NanoHTTPD
       -v                    Verbose logging
 
 The server supports multiple named indexes as subdirectories.  Currently indexes

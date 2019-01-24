@@ -40,7 +40,7 @@ class Web {
             try {
                 String authnHeader = session.getHeaders().getOrDefault("authorization", "");
                 Permit permit = authorizer.verify(authnHeader);
-                Request request = new Request(session, permit);
+                NRequest request = new NRequest(session, permit);
                 return handler.handle(request);
             } catch (Web.ResponseException e) {
                 return e.response;
@@ -51,55 +51,46 @@ class Web {
         }
     }
 
-    static class Request {
+    static class NRequest implements Request {
         private final IHTTPSession session;
         private final Permit permit;
 
-        Request(IHTTPSession session, Permit permit) {
+        NRequest(IHTTPSession session, Permit permit) {
             this.session = session;
             this.permit = permit;
         }
 
-        public Method method() {
-            return session.getMethod();
+        @Override
+        public String method() {
+            return session.getMethod().name();
         }
 
+        @Override
         public String path() {
             return session.getUri();
         }
 
+        @Override
         public Map<String, String> params() {
             return session.getParms();
         }
 
-        public String param(String name) {
-            return session.getParms().get(name);
-        }
-
-        public String param(String name, String defaultValue) {
-            return session.getParms().getOrDefault(name, defaultValue);
-        }
-
-        public String mandatoryParam(String name) throws ResponseException {
-            String value = param(name);
-            if (value == null) {
-                throw new Web.ResponseException(badRequest("missing mandatory parameter: " + name));
-            }
-            return value;
-        }
-
+        @Override
         public String header(String name) {
             return session.getHeaders().get(name);
         }
 
+        @Override
         public InputStream inputStream() {
             return session.getInputStream();
         }
 
+        @Override
         public boolean hasPermission(Permission permission) {
             return permit.permissions.contains(permission);
         }
 
+        @Override
         public String username() {
             return permit.username;
         }
@@ -221,7 +212,7 @@ class Web {
         }
 
         public Response handle(Request request) throws Exception {
-            if (method != null && method != request.method()) {
+            if (method != null && !request.method().equalsIgnoreCase(method.name())) {
                 return null;
             }
 
@@ -242,4 +233,36 @@ class Web {
         }
     }
 
+    public static interface Request {
+        String method();
+
+        String path();
+
+        Map<String, String> params();
+
+        String header(String name);
+
+        InputStream inputStream();
+
+        boolean hasPermission(Permission permission);
+
+        String username();
+
+        default String param(String name) {
+            return params().get(name);
+        }
+
+        default String param(String name, String defaultValue) {
+            return params().getOrDefault(name, defaultValue);
+        }
+
+        default String mandatoryParam(String name) throws ResponseException {
+            String value = param(name);
+            if (value == null) {
+                throw new ResponseException(badRequest("missing mandatory parameter: " + name));
+            }
+            return value;
+        }
+
+    }
 }

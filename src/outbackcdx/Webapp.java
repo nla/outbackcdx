@@ -413,7 +413,7 @@ class Webapp implements Web.Handler {
     }
 
     @Override
-    public Response handle(Request request) throws Exception {
+    public Response handle(Web.Request request) throws Exception {
         Response response = router.handle(request);
         if (response != null) {
             response.addHeader("Access-Control-Allow-Origin", "*");
