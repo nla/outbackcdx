@@ -135,17 +135,17 @@ OpenWayback "OpenSearch" XML:
        </results>
     </wayback>
 
-Query URLs that match a given SURT prefix:
+Query URLs that match a given URL prefix:
 
-    $ curl 'http://localhost:8080/myindex?url=(org,example&matchType=prefix'
+    $ curl 'http://localhost:8080/myindex?url=http://example.org/abc&matchType=prefix'
     
 Find the first 5 URLs with a given domain:
 
     $ curl 'http://localhost:8080/myindex?url=example.org&matchType=domain&limit=5'
 
-Find the next 10 URLs in the index starting from the given SURT:
+Find the next 10 URLs in the index starting from the given URL prefix:
 
-    $ curl 'http://localhost:8080/myindex?url=(org,example,&matchType=range&limit=10'
+    $ curl 'http://localhost:8080/myindex?url=http://example.org/abc&matchType=range&limit=10'
 
 Return results in reverse order:
  
