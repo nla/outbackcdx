@@ -29,45 +29,106 @@ public class Index {
     /**
      * Returns all captures that match the given prefix.
      */
-    public Iterable<Capture> prefixQuery(String surtPrefix, String accessPoint) {
-        return () -> filteredCaptures(Capture.encodeKey(surtPrefix, 0), record -> record.urlkey.startsWith(surtPrefix), accessPoint, false);
+    public Iterable<Capture> prefixQuery(String surtPrefix, Predicate<Capture> filter) {
+        return () -> filteredCaptures(Capture.encodeKey(surtPrefix, 0), record -> record.urlkey.startsWith(surtPrefix), filter, false);
+    }
+
+    public Iterable<Capture> prefixQueryAP(String surtPrefix, String accessPoint) {
+        if (accessPoint != null && accessControl != null) {
+            return prefixQuery(surtPrefix, accessControl.filter(accessPoint, new Date()));
+        } else {
+            return prefixQuery(surtPrefix, null);
+        }
     }
 
     /**
      * Returns all captures with keys in the given range.
      */
-    public Iterable<Capture> rangeQuery(String startSurt, String endSurt, String accessPoint) {
-        return () -> filteredCaptures(Capture.encodeKey(startSurt, 0), record -> record.urlkey.compareTo(endSurt) < 0, accessPoint, false);
+    public Iterable<Capture> rangeQuery(String startSurt, String endSurt, Predicate<Capture> filter) {
+        return () -> filteredCaptures(Capture.encodeKey(startSurt, 0), record -> record.urlkey.compareTo(endSurt) < 0, filter, false);
     }
 
     /**
      * Returns all captures for the given url.
      */
-    public Iterable<Capture> query(String surt, String accessPoint) {
+    public Iterable<Capture> query(String surt, Predicate<Capture> filter) {
         String urlkey = resolveAlias(surt);
         byte[] key = Capture.encodeKey(urlkey, 0);
-        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey), accessPoint, false);
+        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey), filter, false);
+    }
+
+    /**
+     * Returns all captures for the given url.
+     */
+    public Iterable<Capture> queryAP(String surt, String accessPoint) {
+        if (accessPoint != null && accessControl != null) {
+            return query(surt, accessControl.filter(accessPoint, new Date()));
+        } else {
+            return query(surt, null);
+        }
     }
 
     /**
      * Returns all captures for the given url in reverse order.
      */
-    public Iterable<Capture> reverseQuery(String surt, String accessPoint) {
+    public Iterable<Capture> reverseQuery(String surt, Predicate<Capture> filter) {
         String urlkey = resolveAlias(surt);
         byte[] key = Capture.encodeKey(urlkey, 99999999999999L);
-        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey), accessPoint, true);
+        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey), filter, true);
     }
 
     /**
      * Returns all captures for the given url ordered by distance from the given timestamp.
      */
-    public Iterable<Capture> closestQuery(String surt, long targetTimestamp, String accessPoint) {
+    public Iterable<Capture> closestQuery(String surt, long targetTimestamp, Predicate<Capture> filter) {
         String urlkey = resolveAlias(surt);
         byte[] key = Capture.encodeKey(urlkey, targetTimestamp);
         Predicate<Capture> scope = record -> record.urlkey.equals(urlkey);
         return () -> new ClosestTimestampIterator(targetTimestamp,
-                filteredCaptures(key, scope, accessPoint, false),
-                filteredCaptures(key, scope, accessPoint, true));
+                filteredCaptures(key, scope, filter, false),
+                filteredCaptures(key, scope, filter, true));
+    }
+
+    public Iterable<Capture> execute(Query query) {
+        Predicate<Capture> filter = query.filter;
+        if (query.accessPoint != null && accessControl != null) {
+            filter = filter.and(accessControl.filter(query.accessPoint, new Date()));
+        }
+        String surt = UrlCanonicalizer.surtCanonicalize(query.url);
+        switch (query.matchType) {
+            case EXACT:
+                switch (query.sort) {
+                    case DEFAULT:
+                        return query(surt, filter);
+                    case CLOSEST:
+                        return closestQuery(UrlCanonicalizer.surtCanonicalize(query.url), Long.parseLong(query.closest), filter);
+                    case REVERSE:
+                        return reverseQuery(UrlCanonicalizer.surtCanonicalize(query.url), filter);
+                }
+            case PREFIX:
+                if (query.url.endsWith("/") && !surt.endsWith("/")) {
+                    surt += "/";
+                }
+                return prefixQuery(surt, filter);
+            case HOST:
+                return prefixQuery(hostFromSurt(surt) + ")/", filter);
+            case DOMAIN:
+                String host = hostFromSurt(surt);
+                return rangeQuery(host, host + "-", filter);
+            case RANGE:
+                return rangeQuery(surt, "~", filter);
+            default:
+                throw new IllegalArgumentException("unknown matchType: " + query.matchType);
+        }
+    }
+
+
+    /**
+     * "org,example)/foo/bar" => "org,example"
+     */
+    static String hostFromSurt(String surtPrefix) {
+        int i = surtPrefix.indexOf(")/");
+        return i < 0 ? surtPrefix : surtPrefix.substring(0, i);
     }
 
     /**
@@ -138,8 +199,8 @@ public class Index {
     /**
      * Perform a query without first resolving aliases.
      */
-    private Iterable<Capture> rawQuery(String key, String accessPoint, boolean reverse) {
-        return () -> filteredCaptures(Capture.encodeKey(key, 0), record -> record.urlkey.equals(key), accessPoint, reverse);
+    private Iterable<Capture> rawQuery(String key, Predicate<Capture> filter, boolean reverse) {
+        return () -> filteredCaptures(Capture.encodeKey(key, 0), record -> record.urlkey.equals(key), filter, reverse);
     }
 
     /**
@@ -162,10 +223,10 @@ public class Index {
         }
     }
 
-    private Iterator<Capture> filteredCaptures(byte[] key, Predicate<Capture> scope, String accessPoint, boolean reverse) {
+    private Iterator<Capture> filteredCaptures(byte[] key, Predicate<Capture> scope, Predicate<Capture> filter, boolean reverse) {
         Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope, reverse);
-        if (accessPoint != null && accessControl != null) {
-            captures = new FilteringIterator<>(captures, accessControl.filter(accessPoint, new Date()));
+        if (filter != null) {
+            captures = new FilteringIterator<>(captures, filter);
         }
         return captures;
     }

@@ -101,7 +101,7 @@ public class XmlQuery {
         boolean wroteHeader = false;
         int results = 0;
         int i = 0;
-        for (Capture capture : index.query(queryUrl, accessPoint)) {
+        for (Capture capture : index.queryAP(queryUrl, accessPoint)) {
             if (i < offset) {
                 i++;
                 continue;
@@ -151,7 +151,7 @@ public class XmlQuery {
     private void prefixQuery(XMLStreamWriter out) throws XMLStreamException {
         boolean wroteHeader = false;
         int i = 0;
-        Resources it = new Resources(index.prefixQuery(queryUrl, accessPoint).iterator());
+        Resources it = new Resources(index.prefixQueryAP(queryUrl, accessPoint).iterator());
         while (it.hasNext()) {
             Resource resource = it.next();
             if (i < offset) {

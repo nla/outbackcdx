@@ -10,17 +10,17 @@ import static org.junit.Assert.assertEquals;
 public class WbCdxApiTest {
     @Test
     public void hostFromSurt() {
-        assertEquals("org,example", WbCdxApi.hostFromSurt("org,example)/foo/bar"));
-        assertEquals("org,example", WbCdxApi.hostFromSurt("org,example"));
+        assertEquals("org,example", Index.hostFromSurt("org,example)/foo/bar"));
+        assertEquals("org,example", Index.hostFromSurt("org,example"));
     }
 
     @Test
     public void queryDefaultShouldExpandPrefixWildcards() {
         Map<String,String> params = new HashMap<>();
         params.put("url", "http://example.org/*");
-        WbCdxApi.Query query = new WbCdxApi.Query(params);
+        Query query = new Query(params);
         query.expandWildcards();
-        assertEquals(WbCdxApi.MatchType.PREFIX, query.matchType);
+        assertEquals(Query.MatchType.PREFIX, query.matchType);
         assertEquals("http://example.org/", query.url);
     }
 
@@ -28,9 +28,9 @@ public class WbCdxApiTest {
     public void queryDefaultShouldExpandDomainWildcards() {
         Map<String,String> params = new HashMap<>();
         params.put("url", "*.example.org");
-        WbCdxApi.Query query = new WbCdxApi.Query(params);
+        Query query = new Query(params);
         query.expandWildcards();
-        assertEquals(WbCdxApi.MatchType.DOMAIN, query.matchType);
+        assertEquals(Query.MatchType.DOMAIN, query.matchType);
         assertEquals("example.org", query.url);
     }
 
@@ -39,9 +39,9 @@ public class WbCdxApiTest {
         Map<String,String> params = new HashMap<>();
         params.put("url", "http://example.org/*");
         params.put("matchType", "exact");
-        WbCdxApi.Query query = new WbCdxApi.Query(params);
+        Query query = new Query(params);
         query.expandWildcards();
-        assertEquals(WbCdxApi.MatchType.EXACT, query.matchType);
+        assertEquals(Query.MatchType.EXACT, query.matchType);
         assertEquals("http://example.org/*", query.url);
     }
 }
