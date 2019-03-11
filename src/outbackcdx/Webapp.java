@@ -29,6 +29,7 @@ class Webapp implements Web.Handler {
     private final DataStore dataStore;
     private final Web.Router router;
     private final Map<String,Object> dashboardConfig;
+    private final Iterable<FilterPlugin> filterPlugins;
 
     private Response configJson(Web.Request req) {
         return jsonResponse(dashboardConfig);
@@ -48,6 +49,12 @@ class Webapp implements Web.Handler {
         this.dataStore = dataStore;
         this.verbose = verbose;
         this.dashboardConfig = dashboardConfig;
+
+        if (FeatureFlags.filterPlugins()) {
+            this.filterPlugins = ServiceLoader.load(FilterPlugin.class);
+        } else {
+            this.filterPlugins = new ArrayList<FilterPlugin>();
+        }
 
         router = new Router();
         router.on(GET, "/", serve("dashboard.html"));
@@ -200,9 +207,9 @@ class Webapp implements Web.Handler {
         Index index = getIndex(request);
         Map<String,String> params = request.params();
         if (params.containsKey("q")) {
-            return XmlQuery.query(request, index);
+            return XmlQuery.queryIndex(request, index, this.filterPlugins);
         } else if (params.containsKey("url")) {
-            return WbCdxApi.query(request, index);
+            return WbCdxApi.queryIndex(request, index, this.filterPlugins);
         } else {
             return collectionDetails(index.db);
         }

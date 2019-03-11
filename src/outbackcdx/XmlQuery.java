@@ -28,7 +28,7 @@ public class XmlQuery {
     final long limit;
     final String queryType;
 
-    public XmlQuery(Web.Request request, Index index) {
+    public XmlQuery(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins) {
         this.index = index;
 
         Map<String, String> params = request.params();
@@ -203,8 +203,8 @@ public class XmlQuery {
         out.writeEndElement();
     }
 
-    public static NanoHTTPD.Response query(Web.Request request, Index index) {
-        return new XmlQuery(request, index).streamResults();
+    public static NanoHTTPD.Response queryIndex(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins) {
+        return new XmlQuery(request, index, filterPlugins).streamResults();
     }
 
     /**

@@ -91,9 +91,6 @@ public class Index {
 
     public Iterable<Capture> execute(Query query) {
         Predicate<Capture> filter = query.filter;
-        if (query.accessPoint != null && accessControl != null) {
-            filter = filter.and(accessControl.filter(query.accessPoint, new Date()));
-        }
         String surt = UrlCanonicalizer.surtCanonicalize(query.url);
         switch (query.matchType) {
             case EXACT:
