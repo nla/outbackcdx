@@ -1,12 +1,23 @@
 package outbackcdx;
 
-import org.rocksdb.*;
+import static java.nio.charset.StandardCharsets.US_ASCII;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.function.Predicate;
 
-import static java.nio.charset.StandardCharsets.US_ASCII;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
+import org.rocksdb.RocksIterator;
+import org.rocksdb.TransactionLogIterator;
+import org.rocksdb.WriteBatch;
+import org.rocksdb.WriteOptions;
 
 /**
  * Wraps RocksDB with a higher-level query interface.
@@ -24,6 +35,15 @@ public class Index {
         this.defaultCF = defaultCF;
         this.aliasCF = aliasCF;
         this.accessControl = accessControl;
+    }
+    
+    public TransactionLogIterator getUpdatesSince(long sequenceNumber) {
+    	try { 
+    		TransactionLogIterator logReader = db.getUpdatesSince(sequenceNumber);
+    		return logReader;
+        } catch (RocksDBException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -373,38 +393,53 @@ public class Index {
 
         /**
          * Add a new capture to the index.  Existing captures with the same urlkey and timestamp will be overwritten.
+         * @throws IOException 
          */
-        public void putCapture(Capture capture) {
+        public void putCapture(Capture capture) throws IOException {
             String resolved = newAliases.get(capture.urlkey);
             if (resolved != null) {
                 capture.urlkey = resolved;
             } else {
                 capture.urlkey = resolveAlias(capture.urlkey);
             }
-            dbBatch.put(capture.encodeKey(), capture.encodeValue());
+            try {
+				dbBatch.put(capture.encodeKey(), capture.encodeValue());
+			} catch (RocksDBException e) {
+				throw new IOException(e);
+			}
         }
 
         /**
          * Deletes a capture from the index. Does not actually check if the capture exists.
+         * @throws IOException 
          */
-        void deleteCapture(Capture capture) {
+        void deleteCapture(Capture capture) throws IOException {
             capture.urlkey = resolveAlias(capture.urlkey);
-            dbBatch.remove(capture.encodeKey());
+            try {
+            	dbBatch.remove(capture.encodeKey());
+			} catch (RocksDBException e) {
+				throw new IOException(e);
+			}
         }
 
         /**
          * Adds a new alias to the index.  Updates existing captures affected by the new alias.
+         * @throws IOException 
          */
-        public void putAlias(String aliasSurt, String targetSurt) {
+        public void putAlias(String aliasSurt, String targetSurt) throws IOException {
             if (aliasSurt.equals(targetSurt)) {
                 return; // a self-referential alias is equivalent to no alias so don't bother storing it
             }
-            dbBatch.put(aliasCF, aliasSurt.getBytes(US_ASCII), targetSurt.getBytes(US_ASCII));
+            try {
+            	dbBatch.put(aliasCF, aliasSurt.getBytes(US_ASCII), targetSurt.getBytes(US_ASCII));
+			} catch (RocksDBException e) {
+				throw new IOException(e);
+			}
             newAliases.put(aliasSurt, targetSurt);
             updateExistingRecordsWithNewAlias(dbBatch, aliasSurt, targetSurt);
         }
 
-        public void commit() {
+        public void commit() throws IOException {
             commitBatch(dbBatch);
 
             /*
@@ -417,7 +452,7 @@ public class Index {
             updateExistingRecordsWithNewAliases();
         }
 
-        private void updateExistingRecordsWithNewAliases() {
+        private void updateExistingRecordsWithNewAliases() throws IOException {
             try (WriteBatch wb = new WriteBatch()) {
                 for (Map.Entry<String, String> entry : newAliases.entrySet()) {
                     updateExistingRecordsWithNewAlias(wb, entry.getKey(), entry.getValue());
@@ -426,11 +461,19 @@ public class Index {
             }
         }
 
-        private void updateExistingRecordsWithNewAlias(WriteBatch wb, String aliasSurt, String targetSurt) {
+        private void updateExistingRecordsWithNewAlias(WriteBatch wb, String aliasSurt, String targetSurt) throws IOException {
             for (Capture capture : rawQuery(aliasSurt, null, false)) {
-                wb.remove(capture.encodeKey());
+                try {
+					wb.remove(capture.encodeKey());
+    			} catch (RocksDBException e) {
+    				throw new IOException(e);
+    			}
                 capture.urlkey = targetSurt;
-                wb.put(capture.encodeKey(), capture.encodeValue());
+                try {
+					wb.put(capture.encodeKey(), capture.encodeValue());
+    			} catch (RocksDBException e) {
+    				throw new IOException(e);
+    			}
             }
         }
 

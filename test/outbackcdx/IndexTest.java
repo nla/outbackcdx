@@ -5,6 +5,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.rocksdb.*;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +42,7 @@ public class IndexTest {
     }
 
     @Test
-    public void testClosest() {
+    public void testClosest() throws IOException {
         try (Index.Batch batch = index.beginUpdate()) {
             batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://closest.org/ text/html 200 - - 0 w1"));
             batch.putCapture(Capture.fromCdxLine("- 20060101000000 http://closest.org/ text/html 200 - - 0 w2"));
@@ -59,7 +60,7 @@ public class IndexTest {
     }
 
     @Test
-    public void testDelete() {
+    public void testDelete() throws IOException {
         try (Index.Batch batch = index.beginUpdate()) {
             batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://a.org/ text/html 200 - - 0 w1"));
             batch.putCapture(Capture.fromCdxLine("- 20060101000000 http://a.org/ text/html 200 - - 0 w2"));
@@ -91,7 +92,7 @@ public class IndexTest {
     }
 
     @Test
-    public void testForwardAndReverse() {
+    public void testForwardAndReverse() throws IOException {
         try (Index.Batch batch = index.beginUpdate()) {
             batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://a.org/ text/html 200 - - 0 w1"));
             batch.putCapture(Capture.fromCdxLine("- 20060101000000 http://a.org/ text/html 200 - - 0 w2"));

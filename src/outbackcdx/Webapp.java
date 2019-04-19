@@ -3,9 +3,14 @@ package outbackcdx;
 
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
+import com.google.gson.stream.JsonWriter;
+
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import outbackcdx.NanoHTTPD.Response;
+import outbackcdx.WbCdxApi.JsonFormat;
+import outbackcdx.WbCdxApi.OutputFormat;
+import outbackcdx.WbCdxApi.TextFormat;
 import outbackcdx.auth.Permission;
 
 import javax.xml.stream.XMLStreamException;
@@ -23,6 +28,10 @@ import static outbackcdx.Json.GSON;
 import static outbackcdx.NanoHTTPD.Method.*;
 import static outbackcdx.NanoHTTPD.Response.Status.*;
 import static outbackcdx.Web.*;
+
+import org.rocksdb.TransactionLogIterator;
+import org.rocksdb.TransactionLogIterator.BatchResult;
+import org.rocksdb.WriteBatch;
 
 class Webapp implements Web.Handler {
     private final boolean verbose;
@@ -73,6 +82,7 @@ class Webapp implements Web.Handler {
         router.on(GET, "/<collection>/stats", req2 -> stats(req2));
         router.on(GET, "/<collection>/captures", request -> captures(request));
         router.on(GET, "/<collection>/aliases", request -> aliases(request));
+        router.on(GET, "/changes", request -> changeFeed(request));
 
         if (FeatureFlags.experimentalAccessControl()) {
             router.on(GET, "/<collection>/ap/<accesspoint>", request -> query(request));
@@ -195,8 +205,50 @@ class Webapp implements Web.Handler {
         e.printStackTrace(new PrintWriter(stacktrace));
         return stacktrace.toString();
     }
+    
+    Response changeFeed(Web.Request request) throws Web.ResponseException, IOException {
+        String collection = request.param("collection");
+        long since = Long.parseLong(request.param("since"));
+        final Index index = dataStore.getIndex(collection);
+        TransactionLogIterator logReader = index.getUpdatesSince(since);
+
+        
+        Response response = new Response(OK, "application/json", outputStream -> {
+            JsonWriter output = GSON.newJsonWriter(new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8)));
+            output.beginArray();
+
+            while (logReader.isValid()) {
+                BatchResult batch = logReader.getBatch();
+                
+                output.beginObject();
+                output.name("sequenceNumber").value(batch.sequenceNumber());
+                String base64WriteBatch;
+				try {
+					base64WriteBatch = Base64.getEncoder().encodeToString(batch.writeBatch().data());
+				} catch (RocksDBException e) {
+					throw new IOException(e);
+				}
+                output.name("writeBatch").jsonValue(base64WriteBatch);
+                output.endObject();
+
+                logReader.next();
+            }
+
+            output.endArray();
+            output.flush();
+        });
+        response.addHeader("Access-Control-Allow-Origin", "*");
+        return response;
+
+        
+        
+    }
 
     Response query(Web.Request request) throws IOException, Web.ResponseException {
+        if (verbose) {
+            out.println(request);
+        }
+    	
         Index index = getIndex(request);
         Map<String,String> params = request.params();
         if (params.containsKey("q")) {

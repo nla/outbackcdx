@@ -91,7 +91,7 @@ public class DataStore implements Closeable {
         }
     }
 
-    private void configureColumnFamily(ColumnFamilyOptionsInterface cfOptions) throws RocksDBException {
+    private void configureColumnFamily(ColumnFamilyOptions cfOptions) throws RocksDBException {
         BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
         tableConfig.setBlockSize(22 * 1024); // approximately compresses to < 8 kB
 
