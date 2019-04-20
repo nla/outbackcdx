@@ -1,6 +1,7 @@
 package outbackcdx;
 
 import org.rocksdb.*;
+import org.rocksdb.Options;
 
 import java.io.Closeable;
 import java.io.File;
@@ -89,6 +90,19 @@ public class DataStore implements Closeable {
         } catch (RocksDBException e) {
             throw new IOException(e);
         }
+    }
+
+    private void configureColumnFamily(Options cfOptions) throws RocksDBException {
+        BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
+        tableConfig.setBlockSize(22 * 1024); // approximately compresses to < 8 kB
+
+        cfOptions.setCompactionStyle(CompactionStyle.LEVEL);
+        cfOptions.setWriteBufferSize(64 * 1024 * 1024);
+        cfOptions.setTargetFileSizeBase(64 * 1024 * 1024);
+        cfOptions.setMaxBytesForLevelBase(512 * 1024 * 1024);
+        cfOptions.setTargetFileSizeMultiplier(2);
+        cfOptions.setCompressionType(CompressionType.SNAPPY_COMPRESSION);
+        cfOptions.setTableFormatConfig(tableConfig);
     }
 
     private void configureColumnFamily(ColumnFamilyOptions cfOptions) throws RocksDBException {
