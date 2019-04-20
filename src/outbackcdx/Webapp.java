@@ -82,7 +82,7 @@ class Webapp implements Web.Handler {
         router.on(GET, "/<collection>/stats", req2 -> stats(req2));
         router.on(GET, "/<collection>/captures", request -> captures(request));
         router.on(GET, "/<collection>/aliases", request -> aliases(request));
-        router.on(GET, "/changes", request -> changeFeed(request));
+        router.on(GET, "/<collection>/changes", request -> changeFeed(request));
 
         if (FeatureFlags.experimentalAccessControl()) {
             router.on(GET, "/<collection>/ap/<accesspoint>", request -> query(request));
@@ -209,7 +209,14 @@ class Webapp implements Web.Handler {
     Response changeFeed(Web.Request request) throws Web.ResponseException, IOException {
         String collection = request.param("collection");
         long since = Long.parseLong(request.param("since"));
-        final Index index = dataStore.getIndex(collection);
+        if(verbose) {
+            out.println(String.format("collection: %s, since: %s", collection, since));
+        }
+        final Index index = getIndex(request);
+        out.println(String.format("got index for collection %s since %s", collection, since));
+        out.println(index);
+        // list the "since" endpoints to figure out if null pointer is a real thing
+        
         TransactionLogIterator logReader = index.getUpdatesSince(since);
 
         
