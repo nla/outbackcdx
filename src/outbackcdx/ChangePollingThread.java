@@ -3,6 +3,7 @@ package outbackcdx;
 
 import java.io.*;
 import java.util.Base64;
+import java.util.HashMap;
 
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
@@ -23,6 +24,7 @@ public class ChangePollingThread extends Thread {
     int pollingInterval = 10;
     DataStore dataStore = null;
     Index index = null;
+    Long sequenceNumber = Long.valueOf(0);
 
     ChangePollingThread(String primaryReplicationUrl, int pollingInterval, DataStore dataStore) throws IOException {
         this.primaryReplicationUrl = primaryReplicationUrl;
@@ -32,6 +34,16 @@ public class ChangePollingThread extends Thread {
         String[] splitCollectionUrl = this.primaryReplicationUrl.split("/");
         String collection = splitCollectionUrl[splitCollectionUrl.length - 1];
         this.index = dataStore.getIndex(collection, true);
+
+        try {
+            byte[] output = this.index.db.get(SEQ_NUM_KEY);
+            String sequence = output.toString();
+            sequenceNumber = Long.valueOf(sequence);
+        } catch (RocksDBException e) {
+            System.out.println("Received rocks db exception while looking up the value of the key " + SEQ_NUM_KEY + " locally");
+            e.printStackTrace();
+        }
+        this.primaryReplicationUrl = primaryReplicationUrl + "/changes?since=" + sequenceNumber;
     }
 
     public void run() {
