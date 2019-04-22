@@ -214,9 +214,7 @@ class Webapp implements Web.Handler {
         }
         final Index index = getIndex(request);
         out.println(String.format("got index for collection %s since %s", collection, since));
-        out.println(index);
-        // list the "since" endpoints to figure out if null pointer is a real thing
-        
+
         TransactionLogIterator logReader = index.getUpdatesSince(since);
 
         
@@ -228,7 +226,7 @@ class Webapp implements Web.Handler {
                 BatchResult batch = logReader.getBatch();
                 
                 output.beginObject();
-                output.name("sequenceNumber").value(batch.sequenceNumber());
+                output.name("sequenceNumber").value(((Long) batch.sequenceNumber()).toString());
                 String base64WriteBatch;
 				try {
 					base64WriteBatch = Base64.getEncoder().encodeToString(batch.writeBatch().data());
