@@ -126,6 +126,7 @@ public class Main {
             }
             if (collectionUrl != null){
                 ChangePollingThread cpt = new ChangePollingThread(collectionUrl, pollingInterval, dataStore);
+                cpt.setDaemon(true);
                 cpt.start();
             }
         } catch (InterruptedException | IOException e) {
