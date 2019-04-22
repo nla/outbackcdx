@@ -378,12 +378,10 @@ public class Index {
         return new Batch();
     }
 
-    private void commitBatch(WriteBatch writeBatch) {
+    public void commitBatch(WriteBatch writeBatch) throws RocksDBException {
         try (WriteOptions options = new WriteOptions()) {
             options.setSync(true);
             db.write(options, writeBatch);
-        } catch (RocksDBException e) {
-            throw new RuntimeException(e);
         }
     }
 
@@ -443,7 +441,11 @@ public class Index {
         }
 
         public void commit() throws IOException {
-            commitBatch(dbBatch);
+            try {
+                commitBatch(dbBatch);
+            } catch (RocksDBException e) {
+                throw new RuntimeException(e);
+            }
 
             /*
              * Most of the time this will do nothing as we've already updated existing captures in putAlias, but there's
@@ -460,7 +462,11 @@ public class Index {
                 for (Map.Entry<String, String> entry : newAliases.entrySet()) {
                     updateExistingRecordsWithNewAlias(wb, entry.getKey(), entry.getValue());
                 }
-                commitBatch(wb);
+                try {
+                    commitBatch(wb);
+                } catch (RocksDBException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
 
