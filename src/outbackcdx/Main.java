@@ -30,6 +30,10 @@ public class Main {
         System.err.println("  -p port               Local port to listen on");
         System.err.println("  -t count              Number of web server threads");
         System.err.println("  -v                    Verbose logging");
+        System.err.println();
+        System.err.println("Secondary mode (runs read-only; polls upstream server on 'collection-url' for changes)");
+        System.err.println("  --primary collection-url              URL of collection on upstream primary to poll for changes");
+        System.err.println("  --update-interval poll-interval       Polling frequency for upstream changes, in seconds. Default: 10");
         System.exit(1);
     }
 
@@ -42,6 +46,8 @@ public class Main {
         File dataPath = new File("data");
         boolean verbose = false;
         Authorizer authorizer = new NullAuthorizer();
+        int pollingInterval = 10;
+        String collectionUrl = null;
 
         Map<String,Object> dashboardConfig = new HashMap<>();
         dashboardConfig.put("featureFlags", FeatureFlags.asMap());
@@ -82,6 +88,12 @@ public class Main {
                 case "-t":
                     webThreads = Integer.parseInt(args[++i]);
                     break;
+                case "--primary":
+                    collectionUrl = args[i++];
+                    break;
+                case "--update-interval":
+                    pollingInterval = Integer.parseInt(args[i++]);
+                    break;
                 default:
                     usage();
                     break;
@@ -111,6 +123,10 @@ public class Main {
                 } finally {
                     threadPool.shutdown();
                 }
+            }
+            if (collectionUrl != null){
+                ChangePollingThread cpt = new ChangePollingThread(collectionUrl, pollingInterval, dataStore);
+                cpt.start();
             }
         } catch (InterruptedException | IOException e) {
             e.printStackTrace();
