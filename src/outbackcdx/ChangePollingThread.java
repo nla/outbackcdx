@@ -3,7 +3,6 @@ package outbackcdx;
 
 import java.io.*;
 import java.util.Base64;
-import java.util.HashMap;
 
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
@@ -25,6 +24,8 @@ public class ChangePollingThread extends Thread {
     DataStore dataStore = null;
     Index index = null;
     Long sequenceNumber = Long.valueOf(0);
+    String finalUrl = null;
+    String collection;
 
     ChangePollingThread(String primaryReplicationUrl, int pollingInterval, DataStore dataStore) throws IOException {
         this.primaryReplicationUrl = primaryReplicationUrl;
@@ -32,37 +33,39 @@ public class ChangePollingThread extends Thread {
         this.dataStore = dataStore;
         this.primaryReplicationUrl = this.primaryReplicationUrl.replaceFirst("/$", "");
         String[] splitCollectionUrl = this.primaryReplicationUrl.split("/");
-        String collection = splitCollectionUrl[splitCollectionUrl.length - 1];
+        collection = splitCollectionUrl[splitCollectionUrl.length - 1];
         this.index = dataStore.getIndex(collection, true);
-
-        try {
-            byte[] output = this.index.db.get(SEQ_NUM_KEY);
-            String sequence = output.toString();
-            sequenceNumber = Long.valueOf(sequence);
-        } catch (RocksDBException e) {
-            System.out.println("Received rocks db exception while looking up the value of the key " + SEQ_NUM_KEY.toString() + " locally");
-            e.printStackTrace();
-        } catch (Exception e) {
-            System.out.println("Received an exception while looking up the value of the key " + SEQ_NUM_KEY.toString() + " locally");
-            e.printStackTrace();
-        }
-        this.primaryReplicationUrl = primaryReplicationUrl + "/changes?since=" + sequenceNumber;
+        this.primaryReplicationUrl = primaryReplicationUrl + "/changes?since=";
     }
 
     public void run() {
         while (true) {
             long startTime = System.currentTimeMillis();
             try {
-                System.out.println("Polling " + primaryReplicationUrl + " for changes since sequence number " + sequenceNumber);
-                replicate();
-            } catch (IOException e) {
-                System.out.println("Received I/O exception while processing " + primaryReplicationUrl);
-                e.printStackTrace();
-            } catch (RocksDBException e){
-                System.out.println("The plane has crashed into the mountain. RocksDB threw an exception during replication from "+ primaryReplicationUrl);
+                byte[] output = this.index.db.get(SEQ_NUM_KEY);
+                String sequence = output.toString();
+                sequenceNumber = Long.valueOf(sequence);
+            } catch (RocksDBException e) {
+                System.out.println("Received rocks db exception while looking up the value of the key " + SEQ_NUM_KEY.toString() + " locally");
                 e.printStackTrace();
             } catch (Exception e) {
-                System.out.println("Dang! something happened while processing " + primaryReplicationUrl);
+                System.out.println("Received an exception while looking up the value of the key " + SEQ_NUM_KEY.toString() + " locally");
+                e.printStackTrace();
+            }
+            finalUrl = primaryReplicationUrl + sequenceNumber;
+            try {
+                System.out.println("Polling " + finalUrl + " for changes since sequence number " + sequenceNumber);
+                System.out.println("Beginning replication of changes into collection '" + collection + "'...");
+                replicate();
+                System.out.println("Replication complete.");
+            } catch (IOException e) {
+                System.out.println("Received I/O exception while processing " + finalUrl);
+                e.printStackTrace();
+            } catch (RocksDBException e){
+                System.out.println("The plane has crashed into the mountain. RocksDB threw an exception during replication from "+ finalUrl);
+                e.printStackTrace();
+            } catch (Exception e) {
+                System.out.println("Dang! something happened while processing " + finalUrl);
                 e.printStackTrace();
             }
 
@@ -81,7 +84,7 @@ public class ChangePollingThread extends Thread {
     private void replicate() throws IOException, RocksDBException {
         // strip trailing slash if necessary
         CloseableHttpClient httpclient = HttpClients.createDefault();
-        HttpGet request = new HttpGet(primaryReplicationUrl);
+        HttpGet request = new HttpGet(finalUrl);
         long sequenceNumber = 0;
         String writeBatch = null;
         HttpResponse response = httpclient.execute(request);
@@ -89,7 +92,7 @@ public class ChangePollingThread extends Thread {
         if(response.getStatusLine().getStatusCode() != 200){
             InputStream inputStream = response.getEntity().getContent();
             String contentString = new BufferedReader(new InputStreamReader(inputStream)).readLine();
-            throw new IOException("Received '" + response.getStatusLine() + "' response from " + primaryReplicationUrl + ": \n" + contentString);
+            throw new IOException("Received '" + response.getStatusLine() + "' response from " + finalUrl +": \n" + contentString);
         }
         InputStream content = response.getEntity().getContent();
         JsonReader reader = GSON.newJsonReader(new InputStreamReader(content));
@@ -107,6 +110,7 @@ public class ChangePollingThread extends Thread {
                 }
             } else if (JsonToken.END_OBJECT.equals(nextToken)){
                 reader.endObject();
+                assert writeBatch != null;
                 commitWriteBatch(index, sequenceNumber, writeBatch);
             } else if (JsonToken.END_ARRAY.equals(nextToken)){
                 reader.endArray();
