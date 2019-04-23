@@ -28,14 +28,13 @@ public class ChangePollingThread extends Thread {
     String collection;
 
     ChangePollingThread(String primaryReplicationUrl, int pollingInterval, DataStore dataStore) throws IOException {
-        this.primaryReplicationUrl = primaryReplicationUrl;
         this.pollingInterval = pollingInterval;
         this.dataStore = dataStore;
-        this.primaryReplicationUrl = this.primaryReplicationUrl.replaceFirst("/$", "");
+        this.primaryReplicationUrl = primaryReplicationUrl.replaceFirst("/$", "");
         String[] splitCollectionUrl = this.primaryReplicationUrl.split("/");
         collection = splitCollectionUrl[splitCollectionUrl.length - 1];
         this.index = dataStore.getIndex(collection, true);
-        this.primaryReplicationUrl = primaryReplicationUrl + "/changes?since=";
+        this.primaryReplicationUrl = this.primaryReplicationUrl + "/changes?since=";
     }
 
     public void run() {
