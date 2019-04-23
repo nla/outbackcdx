@@ -94,7 +94,7 @@ public class ChangePollingThread extends Thread {
         InputStream content = response.getEntity().getContent();
         JsonReader reader = GSON.newJsonReader(new InputStreamReader(content));
         reader.beginArray();
-        while (reader.hasNext()) {
+        while (reader.peek() != JsonToken.END_DOCUMENT) {
             JsonToken nextToken = reader.peek();
             if (JsonToken.BEGIN_OBJECT.equals(nextToken)) {
                 reader.beginObject();
@@ -106,12 +106,16 @@ public class ChangePollingThread extends Thread {
                     writeBatch = reader.nextString();
                 }
             } else if (JsonToken.END_OBJECT.equals(nextToken)){
+                reader.endObject();
                 commitWriteBatch(index, sequenceNumber, writeBatch);
+            } else if (JsonToken.END_ARRAY.equals(nextToken)){
+                reader.endArray();
             }
         }
     }
 
     private void commitWriteBatch(Index index, long sequenceNumber, String writeBatch) throws RocksDBException {
+        System.out.println("Committing Write Batch number "+sequenceNumber+" with length "+writeBatch.length());
         Base64.Decoder decoder = Base64.getDecoder();
         byte[] decodedWriteBatch = decoder.decode(writeBatch);
         WriteBatch batch = new WriteBatch(decodedWriteBatch);
