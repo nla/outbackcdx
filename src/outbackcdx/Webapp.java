@@ -228,12 +228,12 @@ class Webapp implements Web.Handler {
                 output.beginObject();
                 output.name("sequenceNumber").value(((Long) batch.sequenceNumber()).toString());
                 String base64WriteBatch;
-				try {
-					base64WriteBatch = Base64.getEncoder().encodeToString(batch.writeBatch().data());
-				} catch (RocksDBException e) {
-					throw new IOException(e);
-				}
-                output.name("writeBatch").jsonValue(base64WriteBatch);
+                try {
+                    base64WriteBatch = Base64.getEncoder().encodeToString(batch.writeBatch().data());
+                } catch (RocksDBException e) {
+                    throw new IOException(e);
+                }
+                output.name("writeBatch").value(base64WriteBatch);
                 output.endObject();
 
                 logReader.next();
