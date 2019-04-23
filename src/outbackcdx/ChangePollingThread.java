@@ -42,6 +42,9 @@ public class ChangePollingThread extends Thread {
         } catch (RocksDBException e) {
             System.out.println("Received rocks db exception while looking up the value of the key " + SEQ_NUM_KEY + " locally");
             e.printStackTrace();
+        } catch (Exception e) {
+            System.out.println("Received an exception while looking up the value of the key " + SEQ_NUM_KEY + " locally");
+            e.printStackTrace();
         }
         this.primaryReplicationUrl = primaryReplicationUrl + "/changes?since=" + sequenceNumber;
     }
@@ -50,6 +53,7 @@ public class ChangePollingThread extends Thread {
         while (true) {
             long startTime = System.currentTimeMillis();
             try {
+                System.out.println("Polling " + primaryReplicationUrl + " for changes since sequence number " + sequenceNumber);
                 replicate();
             } catch (IOException e) {
                 System.out.println("Received I/O exception while processing " + primaryReplicationUrl);
