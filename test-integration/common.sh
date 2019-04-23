@@ -1,5 +1,6 @@
 CDX_PORT=8081
 CDX_URL=http://localhost:$CDX_PORT/testcol
+JAVA_ARGS=
 
 children=()
 
@@ -33,7 +34,7 @@ function check {
 
 function launch_cdx {
     mkdir -p target/data
-    java -jar ../target/outbackcdx-*.jar -p $CDX_PORT -d target/data &
+    java $JAVA_ARGS -jar ../target/outbackcdx-*.jar -p $CDX_PORT -d target/data &
     children+=($!)
     wait_until_listening http://localhost:$CDX_PORT
 
