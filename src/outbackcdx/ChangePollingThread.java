@@ -46,10 +46,10 @@ public class ChangePollingThread extends Thread {
                 String sequence = output.toString();
                 sequenceNumber = Long.valueOf(sequence);
             } catch (RocksDBException e) {
-                System.out.println("Received rocks db exception while looking up the value of the key " + SEQ_NUM_KEY.toString() + " locally");
+                System.out.println("Received rocks db exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
                 e.printStackTrace();
             } catch (Exception e) {
-                System.out.println("Received an exception while looking up the value of the key " + SEQ_NUM_KEY.toString() + " locally");
+                System.out.println("Received an exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
                 e.printStackTrace();
             }
             finalUrl = primaryReplicationUrl + sequenceNumber;
