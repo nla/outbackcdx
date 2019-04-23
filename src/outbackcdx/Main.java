@@ -89,10 +89,10 @@ public class Main {
                     webThreads = Integer.parseInt(args[++i]);
                     break;
                 case "--primary":
-                    collectionUrl = args[i++];
+                    collectionUrl = args[++i];
                     break;
                 case "--update-interval":
-                    pollingInterval = Integer.parseInt(args[i++]);
+                    pollingInterval = Integer.parseInt(args[++i]);
                     break;
                 default:
                     usage();
@@ -111,6 +111,11 @@ public class Main {
                 ServerSocket socket = openSocket(host, port, inheritSocket);
                 Web.Server server = new Web.Server(socket, controller, authorizer);
                 ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
+                if (collectionUrl != null){
+                    ChangePollingThread cpt = new ChangePollingThread(collectionUrl, pollingInterval, dataStore);
+                    cpt.setDaemon(true);
+                    cpt.start();
+                }
                 try {
                     server.setAsyncRunner(threadPool::execute);
                     server.start();
@@ -123,11 +128,6 @@ public class Main {
                 } finally {
                     threadPool.shutdown();
                 }
-            }
-            if (collectionUrl != null){
-                ChangePollingThread cpt = new ChangePollingThread(collectionUrl, pollingInterval, dataStore);
-                cpt.setDaemon(true);
-                cpt.start();
             }
         } catch (InterruptedException | IOException e) {
             e.printStackTrace();
