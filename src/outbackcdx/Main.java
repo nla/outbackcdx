@@ -31,9 +31,14 @@ public class Main {
         System.err.println("  -t count              Number of web server threads");
         System.err.println("  -v                    Verbose logging");
         System.err.println();
+        System.err.println("Primary mode (runs as a replication target for downstream Secondaries)");
+        System.err.println("  --replication-window interval      interval, in seconds, to delete replication history from disk.");
+        System.err.println("                                     0 disables automatic deletion. History files can be deleted manually by");
+        System.err.println("                                     POSTing a replication sequenceNumber to /<collection>/truncate_replication");
+        System.err.println();
         System.err.println("Secondary mode (runs read-only; polls upstream server on 'collection-url' for changes)");
-        System.err.println("  --primary collection-url              URL of collection on upstream primary to poll for changes");
-        System.err.println("  --update-interval poll-interval       Polling frequency for upstream changes, in seconds. Default: 10");
+        System.err.println("  --primary collection-url           URL of collection on upstream primary to poll for changes");
+        System.err.println("  --update-interval poll-interval    Polling frequency for upstream changes, in seconds. Default: 10");
         System.exit(1);
     }
 
@@ -48,6 +53,7 @@ public class Main {
         Authorizer authorizer = new NullAuthorizer();
         int pollingInterval = 10;
         String collectionUrl = null;
+        long replicationWindow = 60 * 60 * 24 * 2; // two days
 
         Map<String,Object> dashboardConfig = new HashMap<>();
         dashboardConfig.put("featureFlags", FeatureFlags.asMap());
@@ -94,13 +100,16 @@ public class Main {
                 case "--update-interval":
                     pollingInterval = Integer.parseInt(args[++i]);
                     break;
+                case "--replication-window":
+                    replicationWindow = Long.parseLong(args[++i]);
+                    break;
                 default:
                     usage();
                     break;
             }
         }
 
-        try (DataStore dataStore = new DataStore(dataPath)) {
+        try (DataStore dataStore = new DataStore(dataPath, replicationWindow)) {
             Webapp controller = new Webapp(dataStore, verbose, dashboardConfig);
             if (undertow) {
                 UWeb.UServer server = new UWeb.UServer(host, port, controller, authorizer);
