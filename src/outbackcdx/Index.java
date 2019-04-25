@@ -38,7 +38,11 @@ public class Index {
         this.aliasCF = aliasCF;
         this.accessControl = accessControl;
     }
-    
+
+    public void flushWal() throws RocksDBException{
+        this.db.flushWal(true);
+    }
+
     public TransactionLogIterator getUpdatesSince(long sequenceNumber) {
         out.println(String.format("looking for updates since %s", sequenceNumber));
         try {
