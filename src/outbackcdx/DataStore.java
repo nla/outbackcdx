@@ -19,8 +19,11 @@ public class DataStore implements Closeable {
     private final File dataDir;
     private final Map<String, Index> indexes = new ConcurrentHashMap<String, Index>();
 
-    public DataStore(File dataDir) {
+    public long replicationWindow;
+
+    public DataStore(File dataDir, long replicationWindow) {
         this.dataDir = dataDir;
+        this.replicationWindow = replicationWindow;
     }
 
     public Index getIndex(String collection) throws IOException {
@@ -56,6 +59,12 @@ public class DataStore implements Closeable {
             DBOptions dbOptions = new DBOptions();
             dbOptions.setCreateIfMissing(createAllowed);
             dbOptions.setMaxBackgroundCompactions(Math.min(8, Runtime.getRuntime().availableProcessors()));
+            if(replicationWindow == 0) {
+                dbOptions.setManualWalFlush(true);
+            } else {
+                dbOptions.setManualWalFlush(false);
+                dbOptions.setWalTtlSeconds(replicationWindow);
+            }
 
             ColumnFamilyOptions cfOptions = new ColumnFamilyOptions();
             configureColumnFamily(cfOptions);
