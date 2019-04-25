@@ -96,7 +96,16 @@ class Webapp implements Web.Handler {
             router.on(GET, "/<collection>/access/policies", req1 -> listAccessPolicies(req1));
             router.on(POST, "/<collection>/access/policies", request -> postAccessPolicy(request), Permission.POLICIES_EDIT);
             router.on(GET, "/<collection>/access/policies/<policyId>", req -> getAccessPolicy(req));
+            router.on(POST, "/<collection>/truncate_replication", request -> flushWal(request));
         }
+    }
+
+    Response flushWal(Web.Request request) throws Web.ResponseException, IOException, RocksDBException{
+        Index index = getIndex(request);
+        index.flushWal();
+        Map<String,Boolean> map = new HashMap<>();
+        map.put("success", true);
+        return jsonResponse(map);
     }
 
     Response listCollections(Web.Request request) {
