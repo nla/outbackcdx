@@ -43,7 +43,7 @@ public class ChangePollingThread extends Thread {
             try {
                 byte[] output = this.index.db.get(SEQ_NUM_KEY);
                 String sequence = new String(output);
-                sequenceNumber = Long.valueOf(sequence);
+                sequenceNumber = Long.valueOf(sequence) + 1;
             } catch (RocksDBException e) {
                 System.out.println("Received rocks db exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
                 e.printStackTrace();
