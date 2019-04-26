@@ -218,13 +218,12 @@ class Webapp implements Web.Handler {
     Response changeFeed(Web.Request request) throws Web.ResponseException, IOException {
         String collection = request.param("collection");
         long since = Long.parseLong(request.param("since"));
-        if(verbose) {
-            out.println(String.format("collection: %s, since: %s", collection, since));
-        }
         final Index index = getIndex(request);
-        out.println(String.format("got index for collection %s since %s", collection, since));
 
         TransactionLogIterator logReader = index.getUpdatesSince(since);
+        if(verbose) {
+            out.println(String.format("Received request %s. Retrieved deltas for collection <%s> since sequenceNumber %s", request, collection, since));
+        }
 
         
         Response response = new Response(OK, "application/json", outputStream -> {
@@ -365,7 +364,7 @@ class Webapp implements Web.Handler {
             ids.add(accessControl.put(rule, request.username()));
         }
 
-        // return succesful response
+        // return successful response
         if (single) {
             Long id = ids.get(0);
             return id == null ? ok() : created(id);

@@ -53,10 +53,7 @@ public class ChangePollingThread extends Thread {
             }
             finalUrl = primaryReplicationUrl + sequenceNumber;
             try {
-                System.out.println("Polling " + finalUrl + " for changes since sequence number " + sequenceNumber);
-                System.out.println("Beginning replication of changes into collection '" + collection + "'...");
                 replicate();
-                System.out.println("Replication complete.");
             } catch (IOException e) {
                 System.out.println("Received I/O exception while processing " + finalUrl);
                 e.printStackTrace();
@@ -118,7 +115,6 @@ public class ChangePollingThread extends Thread {
     }
 
     private void commitWriteBatch(Index index, long sequenceNumber, String writeBatch) throws RocksDBException {
-        System.out.println("Committing Write Batch number "+sequenceNumber+" with length "+writeBatch.length());
         Base64.Decoder decoder = Base64.getDecoder();
         byte[] decodedWriteBatch = decoder.decode(writeBatch);
         WriteBatch batch = new WriteBatch(decodedWriteBatch);
@@ -128,5 +124,6 @@ public class ChangePollingThread extends Thread {
             throw new RuntimeException(e); // ASCII is everywhere; this shouldn't happen.
         }
         index.commitBatch(batch);
+        System.out.println("Committed Write Batch number "+sequenceNumber+" with length "+writeBatch.length());
     }
 }
