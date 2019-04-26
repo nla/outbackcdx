@@ -235,6 +235,7 @@ class Webapp implements Web.Handler {
                 BatchResult batch = logReader.getBatch();
                 // only return results _after_ the 'since' number
                 if((Long) batch.sequenceNumber() < since){
+                    logReader.next();
                     continue;
                 }
 
