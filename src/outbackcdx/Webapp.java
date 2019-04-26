@@ -233,7 +233,11 @@ class Webapp implements Web.Handler {
 
             while (logReader.isValid()) {
                 BatchResult batch = logReader.getBatch();
-                
+                // only return results _after_ the 'since' number
+                if((Long) batch.sequenceNumber() < since){
+                    continue;
+                }
+
                 output.beginObject();
                 output.name("sequenceNumber").value(((Long) batch.sequenceNumber()).toString());
                 String base64WriteBatch;
