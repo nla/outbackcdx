@@ -31,7 +31,6 @@ import static outbackcdx.Web.*;
 
 import org.rocksdb.TransactionLogIterator;
 import org.rocksdb.TransactionLogIterator.BatchResult;
-import org.rocksdb.WriteBatch;
 
 class Webapp implements Web.Handler {
     private final boolean verbose;
