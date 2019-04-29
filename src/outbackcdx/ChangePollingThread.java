@@ -42,13 +42,13 @@ public class ChangePollingThread extends Thread {
             long startTime = System.currentTimeMillis();
             try {
                 byte[] output = this.index.db.get(SEQ_NUM_KEY);
+                if(output == null){
+                    sequenceNumber = Long.valueOf(0);
+                }
                 String sequence = new String(output);
                 sequenceNumber = Long.valueOf(sequence) + 1;
             } catch (RocksDBException e) {
                 System.out.println("Received rocks db exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
-                e.printStackTrace();
-            } catch (Exception e) {
-                System.out.println("Received an exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
                 e.printStackTrace();
             }
             finalUrl = primaryReplicationUrl + sequenceNumber;
