@@ -29,7 +29,9 @@ class Webapp implements Web.Handler {
     private final DataStore dataStore;
     private final Web.Router router;
     private final Map<String,Object> dashboardConfig;
-    private final Iterable<FilterPlugin> filterPlugins;
+    private final ArrayList<FilterPlugin> filterPlugins;
+
+    private static ServiceLoader<FilterPlugin> fpLoader = ServiceLoader.load(FilterPlugin.class);
 
     private Response configJson(Web.Request req) {
         return jsonResponse(dashboardConfig);
@@ -50,10 +52,13 @@ class Webapp implements Web.Handler {
         this.verbose = verbose;
         this.dashboardConfig = dashboardConfig;
 
+        this.filterPlugins = new ArrayList<FilterPlugin>();
         if (FeatureFlags.filterPlugins()) {
-            this.filterPlugins = ServiceLoader.load(FilterPlugin.class);
-        } else {
-            this.filterPlugins = new ArrayList<FilterPlugin>();
+            System.out.println("Loading plugins");
+            for (FilterPlugin f : this.fpLoader) {
+                System.out.println("Loaded plugin");
+                this.filterPlugins.add(f);
+            }
         }
 
         router = new Router();
