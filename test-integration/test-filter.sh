@@ -2,10 +2,10 @@
 
 set -e -u
 
-cd service
+pushd service
 javac -cp ~/.m2/repository:../../target/classes outbackcdx/services/service.java
-jar cvf services.jar
-cd ..
+jar cvf services.jar .
+popd
 
 source common.sh
 
@@ -15,4 +15,4 @@ launch_cdx
 
 rm -rf target
 
-curl -sSvg "$CDX_URL?url=metadata://&matchType=prefix" 
+check_negative "$CDX_URL?url=metadata://&matchType=prefix" "metadata"

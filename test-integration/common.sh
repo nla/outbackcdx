@@ -32,6 +32,15 @@ function check {
     fi
 }
 
+function check_negative {
+    if curl -s "$1" | grep -q "$2"; then
+        echo "FAIL Found '$2' on '$1' but wasn't expecting it"
+        exit 1
+    else
+        echo PASS
+    fi
+}
+
 function launch_cdx {
     mkdir -p target/data
     if [ $JAR == 1 ]; then
