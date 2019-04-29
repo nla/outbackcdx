@@ -218,47 +218,46 @@ class Webapp implements Web.Handler {
         String collection = request.param("collection");
         long since = Long.parseLong(request.param("since"));
         final Index index = getIndex(request);
+        try(TransactionLogIterator logReader = index.getUpdatesSince(since)) {
 
-        TransactionLogIterator logReader = index.getUpdatesSince(since);
-        if(verbose) {
-            out.println(String.format("Received request %s. Retrieved deltas for collection <%s> since sequenceNumber %s", request, collection, since));
-        }
-
-        
-        Response response = new Response(OK, "application/json", outputStream -> {
-            JsonWriter output = GSON.newJsonWriter(new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8)));
-            output.beginArray();
-
-            while (logReader.isValid()) {
-                BatchResult batch = logReader.getBatch();
-                // only return results _after_ the 'since' number
-                if((Long) batch.sequenceNumber() < since){
-                    logReader.next();
-                    continue;
-                }
-
-                output.beginObject();
-                output.name("sequenceNumber").value(((Long) batch.sequenceNumber()).toString());
-                String base64WriteBatch;
-                try {
-                    base64WriteBatch = Base64.getEncoder().encodeToString(batch.writeBatch().data());
-                } catch (RocksDBException e) {
-                    throw new IOException(e);
-                }
-                output.name("writeBatch").value(base64WriteBatch);
-                output.endObject();
-
-                logReader.next();
+            if (verbose) {
+                out.println(String.format("Received request %s. Retrieved deltas for collection <%s> since sequenceNumber %s", request, collection, since));
             }
 
-            output.endArray();
-            output.flush();
-        });
-        response.addHeader("Access-Control-Allow-Origin", "*");
-        return response;
+            Response response = new Response(OK, "application/json", outputStream -> {
+                JsonWriter output = GSON.newJsonWriter(new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8)));
+                output.beginArray();
 
-        
-        
+                while (logReader.isValid()) {
+                    BatchResult batch = logReader.getBatch();
+                    // only return results _after_ the 'since' number
+                    if ((Long) batch.sequenceNumber() < since) {
+                        logReader.next();
+                        continue;
+                    }
+
+                    output.beginObject();
+                    output.name("sequenceNumber").value(((Long) batch.sequenceNumber()).toString());
+                    String base64WriteBatch;
+                    try {
+                        base64WriteBatch = Base64.getEncoder().encodeToString(batch.writeBatch().data());
+                    } catch (RocksDBException e) {
+                        throw new IOException(e);
+                    }
+                    output.name("writeBatch").value(base64WriteBatch);
+                    output.endObject();
+
+                    logReader.next();
+                }
+
+                output.endArray();
+                output.flush();
+            });
+            response.addHeader("Access-Control-Allow-Origin", "*");
+            return response;
+
+        }
+
     }
 
     Response query(Web.Request request) throws IOException, Web.ResponseException {
