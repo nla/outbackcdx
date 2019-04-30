@@ -8,3 +8,6 @@
 LOG
 /test-integration/deps
 /test-integration/target
+*.sw[op]
+/test-integration/service/outbackcdx/services/service.class
+/test-integration/service/services.jar

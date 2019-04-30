@@ -19,8 +19,13 @@ import static outbackcdx.NanoHTTPD.Response.Status.OK;
  * pywb: https://github.com/ikreymer/pywb/wiki/CDX-Server-API
  */
 public class WbCdxApi {
-    public static Response query(Web.Request request, Index index) {
-        Query query = new Query(request.params());
+    private static Query query;
+
+    public static Response queryIndex(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins) {
+        query = new Query(request.params());
+        for (FilterPlugin filterPlugin : filterPlugins) {
+            query.addPredicate(filterPlugin.newFilter(query));
+        }
         Iterable<Capture> captures = query.execute(index);
 
         boolean outputJson = "json".equals(request.param("output"));
@@ -42,6 +47,10 @@ public class WbCdxApi {
         });
         response.addHeader("Access-Control-Allow-Origin", "*");
         return response;
+    }
+
+    public Query getQuery() {
+        return query;
     }
 
     interface OutputFormat {

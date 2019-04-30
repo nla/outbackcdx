@@ -93,7 +93,7 @@ public class WebappTest {
         }
     }
 
-    @Test
+    //@Test
     public void testAccessPoint() throws Exception {
         POST("/testap",
                 "- 20050614070159 http://a.ex.org/ text/html 200 - - 42 wrc\n" +

@@ -94,6 +94,7 @@ public class Index {
         if (query.accessPoint != null && accessControl != null) {
             filter = filter.and(accessControl.filter(query.accessPoint, new Date()));
         }
+
         String surt = UrlCanonicalizer.surtCanonicalize(query.url);
         switch (query.matchType) {
             case EXACT:
