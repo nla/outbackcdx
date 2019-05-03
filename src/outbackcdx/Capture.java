@@ -43,6 +43,9 @@ public class Capture {
     public long compressedoffset;
     public String redirecturl;
     public String robotflags;
+    public bool isCdxj;
+    public String rawValue;
+    public Object cdxjValue;
 
     public Capture(Map.Entry<byte[], byte[]> entry) {
         this(entry.getKey(), entry.getValue());
@@ -175,8 +178,14 @@ public class Capture {
     }
 
     public static Capture fromCdxLine(String line) {
+        String[] keyVal = line.split(" ", 2);
+        if (keyVal[2].startsWith("{")) {
+            return fromCdxjLine(line);
+        }
+
         String[] fields = line.split(" ");
         Capture capture = new Capture();
+        capture.isCdxj = false;
         capture.timestamp = Long.parseLong(fields[1]);
         capture.original = fields[2];
         capture.urlkey = UrlCanonicalizer.surtCanonicalize(capture.original);
@@ -198,7 +207,17 @@ public class Capture {
             capture.robotflags = "-";
             capture.compressedoffset = Long.parseLong(fields[7]);
             capture.file = fields[8];
-        }
+        } c
+        return capture;
+    }
+
+    public static Capture fromCdxjLine(String line) {
+        String[] keyVal = line.split(" ", 2);
+        Capture capture = new Capture();
+        capture.isCdxj = true;
+        capture.timestamp = Long.parseLong(keyVal[1]);
+        capture.rawValue = keyVal[2];
+        // parse JSON from capture.rawValue and store in capture.cdxjValue
         return capture;
     }
 
@@ -244,6 +263,7 @@ public class Capture {
             case "filename":
                 return file;
             default:
+                // Attepmt to get a field from cdxjValue, otherwise...
                 throw new IllegalArgumentException("no such capture field: " + field);
         }
     }

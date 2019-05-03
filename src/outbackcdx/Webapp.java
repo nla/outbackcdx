@@ -189,6 +189,7 @@ class Webapp implements Web.Handler {
                         String targetSurt = UrlCanonicalizer.surtCanonicalize(fields[2]);
                         batch.putAlias(aliasSurt, targetSurt);
                     } else {
+                        // Optionally, check request headers for Content-type: application/ors+cdxj and use Capture.fromCdxjLine;
                         batch.putCapture(Capture.fromCdxLine(line));
                     }
                     added++;
