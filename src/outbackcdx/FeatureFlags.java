@@ -11,6 +11,7 @@ import java.util.Map;
 public class FeatureFlags {
     private static boolean experimentalAccessControl;
     private static boolean pandoraHacks;
+    private static boolean secondaryMode;
 
     static {
         experimentalAccessControl = "1".equals(System.getenv("EXPERIMENTAL_ACCESS_CONTROL"));
@@ -29,10 +30,15 @@ public class FeatureFlags {
         experimentalAccessControl = enabled;
     }
 
+    public static void setSecondaryMode(boolean enabled){ secondaryMode = enabled; }
+
+    public static boolean isSecondary() { return secondaryMode; }
+
     public static Map<String, Boolean> asMap() {
         Map<String,Boolean> map = new HashMap<>();
         map.put("experimentalAccessControl", experimentalAccessControl());
         map.put("pandoraHacks", pandoraHacks());
+        map.put("secondaryMode", isSecondary());
         return map;
     }
 

@@ -82,6 +82,7 @@ class Webapp implements Web.Handler {
         router.on(GET, "/<collection>/captures", request -> captures(request));
         router.on(GET, "/<collection>/aliases", request -> aliases(request));
         router.on(GET, "/<collection>/changes", request -> changeFeed(request));
+        router.on(GET, "/<collection>/sequence", request->sequence(request));
 
         if (FeatureFlags.experimentalAccessControl()) {
             router.on(GET, "/<collection>/ap/<accesspoint>", request -> query(request));
@@ -142,6 +143,9 @@ class Webapp implements Web.Handler {
     }
 
     Response delete(Web.Request request) throws IOException {
+        if(FeatureFlags.isSecondary()){
+            return new Response(UNAUTHORIZED, "text/plain", "This node is running in secondary mode to an upstream primary, and will not accept writes.");
+        }
         String collection = request.param("collection");
         final Index index = dataStore.getIndex(collection);
         BufferedReader in = new BufferedReader(new InputStreamReader(request.inputStream()));
@@ -174,6 +178,9 @@ class Webapp implements Web.Handler {
     }
 
     Response post(Web.Request request) throws IOException {
+        if(FeatureFlags.isSecondary()){
+            return new Response(UNAUTHORIZED, "text/plain", "This node is running in secondary mode to an upstream primary, and will not accept writes.");
+        }
         String collection = request.param("collection");
         final Index index = dataStore.getIndex(collection, true);
         BufferedReader in = new BufferedReader(new InputStreamReader(request.inputStream()));
@@ -212,6 +219,12 @@ class Webapp implements Web.Handler {
         StringWriter stacktrace = new StringWriter();
         e.printStackTrace(new PrintWriter(stacktrace));
         return stacktrace.toString();
+    }
+
+    Response sequence(Web.Request request) throws IOException, ResponseException {
+        final Index index = getIndex(request);
+        String output = String.valueOf(index.db.getLatestSequenceNumber());
+        return new Response(OK, "text/html", output);
     }
     
     Response changeFeed(Web.Request request) throws Web.ResponseException, IOException {

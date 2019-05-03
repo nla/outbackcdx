@@ -96,6 +96,7 @@ public class Main {
                     break;
                 case "--primary":
                     collectionUrl = args[++i];
+                    FeatureFlags.setSecondaryMode(true);
                     break;
                 case "--update-interval":
                     pollingInterval = Integer.parseInt(args[++i]);
