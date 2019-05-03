@@ -31,6 +31,10 @@ public class Query {
         outputJson = "json".equals(params.get("output"));
     }
 
+    public String getAccessPoint() {
+        return accessPoint;
+    }
+
     public void addPredicate(Predicate<Capture> predicate) {
         filter = filter.and(predicate);
     }
