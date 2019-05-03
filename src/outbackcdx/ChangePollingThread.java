@@ -117,13 +117,12 @@ public class ChangePollingThread extends Thread {
     private void commitWriteBatch(Index index, long sequenceNumber, String writeBatch) throws RocksDBException {
         Base64.Decoder decoder = Base64.getDecoder();
         byte[] decodedWriteBatch = decoder.decode(writeBatch);
-        WriteBatch batch = new WriteBatch(decodedWriteBatch);
-        try {
+        try (WriteBatch batch = new WriteBatch(decodedWriteBatch)){
             batch.put(SEQ_NUM_KEY, String.valueOf(sequenceNumber).getBytes("ASCII"));
+            index.commitBatch(batch);
         } catch (UnsupportedEncodingException e){
             throw new RuntimeException(e); // ASCII is everywhere; this shouldn't happen.
         }
-        index.commitBatch(batch);
         System.out.println("Committed Write Batch number "+sequenceNumber+" with length "+writeBatch.length());
     }
 }
