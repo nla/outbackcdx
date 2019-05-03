@@ -82,7 +82,8 @@ class Webapp implements Web.Handler {
         router.on(GET, "/<collection>/captures", request -> captures(request));
         router.on(GET, "/<collection>/aliases", request -> aliases(request));
         router.on(GET, "/<collection>/changes", request -> changeFeed(request));
-        router.on(GET, "/<collection>/sequence", request->sequence(request));
+        router.on(GET, "/<collection>/sequence", request -> sequence(request));
+        router.on(POST, "/<collection>/truncate_replication", request -> flushWal(request));
 
         if (FeatureFlags.experimentalAccessControl()) {
             router.on(GET, "/<collection>/ap/<accesspoint>", request -> query(request));
@@ -96,7 +97,6 @@ class Webapp implements Web.Handler {
             router.on(GET, "/<collection>/access/policies", req1 -> listAccessPolicies(req1));
             router.on(POST, "/<collection>/access/policies", request -> postAccessPolicy(request), Permission.POLICIES_EDIT);
             router.on(GET, "/<collection>/access/policies/<policyId>", req -> getAccessPolicy(req));
-            router.on(POST, "/<collection>/truncate_replication", request -> flushWal(request));
         }
     }
 
