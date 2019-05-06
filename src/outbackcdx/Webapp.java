@@ -231,13 +231,13 @@ class Webapp implements Web.Handler {
         String collection = request.param("collection");
         long since = Long.parseLong(request.param("since"));
         final Index index = getIndex(request);
-        try(TransactionLogIterator logReader = index.getUpdatesSince(since)) {
 
-            if (verbose) {
-                out.println(String.format("Received request %s. Retrieved deltas for collection <%s> since sequenceNumber %s", request, collection, since));
-            }
+        if (verbose) {
+            out.println(String.format("Received request %s. Retrieved deltas for collection <%s> since sequenceNumber %s", request, collection, since));
+        }
 
-            Response response = new Response(OK, "application/json", outputStream -> {
+        Response response = new Response(OK, "application/json", outputStream -> {
+            try(TransactionLogIterator logReader = index.getUpdatesSince(since)) {
                 JsonWriter output = GSON.newJsonWriter(new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8)));
                 output.beginArray();
 
@@ -262,14 +262,12 @@ class Webapp implements Web.Handler {
 
                     logReader.next();
                 }
-
                 output.endArray();
                 output.flush();
-            });
-            response.addHeader("Access-Control-Allow-Origin", "*");
-            return response;
-
-        }
+            }
+        });
+        response.addHeader("Access-Control-Allow-Origin", "*");
+        return response;
 
     }
 
