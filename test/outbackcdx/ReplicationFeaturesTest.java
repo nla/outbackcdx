@@ -48,7 +48,6 @@ public class ReplicationFeaturesTest {
         // make a request to a write-able url
         // it should 401.
         POST("/test", "- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n", UNAUTHORIZED);
-        DELETE("/test?url=http://nla.gov.au/", UNAUTHORIZED);
         FeatureFlags.setSecondaryMode(false);
     }
 
@@ -58,8 +57,8 @@ public class ReplicationFeaturesTest {
         // post some CDX
         POST("/testa", "- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n", OK);
         // get the sequenceNumber, should be 1
-        String output = GET("/test/sequence");
-        assertEquals(output, "1");
+        String output = GET("/testa/sequence", OK);
+        assertEquals("2", output);
         FeatureFlags.setSecondaryMode(false);
     }
 
@@ -69,25 +68,33 @@ public class ReplicationFeaturesTest {
         // post some CDX
         POST("/testb", "- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n", OK);
         // check that we get items back from the iterator
-        String output = GET("/testb/changes?since=0", "");
+        String output = GET("/testb/changes", OK, "since", "0");
         // assert output != {}
         assertNotEquals("{}", output);
-        // get index
         Index index = manager.getIndex("testb");
+	index.db.flushWal(true);
         // make a request to delete WAL
         POST("/testb/truncate_replication", String.valueOf(index.db.getLatestSequenceNumber()), OK);
         // check that we get back no items from the iterator
-        output = GET("/testb/changes?since=0", "");
+        output = GET("/testb/changes", OK, "since", "0");
         assertEquals("{}", output);
+        FeatureFlags.setSecondaryMode(false);
     }
 
-    private String GET(String url, String... parmKeysAndValues) throws Exception {
+    private String GET(String url, NanoHTTPD.Response.Status expectedStatus) throws Exception {
+        ReplicationFeaturesTest.DummySession session = new ReplicationFeaturesTest.DummySession(GET, url);
+	NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
+        assertEquals(expectedStatus, response.getStatus());
+        return slurp(response);
+    }
+
+    private String GET(String url, NanoHTTPD.Response.Status expectedStatus, String... parmKeysAndValues) throws Exception {
         ReplicationFeaturesTest.DummySession session = new ReplicationFeaturesTest.DummySession(GET, url);
         for (int i = 0; i < parmKeysAndValues.length; i += 2) {
-            session.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
-        }
-        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
-        assertEquals(OK, response.getStatus());
+	    session.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
+	}
+	NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
+        assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
 
