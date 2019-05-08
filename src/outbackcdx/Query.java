@@ -3,7 +3,7 @@ package outbackcdx;
 import java.util.Map;
 import java.util.function.Predicate;
 
-class Query {
+public class Query {
     String accessPoint;
     MatchType matchType;
     Sort sort;
@@ -14,7 +14,7 @@ class Query {
     long limit;
     Predicate<Capture> filter;
 
-    Query(Map<String,String> params) {
+    public Query(Map<String,String> params) {
         accessPoint = params.get("accesspoint");
         url = params.get("url");
         matchType = MatchType.valueOf(params.getOrDefault("matchType", "default").toUpperCase());
@@ -29,6 +29,14 @@ class Query {
         limit = limitParam == null ? Long.MAX_VALUE : Long.parseLong(limitParam);
 
         outputJson = "json".equals(params.get("output"));
+    }
+
+    public String getAccessPoint() {
+        return accessPoint;
+    }
+
+    public void addPredicate(Predicate<Capture> predicate) {
+        filter = filter.and(predicate);
     }
 
     void expandWildcards() {

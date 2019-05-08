@@ -1,5 +1,6 @@
 CDX_PORT=8081
 CDX_URL=http://localhost:$CDX_PORT/testcol
+JAR=1
 
 children=()
 
@@ -31,9 +32,22 @@ function check {
     fi
 }
 
+function check_negative {
+    if curl -s "$1" | grep -q "$2"; then
+        echo "FAIL Found '$2' on '$1' but wasn't expecting it"
+        exit 1
+    else
+        echo PASS
+    fi
+}
+
 function launch_cdx {
     mkdir -p target/data
-    java -jar ../target/outbackcdx-*.jar -p $CDX_PORT -d target/data &
+    if [ $JAR == 1 ]; then
+        java -jar ../target/outbackcdx-*.jar -p $CDX_PORT -d target/data &
+    else
+        java -cp `find ../target/outbackcdx-*.jar | head -n 1`:service/services.jar outbackcdx.Main -p $CDX_PORT -d target/data &
+    fi
     children+=($!)
     wait_until_listening http://localhost:$CDX_PORT
 
