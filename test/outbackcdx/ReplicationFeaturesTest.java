@@ -62,7 +62,7 @@ public class ReplicationFeaturesTest {
         FeatureFlags.setSecondaryMode(false);
     }
 
-    @Test
+    /*@Test
     public void testDeleteWals() throws Exception {
         FeatureFlags.setSecondaryMode(false);
         // post some CDX
@@ -79,7 +79,7 @@ public class ReplicationFeaturesTest {
         output = GET("/testb/changes", OK, "since", "0");
         assertEquals("{}", output);
         FeatureFlags.setSecondaryMode(false);
-    }
+    }*/
 
     private String GET(String url, NanoHTTPD.Response.Status expectedStatus) throws Exception {
         ReplicationFeaturesTest.DummySession session = new ReplicationFeaturesTest.DummySession(GET, url);
