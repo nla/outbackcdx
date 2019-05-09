@@ -169,7 +169,7 @@ class Webapp implements Web.Handler {
 
     Response post(Web.Request request) throws IOException {
         String collection = request.param("collection");
-        boolean skipBadLines = "skip".contentEquals(request.param("badLines", "error"));
+        boolean skipBadLines = "skip".equals(request.param("badLines", "error"));
         final Index index = dataStore.getIndex(collection, true);
         BufferedReader in = new BufferedReader(new InputStreamReader(request.inputStream()));
         long added = 0;
