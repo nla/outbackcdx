@@ -169,6 +169,7 @@ class Webapp implements Web.Handler {
 
     Response post(Web.Request request) throws IOException {
         String collection = request.param("collection");
+        boolean skipBadLines = "skip".contentEquals(request.param("badLines", "error"));
         final Index index = dataStore.getIndex(collection, true);
         BufferedReader in = new BufferedReader(new InputStreamReader(request.inputStream()));
         long added = 0;
@@ -188,10 +189,20 @@ class Webapp implements Web.Handler {
                         String aliasSurt = UrlCanonicalizer.surtCanonicalize(fields[1]);
                         String targetSurt = UrlCanonicalizer.surtCanonicalize(fields[2]);
                         batch.putAlias(aliasSurt, targetSurt);
+                        added++;
                     } else {
-                        batch.putCapture(Capture.fromCdxLine(line));
+                        try  {
+                            batch.putCapture(Capture.fromCdxLine(line));
+                            added++;
+                        } catch (Exception e) {
+                            if (skipBadLines) {
+                                System.err.println("skipping bad cdx line: " + line);
+                                e.printStackTrace();
+                            } else {
+                                throw e;
+                            }
+                        }
                     }
-                    added++;
                 } catch (Exception e) {
                     return new Response(BAD_REQUEST, "text/plain", "At line: " + line + "\n" + formatStackTrace(e));
                 }
