@@ -71,6 +71,9 @@ public class WebappTest {
             String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F limit:2 offset:0");
             assertEquals(2, StringUtils.countMatches(response, "<result>"));
         }
+        
+        POST("/test", "- 20060614070159 http://nla.gov.au/bad-wolf text/html bad-wolf XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n", BAD_REQUEST);
+        POST("/test", "- 20060614070159 http://nla.gov.au/bad-wolf text/html bad-wolf XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n", OK, "badLines", "skip");
     }
 
     @Test
@@ -221,9 +224,12 @@ public class WebappTest {
     private String POST(String url, String data) throws Exception {
         return POST(url, data, OK);
     }
-    private String POST(String url, String data, NanoHTTPD.Response.Status expectedStatus) throws Exception {
+    private String POST(String url, String data, NanoHTTPD.Response.Status expectedStatus, String... parmKeysAndValues) throws Exception {
         DummySession session = new DummySession(POST, url);
         session.data(data);
+        for (int i = 0; i < parmKeysAndValues.length; i += 2) {
+            session.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
+        }
         NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
