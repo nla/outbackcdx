@@ -786,8 +786,7 @@ public abstract class NanoHTTPD {
                     inputStream.unread(buf, splitbyte, rlen - splitbyte);
                 }
 
-                String uri = getUri() +"?"+ getQueryParameterString();
-                System.out.println(new Date() + " " + getHeaders().get("remote-addr") + " " + getMethod() + " " + uri);
+                String remoteAddr = headers.get("remote-addr");
 
                 parms = new HashMap<String, String>();
                 if (null == headers) {
@@ -812,6 +811,9 @@ public abstract class NanoHTTPD {
                 long contentLength =  Long.parseLong(headers.getOrDefault("content-length", "0"));
                 bodyStream = new BoundedInputStream(inputStream, contentLength);
                 bodyStream.setPropagateClose(false);
+
+                String url = getUri() + "?" + getQueryParameterString();
+                System.out.println(new Date() + " " + getHeaders().get("remote-addr") + " " + getMethod() + " " + url);
 
                 // Ok, now do the serve()
                 Response r = serve(this);
