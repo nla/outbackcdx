@@ -1,23 +1,28 @@
 package outbackcdx;
 
+import static outbackcdx.Json.GSON;
+import static outbackcdx.NanoHTTPD.Response.Status.BAD_REQUEST;
+import static outbackcdx.NanoHTTPD.Response.Status.FORBIDDEN;
+import static outbackcdx.NanoHTTPD.Response.Status.INTERNAL_ERROR;
+import static outbackcdx.NanoHTTPD.Response.Status.NOT_FOUND;
+import static outbackcdx.NanoHTTPD.Response.Status.OK;
+
+import java.io.InputStream;
+import java.net.ServerSocket;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import outbackcdx.NanoHTTPD.IHTTPSession;
 import outbackcdx.NanoHTTPD.Method;
 import outbackcdx.NanoHTTPD.Response;
 import outbackcdx.auth.Authorizer;
 import outbackcdx.auth.Permission;
 import outbackcdx.auth.Permit;
-
-import java.io.InputStream;
-import java.net.ServerSocket;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import static outbackcdx.Json.GSON;
-import static outbackcdx.NanoHTTPD.Response.Status.*;
 
 class Web {
 
@@ -37,6 +42,9 @@ class Web {
 
         @Override
         public Response serve(IHTTPSession session) {
+            String uri = session.getUri() +"?"+ session.getQueryParameterString();
+            System.out.println(new Date() + " " + session.getHeaders().get("remote-addr") + " " + session.getMethod() + " " + uri);  
+
             try {
                 String authnHeader = session.getHeaders().getOrDefault("authorization", "");
                 Permit permit = authorizer.verify(authnHeader);
