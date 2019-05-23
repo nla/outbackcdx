@@ -813,7 +813,7 @@ public abstract class NanoHTTPD {
                 bodyStream.setPropagateClose(false);
 
                 String url = getUri() + "?" + getQueryParameterString();
-                System.out.println(new Date() + " " + getHeaders().get("remote-addr") + " " + getMethod() + " " + url);
+                System.out.println(new Date() + " " + remoteAddr + " " + getMethod() + " " + url);
 
                 // Ok, now do the serve()
                 Response r = serve(this);
