@@ -786,6 +786,9 @@ public abstract class NanoHTTPD {
                     inputStream.unread(buf, splitbyte, rlen - splitbyte);
                 }
 
+                String uri = getUri() +"?"+ getQueryParameterString();
+                System.out.println(new Date() + " " + getHeaders().get("remote-addr") + " " + getMethod() + " " + uri);
+
                 parms = new HashMap<String, String>();
                 if (null == headers) {
                     headers = new HashMap<String, String>();

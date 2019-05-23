@@ -42,9 +42,6 @@ class Web {
 
         @Override
         public Response serve(IHTTPSession session) {
-            String uri = session.getUri() +"?"+ session.getQueryParameterString();
-            System.out.println(new Date() + " " + session.getHeaders().get("remote-addr") + " " + session.getMethod() + " " + uri);  
-
             try {
                 String authnHeader = session.getHeaders().getOrDefault("authorization", "");
                 Permit permit = authorizer.verify(authnHeader);
