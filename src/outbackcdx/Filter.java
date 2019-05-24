@@ -17,14 +17,14 @@ interface Filter extends Predicate<Capture> {
         Matcher m = FILTER_RE.matcher(spec);
         if (!m.matches()) throw new IllegalArgumentException("Invalid filter: " + spec);
 
-        String field = m.group(4);
-        boolean invert = m.group(3) != null;
-        boolean substring = m.group(2) != null;
+        String field = m.group(3);
+        boolean invert = m.group(2) != null;
+        boolean substring = m.group(1) != null;
 
         if (substring) {
-            return new SubstringFilter(m.group(5), field, invert);
+            return new SubstringFilter(m.group(4), field, invert);
         } else {
-            return new RegexFilter(m.group(5), field, invert);
+            return new RegexFilter(m.group(4), field, invert);
         }
     }
 
