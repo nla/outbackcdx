@@ -10,7 +10,6 @@ import outbackcdx.auth.Permit;
 
 import java.io.*;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.Map;
 
 public class UWeb {
@@ -77,15 +76,17 @@ public class UWeb {
 
     static class URequest implements Web.Request {
         private final HttpServerExchange exchange;
-        private final Map<String,String> params;
+        private final MultiMap<String,String> params;
         private final Permit permit;
 
         public URequest(HttpServerExchange exchange, Permit permit) {
             this.exchange = exchange;
             this.permit = permit;
-            params = new HashMap<>();
+            params = new MultiMap<>();
             for (Map.Entry<String, Deque<String>> pair : exchange.getQueryParameters().entrySet()) {
-                params.put(pair.getKey(), pair.getValue().getFirst());
+                for (String value: pair.getValue()) {
+                    params.add(pair.getKey(), value);
+                }
             }
         }
 
@@ -100,7 +101,7 @@ public class UWeb {
         }
 
         @Override
-        public Map<String, String> params() {
+        public MultiMap<String, String> params() {
             return params;
         }
 

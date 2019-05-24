@@ -1,6 +1,5 @@
 package outbackcdx;
 
-import java.util.Map;
 import java.util.function.Predicate;
 
 public class Query {
@@ -12,15 +11,22 @@ public class Query {
     String[] fields;
     boolean outputJson;
     long limit;
-    Predicate<Capture> filter;
+    Predicate<Capture> predicate;
 
-    public Query(Map<String,String> params) {
+    public Query(MultiMap<String,String> params) {
         accessPoint = params.get("accesspoint");
         url = params.get("url");
         matchType = MatchType.valueOf(params.getOrDefault("matchType", "default").toUpperCase());
         sort = Sort.valueOf(params.getOrDefault("sort", "default").toUpperCase());
         closest = params.get("closest");
-        filter = params.containsKey("filter") ? new RegexFilter(params.get("filter")) : (capture -> true);
+
+        predicate = capture -> true;
+        if (params.getAll("filter") != null) {
+            for (String filterSpec: params.getAll("filter")) {
+                Filter filter = Filter.fromSpec(filterSpec);
+                addPredicate(filter);
+            }
+        }
 
         String fl = params.getOrDefault("fl", "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename");
         fields = fl.split(",");
@@ -36,7 +42,7 @@ public class Query {
     }
 
     public void addPredicate(Predicate<Capture> predicate) {
-        filter = filter.and(predicate);
+        this.predicate = this.predicate.and(predicate);
     }
 
     void expandWildcards() {

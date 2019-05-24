@@ -76,7 +76,7 @@ class Web {
         }
 
         @Override
-        public Map<String, String> params() {
+        public MultiMap<String, String> params() {
             return session.getParms();
         }
 
@@ -243,7 +243,7 @@ class Web {
 
         String path();
 
-        Map<String, String> params();
+        MultiMap<String, String> params();
 
         String header(String name);
 

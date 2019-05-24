@@ -701,7 +701,7 @@ public abstract class NanoHTTPD {
     public interface IHTTPSession {
         void execute() throws IOException;
 
-        Map<String, String> getParms();
+        MultiMap<String, String> getParms();
 
         Map<String, String> getHeaders();
 
@@ -726,7 +726,7 @@ public abstract class NanoHTTPD {
         private int rlen;
         private String uri;
         private Method method;
-        private Map<String, String> parms;
+        private MultiMap<String, String> parms;
         private Map<String, String> headers;
         private String queryParameterString;
 
@@ -788,7 +788,7 @@ public abstract class NanoHTTPD {
 
                 String remoteAddr = headers.get("remote-addr");
 
-                parms = new HashMap<String, String>();
+                parms = new MultiMap<String, String>();
                 if (null == headers) {
                     headers = new HashMap<String, String>();
                 } else {
@@ -848,7 +848,7 @@ public abstract class NanoHTTPD {
         /**
          * Decodes the sent headers and loads the data into Key/value pairs
          */
-        private void decodeHeader(BufferedReader in, Map<String, String> pre, Map<String, String> parms, Map<String, String> headers)
+        private void decodeHeader(BufferedReader in, Map<String, String> pre, MultiMap<String, String> parms, Map<String, String> headers)
                 throws ResponseException {
             try {
                 // Read the request line
@@ -960,7 +960,7 @@ public abstract class NanoHTTPD {
          * Decodes parameters in percent-encoded URI-format ( e.g. "name=Jack%20Daniels&pass=Single%20Malt" ) and
          * adds them to given Map. NOTE: this doesn't support multiple identical keys due to the simplicity of Map.
          */
-        private void decodeParms(String parms, Map<String, String> p) {
+        private void decodeParms(String parms, MultiMap<String, String> p) {
             if (parms == null) {
                 queryParameterString = "";
                 return;
@@ -972,16 +972,16 @@ public abstract class NanoHTTPD {
                 String e = st.nextToken();
                 int sep = e.indexOf('=');
                 if (sep >= 0) {
-                    p.put(decodePercent(e.substring(0, sep)).trim(),
+                    p.add(decodePercent(e.substring(0, sep)).trim(),
                             decodePercent(e.substring(sep + 1)));
                 } else {
-                    p.put(decodePercent(e).trim(), "");
+                    p.add(decodePercent(e).trim(), "");
                 }
             }
         }
 
         @Override
-        public final Map<String, String> getParms() {
+        public final MultiMap<String, String> getParms() {
             return parms;
         }
 
