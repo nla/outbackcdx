@@ -110,4 +110,8 @@ public class MultiMap<K, V> implements Map<K, V> {
         }
     }
     
+    @Override
+    public String toString() {
+        return inner.toString();
+    }
 }
