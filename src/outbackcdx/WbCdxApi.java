@@ -1,13 +1,17 @@
 package outbackcdx;
 
-import com.google.gson.stream.JsonWriter;
-import outbackcdx.NanoHTTPD.Response;
-
-import java.io.*;
-
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static outbackcdx.Json.GSON;
 import static outbackcdx.NanoHTTPD.Response.Status.OK;
+
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+
+import com.google.gson.stream.JsonWriter;
+
+import outbackcdx.NanoHTTPD.Response;
 
 /**
  * Implements a partial, semi-compatible subset of the various CDX server APIs.
@@ -19,10 +23,8 @@ import static outbackcdx.NanoHTTPD.Response.Status.OK;
  * pywb: https://github.com/ikreymer/pywb/wiki/CDX-Server-API
  */
 public class WbCdxApi {
-    private static Query query;
-
     public static Response queryIndex(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins) {
-        query = new Query(request.params());
+        Query query = new Query(request.params());
         for (FilterPlugin filterPlugin : filterPlugins) {
             query.addPredicate(filterPlugin.newFilter(query));
         }
@@ -47,10 +49,6 @@ public class WbCdxApi {
         });
         response.addHeader("Access-Control-Allow-Origin", "*");
         return response;
-    }
-
-    public Query getQuery() {
-        return query;
     }
 
     interface OutputFormat {
