@@ -22,7 +22,7 @@ public class Query {
         closest = params.get("closest");
         filter = params.containsKey("filter") ? new RegexFilter(params.get("filter")) : (capture -> true);
 
-        String fl = params.getOrDefault("fl", "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename");
+        String fl = params.getOrDefault("fl", "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename,originalLength,originalOffset,originalFilename");
         fields = fl.split(",");
 
         String limitParam = params.get("limit");

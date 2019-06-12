@@ -28,7 +28,7 @@ import java.util.Map;
  * value is a schema version number to allow fields to be added or removed in later versions.
  */
 public class Capture {
-    private static int CURRENT_VERSION = 2;
+    private static int CURRENT_VERSION = 3;
     static final DateTimeFormatter arcTimeFormat = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     static final Base32 base32 = new Base32();
 
@@ -43,6 +43,11 @@ public class Capture {
     public long compressedoffset;
     public String redirecturl;
     public String robotflags;
+
+    // Additional properties for CDX14
+    public long originalLength = -1;
+    public long originalCompressedoffset = -1;
+    public String originalFile = "-";
 
     public Capture(Map.Entry<byte[], byte[]> entry) {
         this(entry.getKey(), entry.getValue());
@@ -88,6 +93,9 @@ public class Capture {
             case 2:
                 decodeValueV2(bb);
                 break;
+            case 3:
+                decodeValueV3(bb);
+                break;
             default:
                 throw new IllegalArgumentException("CDX encoding is too new (v" + version + ") only versions up to v"
                         + CURRENT_VERSION + " are supported");
@@ -123,6 +131,10 @@ public class Capture {
         robotflags = VarInt.decodeAscii(bb);
     }
 
+    private void decodeValueV3(ByteBuffer bb) {
+        decodeValueV2(bb);
+    }
+
     public int sizeValue() {
         return VarInt.size(CURRENT_VERSION) +
                 VarInt.sizeAscii(original) +
@@ -156,21 +168,40 @@ public class Capture {
     }
 
     /**
-     * Format as a CDX11 line.
+     * Format as a CDX11 line, or CDX14, depending on what fields are present.
      */
     public String toString() {
         StringBuilder out = new StringBuilder();
-        out.append(urlkey).append(' ');
-        out.append(Long.toString(timestamp)).append(' ');
-        out.append(original).append(' ');
-        out.append(mimetype).append(' ');
-        out.append(Integer.toString(status)).append(' ');
-        out.append(digest).append(' ');
-        out.append(redirecturl).append(' ');
-        out.append(robotflags).append(' ');
-        out.append(Long.toString(length)).append(' ');
-        out.append(compressedoffset).append(' ');
+        out.append(urlkey).append(" ");
+        out.append(Long.toString(timestamp)).append(" ");
+        out.append(original).append(" ");
+        out.append(mimetype).append(" ");
+        out.append(Integer.toString(status)).append(" ");
+        out.append(digest).append(" ");
+        out.append(redirecturl).append(" ");
+        out.append(robotflags).append(" ");
+        out.append(Long.toString(length)).append(" ");
+        out.append(compressedoffset).append(" ");
         out.append(file);
+
+        if (CURRENT_VERSION == 3) {
+            out.append(" ");
+
+            if (originalLength > 0) {
+                out.append(Long.toString(originalLength)).append(" ");
+            } else {
+                out.append("-").append(" ");
+            }
+
+            if (originalCompressedoffset > 0) {
+                out.append(Long.toString(originalCompressedoffset)).append(" ");
+            } else {
+                out.append("-").append(" ");
+            }
+
+            out.append(originalFile);
+        }
+
         return out.toString();
     }
 
@@ -190,6 +221,12 @@ public class Capture {
             capture.length = fields[8].equals("-") ? 0 : Long.parseLong(fields[8]);
             capture.compressedoffset = Long.parseLong(fields[9]);
             capture.file = fields[10];
+
+            if (fields.length == 14 ) { // 14 fields: CDX N b a m s k r M S V g
+                capture.originalLength = fields[11].equals("-") ? 0 : Long.parseLong(fields[11]);
+                capture.originalCompressedoffset = fields[12].equals("-") ? 0 : Long.parseLong(fields[12]);
+                capture.originalFile = fields[13];
+            }
         } else if (fields.length == 10) { // 10 fields:  CDX N b a m s k r M V g
             capture.robotflags = fields[7];
             capture.compressedoffset = Long.parseLong(fields[8]);
@@ -199,6 +236,7 @@ public class Capture {
             capture.compressedoffset = Long.parseLong(fields[7]);
             capture.file = fields[8];
         }
+
         return capture;
     }
 
@@ -243,6 +281,12 @@ public class Capture {
                 return compressedoffset;
             case "filename":
                 return file;
+            case "originalLength":
+                return (originalLength != -1) ? originalLength : "-";
+            case "originalOffset":
+                return (originalCompressedoffset != -1) ? originalCompressedoffset : "-";
+            case "originalFilename":
+                return originalFile;
             default:
                 throw new IllegalArgumentException("no such capture field: " + field);
         }
