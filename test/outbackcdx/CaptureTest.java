@@ -12,7 +12,7 @@ public class CaptureTest {
         byte[] key = src.encodeKey();
         byte[] value = src.encodeValue();
 
-        assertEquals(2, value[0]);
+        assertEquals(3, value[0]);
         assertEquals(8, value[1]);
         assertEquals('o', value[2]);
         assertEquals('r', value[3]);
