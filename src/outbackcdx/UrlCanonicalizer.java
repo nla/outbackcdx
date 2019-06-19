@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -101,8 +102,44 @@ public class UrlCanonicalizer {
         }
     }
 
+    protected static Pattern SPECIAL_URL_REGEX =
+            Pattern.compile("^((?:urn:)?[^:]+):(https?://.*)", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Canonicalizes <code>url</code> and returns in SURT form, for use as a key in
+     * the CDX index.
+     *
+     * <p>
+     * Handles urls that look like <code>{some-scheme}:{http(s)-url}</code>
+     * specially, e.g.
+     *
+     * <ul>
+     * <li><code>youtube-dl:http://example.com/</code>
+     * <li><code>urn:transclusions:http://example.com/</code>
+     * <li><code>screenshot:https://example.com/</code>
+     * </ul>
+     *
+     * <p>
+     * We split the scheme off, canonicalize and surtify the http(s) url, then stick
+     * the scheme back on. For example, <code>youtube-dl:http://example.com/</code>
+     * becomes <code>youtube-dl:com,example)/</code>.
+     *
+     * <p>
+     * As an extra-special case, we change the scheme
+     * <code>urn:transclusions</code> to <code>youtube-dl</code>, since by
+     * convention, both schemes indicate youtube-dl json.
+     */
     public static String surtCanonicalize(String url) {
-        return toUnschemedSurt(canonicalize(url));
+        Matcher m = SPECIAL_URL_REGEX.matcher(url);
+        if (m.matches()) {
+            String scheme = canonicalizeScheme(m.group(1));
+            if ("urn:transclusions".equals(scheme)) {
+                scheme = "youtube-dl";
+            }
+            return scheme + ":" + toUnschemedSurt(canonicalize(m.group(2)));
+        } else {
+            return toUnschemedSurt(canonicalize(url));
+        }
     }
 
     private static boolean hasScheme(String url) {
