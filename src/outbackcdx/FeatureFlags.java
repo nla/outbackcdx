@@ -48,12 +48,17 @@ public class FeatureFlags {
 
     public static boolean isSecondary() { return secondaryMode; }
 
+    public static void setAcceptWrites(boolean enabled){ acceptWrites = enabled; }
+
+    public static boolean acceptsWrites() { return acceptWrites; }
+
     public static Map<String, Boolean> asMap() {
         Map<String,Boolean> map = new HashMap<>();
         map.put("experimentalAccessControl", experimentalAccessControl());
         map.put("pandoraHacks", pandoraHacks());
         map.put("secondaryMode", isSecondary());
         map.put("filterPlugins", filterPlugins());
+        map.put("acceptsWrites", acceptsWrites());
         return map;
     }
 }

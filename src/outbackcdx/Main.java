@@ -39,6 +39,7 @@ public class Main {
         System.err.println("Secondary mode (runs read-only; polls upstream server on 'collection-url' for changes)");
         System.err.println("  --primary collection-url           URL of collection on upstream primary to poll for changes");
         System.err.println("  --update-interval poll-interval    Polling frequency for upstream changes, in seconds. Default: 10");
+        System.err.println("  --accept-writes                    Allow writes to this node, even though running as a secondary");
         System.exit(1);
     }
 
@@ -97,6 +98,9 @@ public class Main {
                 case "--primary":
                     collectionUrl = args[++i];
                     FeatureFlags.setSecondaryMode(true);
+                    break;
+                case "--accept-writes":
+                    FeatureFlags.setAcceptWrites(true);
                     break;
                 case "--update-interval":
                     pollingInterval = Integer.parseInt(args[++i]);
