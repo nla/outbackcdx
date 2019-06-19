@@ -143,7 +143,7 @@ class Webapp implements Web.Handler {
     }
 
     Response delete(Web.Request request) throws IOException {
-        if(FeatureFlags.isSecondary()){
+        if(FeatureFlags.isSecondary() && !FeatureFlags.acceptsWrites()){
             return new Response(UNAUTHORIZED, "text/plain", "This node is running in secondary mode to an upstream primary, and will not accept writes.");
         }
         String collection = request.param("collection");
@@ -178,7 +178,7 @@ class Webapp implements Web.Handler {
     }
 
     Response post(Web.Request request) throws IOException {
-        if(FeatureFlags.isSecondary()){
+        if(FeatureFlags.isSecondary() && !FeatureFlags.acceptsWrites()){
             return new Response(UNAUTHORIZED, "text/plain", "This node is running in secondary mode to an upstream primary, and will not accept writes.");
         }
         String collection = request.param("collection");
