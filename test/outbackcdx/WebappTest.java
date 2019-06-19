@@ -274,7 +274,7 @@ public class WebappTest {
     private static class DummySession implements NanoHTTPD.IHTTPSession {
         private final NanoHTTPD.Method method;
         InputStream stream = new ByteArrayInputStream(new byte[0]);
-        Map<String, String> parms = new HashMap<String, String>();
+        MultiMap<String, String> parms = new MultiMap<String, String>();
         String url;
 
         public DummySession(NanoHTTPD.Method method, String url) {
@@ -288,7 +288,7 @@ public class WebappTest {
         }
 
         public DummySession parm(String key, String value) {
-            parms.put(key, value);
+            parms.add(key, value);
             return this;
         }
 
@@ -298,7 +298,7 @@ public class WebappTest {
         }
 
         @Override
-        public Map<String, String> getParms() {
+        public MultiMap<String, String> getParms() {
             return parms;
         }
 

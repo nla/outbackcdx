@@ -117,7 +117,7 @@ public class Index {
     }
 
     public Iterable<Capture> execute(Query query) {
-        Predicate<Capture> filter = query.filter;
+        Predicate<Capture> filter = query.predicate;
         if (query.accessPoint != null && accessControl != null) {
             filter = filter.and(accessControl.filter(query.accessPoint, new Date()));
         }

@@ -420,6 +420,12 @@ public abstract class NanoHTTPD {
         private boolean chunkedTransfer;
 
         /**
+         * Url that spawned this response.
+         */
+        public String url;
+        public String remoteAddr;
+
+        /**
          * Default constructor: response = HTTP_OK, mime = MIME_HTML and your supplied message
          */
         public Response(String msg) {
@@ -469,7 +475,10 @@ public abstract class NanoHTTPD {
         /**
          * Sends given response to the socket.
          */
-        protected void send(OutputStream outputStream) {
+        protected void send(OutputStream rawOut) {
+            long start = System.currentTimeMillis();
+            CountingOutputStream outputStream = new CountingOutputStream(rawOut);
+
             String mime = mimeType;
             SimpleDateFormat gmtFrmt = new SimpleDateFormat("E, d MMM yyyy HH:mm:ss 'GMT'", Locale.US);
             gmtFrmt.setTimeZone(TimeZone.getTimeZone("GMT"));
@@ -522,6 +531,10 @@ public abstract class NanoHTTPD {
                 }
                 outputStream.flush();
                 safeClose(data);
+
+                String elapsed = String.format("%.3f", 1.0 * (System.currentTimeMillis() - start) / 1000);
+                System.out.println(new Date() + " " + remoteAddr + " " + status.getRequestStatus() + " "
+                        + outputStream.count + " " + elapsed + "s " + requestMethod + " " + url);
             } catch (IOException ioe) {
                 // Couldn't write? No can do.
             }
@@ -701,7 +714,7 @@ public abstract class NanoHTTPD {
     public interface IHTTPSession {
         void execute() throws IOException;
 
-        Map<String, String> getParms();
+        MultiMap<String, String> getParms();
 
         Map<String, String> getHeaders();
 
@@ -726,7 +739,7 @@ public abstract class NanoHTTPD {
         private int rlen;
         private String uri;
         private Method method;
-        private Map<String, String> parms;
+        private MultiMap<String, String> parms;
         private Map<String, String> headers;
         private String queryParameterString;
 
@@ -747,6 +760,7 @@ public abstract class NanoHTTPD {
 
         @Override
         public void execute() throws IOException {
+            String remoteAddr = null;
             try {
                 // Read the first 8192 bytes.
                 // The full header should fit in here.
@@ -786,7 +800,9 @@ public abstract class NanoHTTPD {
                     inputStream.unread(buf, splitbyte, rlen - splitbyte);
                 }
 
-                parms = new HashMap<String, String>();
+                remoteAddr = headers.get("remote-addr");
+
+                parms = new MultiMap<String, String>();
                 if (null == headers) {
                     headers = new HashMap<String, String>();
                 } else {
@@ -812,6 +828,8 @@ public abstract class NanoHTTPD {
 
                 // Ok, now do the serve()
                 Response r = serve(this);
+                r.url = getUri() + "?" + getQueryParameterString();
+                r.remoteAddr = remoteAddr;
 
                 // ensure body is consumed
                 if (contentLength > 0) {
@@ -831,10 +849,14 @@ public abstract class NanoHTTPD {
                 throw ste;
             } catch (IOException ioe) {
                 Response r = new Response(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "SERVER INTERNAL ERROR: IOException: " + ioe.getMessage());
+                r.url = getUri() + "?" + getQueryParameterString();
+                r.remoteAddr = remoteAddr;
                 r.send(outputStream);
                 safeClose(outputStream);
             } catch (ResponseException re) {
                 Response r = new Response(re.getStatus(), MIME_PLAINTEXT, re.getMessage());
+                r.url = getUri() + "?" + getQueryParameterString();
+                r.remoteAddr = remoteAddr;
                 r.send(outputStream);
                 safeClose(outputStream);
             }
@@ -843,7 +865,7 @@ public abstract class NanoHTTPD {
         /**
          * Decodes the sent headers and loads the data into Key/value pairs
          */
-        private void decodeHeader(BufferedReader in, Map<String, String> pre, Map<String, String> parms, Map<String, String> headers)
+        private void decodeHeader(BufferedReader in, Map<String, String> pre, MultiMap<String, String> parms, Map<String, String> headers)
                 throws ResponseException {
             try {
                 // Read the request line
@@ -955,7 +977,7 @@ public abstract class NanoHTTPD {
          * Decodes parameters in percent-encoded URI-format ( e.g. "name=Jack%20Daniels&pass=Single%20Malt" ) and
          * adds them to given Map. NOTE: this doesn't support multiple identical keys due to the simplicity of Map.
          */
-        private void decodeParms(String parms, Map<String, String> p) {
+        private void decodeParms(String parms, MultiMap<String, String> p) {
             if (parms == null) {
                 queryParameterString = "";
                 return;
@@ -967,16 +989,16 @@ public abstract class NanoHTTPD {
                 String e = st.nextToken();
                 int sep = e.indexOf('=');
                 if (sep >= 0) {
-                    p.put(decodePercent(e.substring(0, sep)).trim(),
+                    p.add(decodePercent(e.substring(0, sep)).trim(),
                             decodePercent(e.substring(sep + 1)));
                 } else {
-                    p.put(decodePercent(e).trim(), "");
+                    p.add(decodePercent(e).trim(), "");
                 }
             }
         }
 
         @Override
-        public final Map<String, String> getParms() {
+        public final MultiMap<String, String> getParms() {
             return parms;
         }
 
@@ -1002,6 +1024,27 @@ public abstract class NanoHTTPD {
         @Override
         public final InputStream getInputStream() {
             return bodyStream;
+        }
+    }
+
+    // copied from guava
+    static final class CountingOutputStream extends FilterOutputStream {
+        long count = 0l;
+
+        public CountingOutputStream(OutputStream out) {
+            super(out);
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+            out.write(b, off, len);
+            count += len;
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+            out.write(b);
+            count++;
         }
     }
 }

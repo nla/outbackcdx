@@ -1,11 +1,8 @@
 package outbackcdx;
 
-import org.junit.Test;
-
-import java.util.HashMap;
-import java.util.Map;
-
 import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
 
 public class WbCdxApiTest {
     @Test
@@ -16,7 +13,7 @@ public class WbCdxApiTest {
 
     @Test
     public void queryDefaultShouldExpandPrefixWildcards() {
-        Map<String,String> params = new HashMap<>();
+        MultiMap<String,String> params = new MultiMap<>();
         params.put("url", "http://example.org/*");
         Query query = new Query(params);
         query.expandWildcards();
@@ -26,7 +23,7 @@ public class WbCdxApiTest {
 
     @Test
     public void queryDefaultShouldExpandDomainWildcards() {
-        Map<String,String> params = new HashMap<>();
+        MultiMap<String,String> params = new MultiMap<>();
         params.put("url", "*.example.org");
         Query query = new Query(params);
         query.expandWildcards();
@@ -36,7 +33,7 @@ public class WbCdxApiTest {
 
     @Test
     public void queryExactMatchShouldNotExpandWildcards() {
-        Map<String,String> params = new HashMap<>();
+        MultiMap<String,String> params = new MultiMap<>();
         params.put("url", "http://example.org/*");
         params.put("matchType", "exact");
         Query query = new Query(params);

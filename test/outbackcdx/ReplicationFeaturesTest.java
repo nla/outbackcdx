@@ -135,7 +135,7 @@ public class ReplicationFeaturesTest {
     private static class DummySession implements NanoHTTPD.IHTTPSession {
         private final NanoHTTPD.Method method;
         InputStream stream = new ByteArrayInputStream(new byte[0]);
-        Map<String, String> parms = new HashMap<String, String>();
+        MultiMap<String, String> parms = new MultiMap<String, String>();
         String url;
 
         public DummySession(NanoHTTPD.Method method, String url) {
@@ -159,7 +159,7 @@ public class ReplicationFeaturesTest {
         }
 
         @Override
-        public Map<String, String> getParms() {
+        public MultiMap<String, String> getParms() {
             return parms;
         }
 
