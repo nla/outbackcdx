@@ -13,6 +13,7 @@ public class FeatureFlags {
     private static boolean pandoraHacks;
     private static boolean secondaryMode;
     private static boolean filterPlugins;
+    private static boolean acceptWrites;
 
     static {
         experimentalAccessControl = "1".equals(System.getenv("EXPERIMENTAL_ACCESS_CONTROL"));
