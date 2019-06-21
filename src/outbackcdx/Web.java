@@ -7,13 +7,13 @@ import static outbackcdx.NanoHTTPD.Response.Status.INTERNAL_ERROR;
 import static outbackcdx.NanoHTTPD.Response.Status.NOT_FOUND;
 import static outbackcdx.NanoHTTPD.Response.Status.OK;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.ServerSocket;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,6 +25,7 @@ import outbackcdx.auth.Permission;
 import outbackcdx.auth.Permit;
 
 class Web {
+    private static final Map<String,String> versionCache = new HashMap<>();
 
     interface Handler {
         Response handle(Request request) throws Exception;
@@ -132,6 +133,60 @@ class Web {
             throw new IllegalArgumentException("No such resource: " + file);
         }
         return req -> new Response(OK, guessType(file), url.openStream());
+    }
+
+    static synchronized String version(String groupId, String artifactId) {
+        String version = versionCache.get(groupId + ":" + artifactId);
+        if (version != null) return version;
+        String path = "/META-INF/maven/" + groupId + "/" + artifactId + "/pom.properties";
+        URL url = Webapp.class.getResource(path);
+        if (url == null) throw new RuntimeException("Not found on classpath: " + path);
+        Properties properties = new Properties();
+        try (InputStream stream = url.openStream()) {
+            properties.load(stream);
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading " + path, e);
+        }
+        version = properties.getProperty("version");
+        versionCache.put(groupId + ":" + artifactId, version);
+        return version;
+    }
+
+    static Handler interpolated(String file) {
+        URL url = Web.class.getResource(file);
+        if (url == null) {
+            throw new IllegalArgumentException("No such resource: " + file);
+        }
+        String raw;
+        try (InputStream stream = url.openStream()) {
+            raw = slurp(stream);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        String processed = interpolate(raw);
+        return req -> new Response(OK, guessType(file), processed);
+    }
+
+    private static String interpolate(String raw) {
+        StringBuilder sb = new StringBuilder();
+        Matcher m = Pattern.compile("\\$\\{version:([^:}]+):([^:}]+)}").matcher(raw);
+        int pos = 0;
+        while (m.find()) {
+            sb.append(raw, pos, m.start());
+            sb.append(version(m.group(1), m.group(2)));
+            pos = m.end();
+        }
+        sb.append(raw, pos, raw.length());
+        return sb.toString();
+    }
+
+    private static String slurp(InputStream stream) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        for (int n = stream.read(buffer); n >= 0; n = stream.read(buffer)) {
+            baos.write(buffer, 0, n);
+        }
+        return baos.toString("utf-8");
     }
 
     static Response jsonResponse(Object data) {
