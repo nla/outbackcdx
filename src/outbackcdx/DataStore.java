@@ -60,8 +60,11 @@ public class DataStore implements Closeable {
             dbOptions.setCreateIfMissing(createAllowed);
             dbOptions.setMaxBackgroundCompactions(Math.min(8, Runtime.getRuntime().availableProcessors()));
             dbOptions.setAvoidFlushDuringRecovery(true);
-            if(replicationWindow == 0) {
+            dbOptions.setWalSizeLimitMB(Long.MAX_VALUE);
+            dbOptions.setMaxTotalWalSize(Long.MAX_VALUE);
+            if(replicationWindow <= 0) {
                 dbOptions.setManualWalFlush(true);
+                dbOptions.setWalTtlSeconds(Long.MAX_VALUE);
             } else {
                 dbOptions.setManualWalFlush(false);
                 dbOptions.setWalTtlSeconds(replicationWindow);
