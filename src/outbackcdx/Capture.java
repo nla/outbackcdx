@@ -133,6 +133,9 @@ public class Capture {
 
     private void decodeValueV3(ByteBuffer bb) {
         decodeValueV2(bb);
+        originalLength = VarInt.decode(bb);
+        originalFile = VarInt.decodeAscii(bb);
+        originalCompressedoffset = VarInt.decode(bb);
     }
 
     public int sizeValue() {
@@ -145,7 +148,10 @@ public class Capture {
                 VarInt.sizeAscii(file) +
                 VarInt.size(compressedoffset) +
                 VarInt.sizeAscii(redirecturl) +
-                VarInt.sizeAscii(robotflags);
+                VarInt.sizeAscii(robotflags) +
+                VarInt.size(originalLength) +
+                VarInt.sizeAscii(originalFile) +
+                VarInt.size(originalCompressedoffset);
     }
 
     public void encodeValue(ByteBuffer bb) {
@@ -159,6 +165,9 @@ public class Capture {
         VarInt.encode(bb, compressedoffset);
         VarInt.encodeAscii(bb, redirecturl);
         VarInt.encodeAscii(bb, robotflags);
+        VarInt.encode(bb, originalLength);
+        VarInt.encodeAscii(bb, originalFile);
+        VarInt.encode(bb, originalCompressedoffset);
     }
 
     public byte[] encodeValue() {
