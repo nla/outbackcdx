@@ -13,7 +13,9 @@ import java.net.ServerSocket;
 import java.net.URL;
 import java.nio.channels.Channel;
 import java.nio.channels.ServerSocketChannel;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -53,7 +55,7 @@ public class Main {
         boolean verbose = false;
         Authorizer authorizer = new NullAuthorizer();
         int pollingInterval = 10;
-        String collectionUrl = null;
+        List<String> collectionUrls = new ArrayList<>();
         long replicationWindow = 60 * 60 * 24 * 2; // two days
 
         Map<String,Object> dashboardConfig = new HashMap<>();
@@ -96,7 +98,7 @@ public class Main {
                     webThreads = Integer.parseInt(args[++i]);
                     break;
                 case "--primary":
-                    collectionUrl = args[++i];
+                    collectionUrls.add(args[++i]);
                     FeatureFlags.setSecondaryMode(true);
                     break;
                 case "--accept-writes":
@@ -125,7 +127,7 @@ public class Main {
                 ServerSocket socket = openSocket(host, port, inheritSocket);
                 Web.Server server = new Web.Server(socket, controller, authorizer);
                 ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
-                if (collectionUrl != null){
+                for (String collectionUrl: collectionUrls) {
                     ChangePollingThread cpt = new ChangePollingThread(collectionUrl, pollingInterval, dataStore);
                     cpt.setDaemon(true);
                     cpt.start();
