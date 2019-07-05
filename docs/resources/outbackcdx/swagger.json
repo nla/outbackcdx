@@ -76,11 +76,32 @@
             "description": "Output format"
           },
           {
+            "name": "filter",
+            "in": "query",
+            "type": "string",
+            "description": "Regular expression used to filter the results",
+            "example": "!mimetype:warc/revisit"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "integer",
+            "description": "Limit the number of results to no more than the number specified",
+            "example": 10
+          },
+          {
             "name": "fl",
             "in": "query",
             "type": "string",
             "description": "Comma-separated list of fields to include in output",
             "example": "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename"
+          },
+          {
+            "name": "accesspoint",
+            "in": "query",
+            "type": "string",
+            "description": "If experimental access control is enabled, the name of the access point (this may also be accessed from the path: /{collection}/ap/{accesspoint} )",
+            "example": "public"
           }
         ]
       }

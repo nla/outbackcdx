@@ -34,7 +34,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>2.1</version>
+                <version>3.2.1</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -47,43 +47,6 @@
                                     <mainClass>outbackcdx.Main</mainClass>
                                 </transformer>
                             </transformers>
-                            <filters>
-                                <filter>
-                                    <artifact>org.webjars.npm:vue</artifact>
-                                    <includes>
-                                        <include>META-INF/resources/webjars/vue/2.0.1/dist/vue.js</include>
-                                        <include>META-INF/resources/webjars/vue/2.0.1/LICENSE</include>
-                                    </includes>
-                                </filter>
-                                <filter>
-                                    <artifact>org.webjars.npm:pikaday</artifact>
-                                    <includes>
-                                        <include>META-INF/resources/webjars/pikaday/1.4.0/pikaday.js</include>
-                                        <include>META-INF/resources/webjars/pikaday/1.4.0/css/pikaday.css</include>
-                                        <include>META-INF/resources/webjars/pikaday/1.4.0/LICENSE</include>
-                                    </includes>
-                                </filter>
-                                <filter>
-                                    <artifact>org.webjars.npm:moment</artifact>
-                                    <includes>
-                                        <include>META-INF/resources/webjars/moment/2.15.2/min/moment.min.js</include>
-                                        <include>META-INF/resources/webjars/moment/2.15.2/LICENSE</include>
-                                    </includes>
-                                </filter>
-                                <filter>
-                                    <artifact>org.webjars:lodash</artifact>
-                                    <includes>
-                                        <include>META-INF/resources/webjars/lodash/4.15.0/lodash.min.js</include>
-                                    </includes>
-                                </filter>
-                                <filter>
-                                    <artifact>org.webjars.bower:redoc</artifact>
-                                    <includes>
-                                        <include>META-INF/resources/webjars/redoc/1.4.1/dist/redoc.min.js</include>
-                                        <include>META-INF/resources/webjars/redoc/1.4.1/LICENSE</include>
-                                    </includes>
-                                </filter>
-                            </filters>
                         </configuration>
                     </execution>
                 </executions>
@@ -91,7 +54,7 @@
             <plugin>
                 <groupId>org.eluder.coveralls</groupId>
                 <artifactId>coveralls-maven-plugin</artifactId>
-                <version>4.0.0</version>
+                <version>4.3.0</version>
                 <configuration>
                     <repoToken>${env.coveralls_repo_token}</repoToken>
                 </configuration>
@@ -99,7 +62,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.7.5.201505241946</version>
+                <version>0.8.4</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
@@ -116,7 +79,7 @@
         <dependency>
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>
-            <version>1.10</version>
+            <version>1.12</version>
         </dependency>
         <dependency>
             <groupId>org.rocksdb</groupId>
@@ -131,22 +94,22 @@
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-            <version>2.7</version>
+            <version>2.8.5</version>
         </dependency>
         <dependency>
             <groupId>com.googlecode.concurrent-trees</groupId>
             <artifactId>concurrent-trees</artifactId>
-            <version>2.4.0</version>
+            <version>2.6.1</version>
         </dependency>
         <dependency>
             <groupId>org.netpreserve</groupId>
             <artifactId>urlcanon</artifactId>
-            <version>0.1.0</version>
+            <version>0.1.1</version>
         </dependency>
         <dependency>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
-            <version>6.0</version>
+            <version>7.3</version>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
@@ -164,22 +127,22 @@
         <dependency>
             <groupId>org.webjars.npm</groupId>
             <artifactId>pikaday</artifactId>
-            <version>1.4.0</version>
+            <version>1.7.0</version>
         </dependency>
         <dependency>
             <groupId>org.webjars</groupId>
             <artifactId>lodash</artifactId>
-            <version>4.15.0</version>
+            <version>4.17.4</version>
         </dependency>
         <dependency>
             <groupId>org.webjars.bower</groupId>
             <artifactId>redoc</artifactId>
-            <version>1.4.1</version>
+            <version>1.19.1</version>
         </dependency>
         <dependency>
             <groupId>org.webjars.npm</groupId>
             <artifactId>moment</artifactId>
-            <version>2.15.2</version>
+            <version>2.24.0</version>
         </dependency>
 
         <!--

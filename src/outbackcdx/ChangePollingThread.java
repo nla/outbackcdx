@@ -1,11 +1,16 @@
 package outbackcdx;
 
 
-import java.io.*;
-import java.util.Base64;
+import static outbackcdx.Json.GSON;
 
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.util.Base64;
+import java.util.Date;
+
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -13,7 +18,8 @@ import org.apache.http.impl.client.HttpClients;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteBatch;
 
-import static outbackcdx.Json.GSON;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 
 
 public class ChangePollingThread extends Thread {
@@ -27,7 +33,7 @@ public class ChangePollingThread extends Thread {
     String finalUrl = null;
     String collection;
 
-    ChangePollingThread(String primaryReplicationUrl, int pollingInterval, DataStore dataStore) throws IOException {
+    protected ChangePollingThread(String primaryReplicationUrl, int pollingInterval, DataStore dataStore) throws IOException {
         this.pollingInterval = pollingInterval;
         this.dataStore = dataStore;
         this.primaryReplicationUrl = primaryReplicationUrl.replaceFirst("/$", "");
@@ -43,26 +49,26 @@ public class ChangePollingThread extends Thread {
             try {
                 byte[] output = this.index.db.get(SEQ_NUM_KEY);
                 if(output == null){
-                    sequenceNumber = Long.valueOf(0);
+                    sequenceNumber = 0l;
                 } else {
-		    String sequence = new String(output);
-		    sequenceNumber = Long.valueOf(sequence) + 1;
-		}
+                    String sequence = new String(output);
+                    sequenceNumber = Long.valueOf(sequence) + 1;
+                }
             } catch (RocksDBException e) {
-                System.out.println("Received rocks db exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
+                System.err.println("Received rocks db exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
                 e.printStackTrace();
             }
             finalUrl = primaryReplicationUrl + sequenceNumber;
             try {
                 replicate();
             } catch (IOException e) {
-                System.out.println("Received I/O exception while processing " + finalUrl);
+                System.err.println(new Date() + " ChangePollingThread: I/O exception processing " + finalUrl);
                 e.printStackTrace();
             } catch (RocksDBException e){
-                System.out.println("The plane has crashed into the mountain. RocksDB threw an exception during replication from "+ finalUrl);
+                System.err.println(new Date() + " ChangePollingThread: The plane has crashed into the mountain. RocksDB threw an exception during replication from "+ finalUrl);
                 e.printStackTrace();
             } catch (Exception e) {
-                System.out.println("Dang! something happened while processing " + finalUrl);
+                System.err.println(new Date() + " ChangePollingThread: Dang! something happened while processing " + finalUrl);
                 e.printStackTrace();
             }
 
@@ -84,7 +90,9 @@ public class ChangePollingThread extends Thread {
         HttpGet request = new HttpGet(finalUrl);
         long sequenceNumber = 0;
         String writeBatch = null;
+        System.out.println(new Date() + " requesting " + finalUrl);
         HttpResponse response = httpclient.execute(request);
+        System.out.println(new Date() + " received " + response.getStatusLine() + " from " + finalUrl);
 
         if(response.getStatusLine().getStatusCode() != 200){
             InputStream inputStream = response.getEntity().getContent();
@@ -124,6 +132,6 @@ public class ChangePollingThread extends Thread {
         } catch (UnsupportedEncodingException e){
             throw new RuntimeException(e); // ASCII is everywhere; this shouldn't happen.
         }
-        System.out.println("Committed Write Batch number "+sequenceNumber+" with length "+writeBatch.length());
+        System.out.println(new Date() + " ChangePollingThread: Committed Write Batch number "+sequenceNumber+" with length "+writeBatch.length());
     }
 }

@@ -70,7 +70,7 @@ class Webapp implements Web.Handler {
         }
 
         router = new Router();
-        router.on(GET, "/", serve("dashboard.html"));
+        router.on(GET, "/", interpolated("dashboard.html"));
         router.on(GET, "/api", serve("api.html"));
         router.on(GET, "/api.js", serve("api.js"));
         router.on(GET, "/add.svg", serve("add.svg"));
@@ -79,12 +79,12 @@ class Webapp implements Web.Handler {
         router.on(GET, "/favicon.ico", serve("outback.svg"));
         router.on(GET, "/swagger.json", serve("swagger.json"));
         router.on(GET, "/lib/vue-router/2.0.0/vue-router.js", serve("lib/vue-router/2.0.0/vue-router.js"));
-        router.on(GET, "/lib/vue/2.0.1/vue.js", serve("/META-INF/resources/webjars/vue/2.0.1/dist/vue.js"));
-        router.on(GET, "/lib/lodash/4.15.0/lodash.min.js", serve("/META-INF/resources/webjars/lodash/4.15.0/lodash.min.js"));
-        router.on(GET, "/lib/moment/2.15.2/moment.min.js", serve("/META-INF/resources/webjars/moment/2.15.2/min/moment.min.js"));
-        router.on(GET, "/lib/pikaday/1.4.0/pikaday.js", serve("/META-INF/resources/webjars/pikaday/1.4.0/pikaday.js"));
-        router.on(GET, "/lib/pikaday/1.4.0/pikaday.css", serve("/META-INF/resources/webjars/pikaday/1.4.0/css/pikaday.css"));
-        router.on(GET, "/lib/redoc/1.4.1/redoc.min.js", serve("/META-INF/resources/webjars/redoc/1.4.1/dist/redoc.min.js"));
+        router.on(GET, "/lib/vue/" + version("org.webjars.npm", "vue") + "/vue.js", serve("/META-INF/resources/webjars/vue/" + version("org.webjars.npm", "vue") + "/dist/vue.js"));
+        router.on(GET, "/lib/lodash/" + version("org.webjars", "lodash") + "/lodash.min.js", serve("/META-INF/resources/webjars/lodash/" + version("org.webjars", "lodash") + "/lodash.min.js"));
+        router.on(GET, "/lib/moment/" + version("org.webjars.npm", "moment") + "/moment.min.js", serve("/META-INF/resources/webjars/moment/" + version("org.webjars.npm", "moment") + "/min/moment.min.js"));
+        router.on(GET, "/lib/pikaday/" + version("org.webjars.npm", "pikaday") + "/pikaday.js", serve("/META-INF/resources/webjars/pikaday/" + version("org.webjars.npm", "pikaday") + "/pikaday.js"));
+        router.on(GET, "/lib/pikaday/" + version("org.webjars.npm", "pikaday") + "/pikaday.css", serve("/META-INF/resources/webjars/pikaday/" + version("org.webjars.npm", "pikaday") + "/css/pikaday.css"));
+        router.on(GET, "/lib/redoc/" + version("org.webjars.bower", "redoc") + "/redoc.min.js", serve("/META-INF/resources/webjars/redoc/" + version("org.webjars.bower", "redoc") + "/dist/redoc.min.js"));
         router.on(GET, "/api/collections", request1 -> listCollections(request1));
         router.on(GET, "/config.json", req1 -> configJson(req1));
         router.on(GET, "/<collection>", request -> query(request));
