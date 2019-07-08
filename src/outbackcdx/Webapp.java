@@ -289,12 +289,12 @@ class Webapp implements Web.Handler {
             response.addHeader("Access-Control-Allow-Origin", "*");
             return response;
         } catch (RocksDBException e) {
+            System.err.println(new Date() + " " + request.method() + " " + request.url() + " - " + e);
             if (!"Requested sequence not yet written in the db".equals(e.getMessage())) {
-                System.err.println(new Date() + " " + request.method() + " " + request.url() + ": " + e);
                 e.printStackTrace();
             }
             throw new Web.ResponseException(
-                    new Response(Status.INTERNAL_ERROR, "text/plain", e.toString()));
+                    new Response(Status.INTERNAL_ERROR, "text/plain", e.toString() + "\n"));
         }
     }
 

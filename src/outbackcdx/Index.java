@@ -19,8 +19,6 @@ import org.rocksdb.TransactionLogIterator;
 import org.rocksdb.WriteBatch;
 import org.rocksdb.WriteOptions;
 
-import static java.lang.System.out;
-
 /**
  * Wraps RocksDB with a higher-level query interface.
  */
@@ -44,7 +42,6 @@ public class Index {
     }
 
     public TransactionLogIterator getUpdatesSince(long sequenceNumber) throws RocksDBException {
-        out.println(String.format("looking for updates since %s", sequenceNumber));
         TransactionLogIterator logReader = db.getUpdatesSince(sequenceNumber);
         return logReader;
     }
