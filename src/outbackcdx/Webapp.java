@@ -8,9 +8,7 @@ import com.google.gson.stream.JsonWriter;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import outbackcdx.NanoHTTPD.Response;
-import outbackcdx.WbCdxApi.JsonFormat;
-import outbackcdx.WbCdxApi.OutputFormat;
-import outbackcdx.WbCdxApi.TextFormat;
+import outbackcdx.NanoHTTPD.Response.Status;
 import outbackcdx.auth.Permission;
 
 import javax.xml.stream.XMLStreamException;
@@ -256,11 +254,11 @@ class Webapp implements Web.Handler {
         final Index index = getIndex(request);
 
         if (verbose) {
-            out.println(String.format("Received request %s. Retrieved deltas for collection <%s> since sequenceNumber %s", request, collection, since));
+            out.println(String.format("%s Received request %s. Retrieving deltas for collection <%s> since sequenceNumber %s", new Date(), request, collection, since));
         }
 
-        Response response = new Response(OK, "application/json", outputStream -> {
-            try(TransactionLogIterator logReader = index.getUpdatesSince(since)) {
+        try(TransactionLogIterator logReader = index.getUpdatesSince(since)) {
+            Response response = new Response(OK, "application/json", outputStream -> {
                 JsonWriter output = GSON.newJsonWriter(new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8)));
                 output.beginArray();
 
@@ -287,11 +285,17 @@ class Webapp implements Web.Handler {
                 }
                 output.endArray();
                 output.flush();
+            });
+            response.addHeader("Access-Control-Allow-Origin", "*");
+            return response;
+        } catch (RocksDBException e) {
+            if (!"Requested sequence not yet written in the db".equals(e.getMessage())) {
+                System.err.println(new Date() + " " + request.method() + " " + request.url() + ": " + e);
+                e.printStackTrace();
             }
-        });
-        response.addHeader("Access-Control-Allow-Origin", "*");
-        return response;
-
+            throw new Web.ResponseException(
+                    new Response(Status.INTERNAL_ERROR, "text/plain", e.toString()));
+        }
     }
 
     Response query(Web.Request request) throws IOException, Web.ResponseException {

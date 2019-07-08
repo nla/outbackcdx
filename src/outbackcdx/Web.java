@@ -11,8 +11,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.io.UnsupportedEncodingException;
 import java.net.ServerSocket;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -324,5 +326,25 @@ class Web {
             return value;
         }
 
+        default String url() {
+            StringBuilder buf = new StringBuilder(path());
+            if (params() != null) {
+                boolean first = true;
+                for (String key: params().keySet()) {
+                    for (String value: params().getAll(key)) {
+                        buf.append(first ? '?' : '&');
+                        first = false;
+                        try {
+                            buf.append(URLEncoder.encode(key, "UTF-8"));
+                            buf.append('=');
+                            buf.append(URLEncoder.encode(value, "UTF-8"));
+                        } catch (UnsupportedEncodingException e) {
+                            throw new RuntimeException(e); // not possible
+                        }
+                    }
+                }
+            }
+            return buf.toString();
+        }
     }
 }

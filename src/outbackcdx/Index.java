@@ -43,14 +43,10 @@ public class Index {
         this.db.flushWal(true);
     }
 
-    public TransactionLogIterator getUpdatesSince(long sequenceNumber) {
+    public TransactionLogIterator getUpdatesSince(long sequenceNumber) throws RocksDBException {
         out.println(String.format("looking for updates since %s", sequenceNumber));
-        try {
-            TransactionLogIterator logReader = db.getUpdatesSince(sequenceNumber);
-            return logReader;
-        } catch (RocksDBException e) {
-            throw new RuntimeException(e);
-        }
+        TransactionLogIterator logReader = db.getUpdatesSince(sequenceNumber);
+        return logReader;
     }
 
     /**
