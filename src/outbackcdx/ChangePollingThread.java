@@ -45,41 +45,46 @@ public class ChangePollingThread extends Thread {
 
     public void run() {
         while (true) {
-            long startTime = System.currentTimeMillis();
             try {
-                byte[] output = this.index.db.get(SEQ_NUM_KEY);
-                if(output == null){
-                    sequenceNumber = 0l;
-                } else {
-                    String sequence = new String(output);
-                    sequenceNumber = Long.valueOf(sequence) + 1;
-                }
-            } catch (RocksDBException e) {
-                System.err.println("Received rocks db exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
-                e.printStackTrace();
-            }
-            finalUrl = primaryReplicationUrl + sequenceNumber;
-            try {
-                replicate();
-            } catch (IOException e) {
-                System.err.println(new Date() + " ChangePollingThread: I/O exception processing " + finalUrl);
-                e.printStackTrace();
-            } catch (RocksDBException e){
-                System.err.println(new Date() + " ChangePollingThread: The plane has crashed into the mountain. RocksDB threw an exception during replication from "+ finalUrl);
-                e.printStackTrace();
-            } catch (Exception e) {
-                System.err.println(new Date() + " ChangePollingThread: Dang! something happened while processing " + finalUrl);
-                e.printStackTrace();
-            }
-
-            long sleepTime = (pollingInterval * 1000) - (System.currentTimeMillis() - startTime);
-            if (sleepTime > 0) {
+                long startTime = System.currentTimeMillis();
                 try {
-                    Thread.sleep(sleepTime);
-                } catch (InterruptedException e) {
-                    System.out.println("Received interruption at " + System.currentTimeMillis());
-                    return;
+                    byte[] output = this.index.db.get(SEQ_NUM_KEY);
+                    if(output == null){
+                        sequenceNumber = 0l;
+                    } else {
+                        String sequence = new String(output);
+                        sequenceNumber = Long.valueOf(sequence) + 1;
+                    }
+                } catch (RocksDBException e) {
+                    System.err.println("Received rocks db exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
+                    e.printStackTrace();
                 }
+                finalUrl = primaryReplicationUrl + sequenceNumber;
+                try {
+                    replicate();
+                } catch (IOException e) {
+                    System.err.println(new Date() + " ChangePollingThread: I/O exception processing " + finalUrl);
+                    e.printStackTrace();
+                } catch (RocksDBException e){
+                    System.err.println(new Date() + " ChangePollingThread: The plane has crashed into the mountain. RocksDB threw an exception during replication from "+ finalUrl);
+                    e.printStackTrace();
+                } catch (Exception e) {
+                    System.err.println(new Date() + " ChangePollingThread: Dang! something happened while processing " + finalUrl);
+                    e.printStackTrace();
+                }
+
+                long sleepTime = (pollingInterval * 1000) - (System.currentTimeMillis() - startTime);
+                if (sleepTime > 0) {
+                    try {
+                        Thread.sleep(sleepTime);
+                    } catch (InterruptedException e) {
+                        System.out.println("Received interruption at " + System.currentTimeMillis());
+                        return;
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("proceeding after unexpected exception");
+                e.printStackTrace();
             }
         }
     }
