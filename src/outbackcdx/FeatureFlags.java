@@ -12,11 +12,13 @@ public class FeatureFlags {
     private static boolean experimentalAccessControl;
     private static boolean pandoraHacks;
     private static boolean filterPlugins;
+    private static boolean cdx14;
 
     static {
         experimentalAccessControl = "1".equals(System.getenv("EXPERIMENTAL_ACCESS_CONTROL"));
         pandoraHacks = "1".equals(System.getenv("PANDORA_HACKS"));
         filterPlugins = "1".equals(System.getenv("FILTER_PLUGINS"));
+        cdx14 = "1".equals(System.getenv("CDX14"));
     }
 
     public static boolean pandoraHacks() {
@@ -31,6 +33,10 @@ public class FeatureFlags {
         return filterPlugins;
     }
 
+    public static boolean cdx14() {
+        return cdx14;
+    }
+
     public static void setExperimentalAccessControl(boolean enabled) {
         FeatureFlags.experimentalAccessControl = enabled;
     }
@@ -43,11 +49,16 @@ public class FeatureFlags {
         FeatureFlags.filterPlugins = enabled;
     }
 
+    public static void setCdx14(boolean enabled) {
+        cdx14 = enabled;
+    }
+
     public static Map<String, Boolean> asMap() {
         Map<String,Boolean> map = new HashMap<>();
         map.put("experimentalAccessControl", experimentalAccessControl());
         map.put("pandoraHacks", pandoraHacks());
         map.put("filterPlugins", filterPlugins());
+        map.put("cdx14", cdx14);
         return map;
     }
 }

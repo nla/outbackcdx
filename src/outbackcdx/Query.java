@@ -4,6 +4,8 @@ import java.util.Map;
 import java.util.function.Predicate;
 
 public class Query {
+    private static final String DEFAULT_FIELDS = "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename";
+    private static final String DEFAULT_FIELDS_CDX14 = DEFAULT_FIELDS + ",originalLength,originalOffset,originalFilename";
     String accessPoint;
     MatchType matchType;
     Sort sort;
@@ -22,7 +24,7 @@ public class Query {
         closest = params.get("closest");
         filter = params.containsKey("filter") ? new RegexFilter(params.get("filter")) : (capture -> true);
 
-        String fl = params.getOrDefault("fl", "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename,originalLength,originalOffset,originalFilename");
+        String fl = params.getOrDefault("fl", FeatureFlags.cdx14() ? DEFAULT_FIELDS_CDX14 : DEFAULT_FIELDS);
         fields = fl.split(",");
 
         String limitParam = params.get("limit");

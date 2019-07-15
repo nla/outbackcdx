@@ -30,6 +30,7 @@ public class Main {
         System.err.println("  -p port               Local port to listen on");
         System.err.println("  -t count              Number of web server threads");
         System.err.println("  -v                    Verbose logging");
+        System.err.println("  -x                    Output CDX14 by default (instead of CDX11)");
         System.exit(1);
     }
 
@@ -81,6 +82,9 @@ public class Main {
                     break;
                 case "-t":
                     webThreads = Integer.parseInt(args[++i]);
+                    break;
+                case "-x":
+                    FeatureFlags.setCdx14(true);
                     break;
                 default:
                     usage();
