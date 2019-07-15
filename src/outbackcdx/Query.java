@@ -11,6 +11,7 @@ public class Query {
     Sort sort;
     String url;
     String closest;
+    String latest;
     String[] fields;
     boolean outputJson;
     long limit;
@@ -63,6 +64,13 @@ public class Query {
             if (closest == null) {
                 throw new IllegalArgumentException("closest={timestamp} is mandatory when using sort=closest");
             }
+        } else if (sort == Sort.LATEST) {
+            if (matchType != MatchType.EXACT) {
+                throw new IllegalArgumentException("sort=latest is currently only implemented for exact matches");
+            }
+            if (closest != null) {
+                throw new IllegalArgumentException("closest={timestamp} is not used when sort=latest");
+            }
         } else if (sort == Sort.REVERSE) {
             if (matchType != MatchType.EXACT) {
                 throw new IllegalArgumentException("sort=reverse is currently only implemented for exact matches");
@@ -91,6 +99,6 @@ public class Query {
     }
 
     enum Sort {
-        DEFAULT, CLOSEST, REVERSE
+        DEFAULT, CLOSEST, REVERSE, LATEST;
     }
 }

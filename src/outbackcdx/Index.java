@@ -58,6 +58,16 @@ public class Index {
     }
 
     /**
+     * Returns the latest result for a given url.
+     */
+    public Iterable<Capture> latestQuery(String surt, Predicate<Capture> filter) {
+        ArrayList<Capture> captures = new ArrayList<Capture>();
+        query(surt, filter).forEach(captures::add);
+        Collections.sort(captures, (Capture cap1, Capture cap2) -> cap2.date().compareTo(cap1.date()));
+        return captures.subList(0, 1);
+    }
+
+    /**
      * Returns all captures for the given url.
      */
     public Iterable<Capture> queryAP(String surt, String accessPoint) {
@@ -101,6 +111,8 @@ public class Index {
                 switch (query.sort) {
                     case DEFAULT:
                         return query(surt, filter);
+                    case LATEST:
+                        return latestQuery(surt, filter);
                     case CLOSEST:
                         return closestQuery(UrlCanonicalizer.surtCanonicalize(query.url), Long.parseLong(query.closest), filter);
                     case REVERSE:
