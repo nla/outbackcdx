@@ -11,7 +11,6 @@ public class Query {
     Sort sort;
     String url;
     String closest;
-    String latest;
     String[] fields;
     boolean outputJson;
     long limit;

@@ -64,7 +64,7 @@ public class Index {
         ArrayList<Capture> captures = new ArrayList<Capture>();
         query(surt, filter).forEach(captures::add);
         Collections.sort(captures, (Capture cap1, Capture cap2) -> cap2.date().compareTo(cap1.date()));
-        return captures.subList(0, 1);
+        return captures;
     }
 
     /**
