@@ -250,48 +250,57 @@ class Webapp implements Web.Handler {
     
     Response changeFeed(Web.Request request) throws Web.ResponseException, IOException {
         String collection = request.param("collection");
-	long since = Long.parseLong(request.param("since"));
-	final Index index = getIndex(request);
-	
-	if (verbose) {
+        long since = Long.parseLong(request.param("since"));
+        final Index index = getIndex(request);
+
+        if (verbose) {
             out.println(String.format("%s Received request %s. Retrieving deltas for collection <%s> since sequenceNumber %s", new Date(), request, collection, since));
         }
 
-        Response response = new Response(OK, "application/json", outputStream -> {
-		try(TransactionLogIterator logReader = index.getUpdatesSince(since)) {
-		    JsonWriter output = GSON.newJsonWriter(new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8)));
-		    output.beginArray();
-		    
-		    while (logReader.isValid()) {
-			BatchResult batch = logReader.getBatch();
-			// only return results _after_ the 'since' number
-			if ((Long) batch.sequenceNumber() < since) {
-			    logReader.next();
-			    continue;
-			}
-			
-			output.beginObject();
-			output.name("sequenceNumber").value(((Long) batch.sequenceNumber()).toString());
-			String base64WriteBatch;
-			try {
-			    base64WriteBatch = Base64.getEncoder().encodeToString(batch.writeBatch().data());
-			} catch (RocksDBException e) {
-			    throw new IOException(e);
-			}
-			output.name("writeBatch").value(base64WriteBatch);
-			output.endObject();
-			
-			logReader.next();
-		    }
-		    output.endArray();
-		    output.flush();
-		} catch(RocksDBException e) {
-		    out.println(String.format("%s Received request %s. Retrieving deltas for collection <%s> since sequenceNumber %s", new Date(), request, collection, since));
-		}
-	    });
-	response.addHeader("Access-Control-Allow-Origin", "*");
-	return response;
+        try {
+            TransactionLogIterator logReader = index.getUpdatesSince(since);
+            Response response = new Response(OK, "application/json", outputStream -> {
+                try {
+                    JsonWriter output = GSON.newJsonWriter(new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8)));
+                    output.beginArray();
 
+                    while (logReader.isValid()) {
+                        BatchResult batch = logReader.getBatch();
+                        // only return results _after_ the 'since' number
+                        if ((Long) batch.sequenceNumber() < since) {
+                            logReader.next();
+                            continue;
+                        }
+
+                        output.beginObject();
+                        output.name("sequenceNumber").value(((Long) batch.sequenceNumber()).toString());
+                        String base64WriteBatch;
+                        try {
+                            base64WriteBatch = Base64.getEncoder().encodeToString(batch.writeBatch().data());
+                        } catch (RocksDBException e) {
+                            throw new IOException(e);
+                        }
+                        output.name("writeBatch").value(base64WriteBatch);
+                        output.endObject();
+
+                        logReader.next();
+                    }
+                    output.endArray();
+                    output.flush();
+                } finally {
+                    logReader.close();
+                }
+            });
+            response.addHeader("Access-Control-Allow-Origin", "*");
+            return response;
+        } catch (RocksDBException e) {
+            System.err.println(new Date() + " " + request.method() + " " + request.url() + " - " + e);
+            if (!"Requested sequence not yet written in the db".equals(e.getMessage())) {
+                e.printStackTrace();
+            }
+            throw new Web.ResponseException(
+                    new Response(Status.INTERNAL_ERROR, "text/plain", e.toString() + "\n"));
+        }
     }
 
     Response query(Web.Request request) throws IOException, Web.ResponseException {
