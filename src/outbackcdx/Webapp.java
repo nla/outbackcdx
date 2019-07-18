@@ -7,8 +7,11 @@ import com.google.gson.stream.JsonWriter;
 
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+
+import outbackcdx.NanoHTTPD.IStreamer;
 import outbackcdx.NanoHTTPD.Response;
 import outbackcdx.NanoHTTPD.Response.Status;
+import outbackcdx.Webapp.ChangeFeedJsonStream;
 import outbackcdx.auth.Permission;
 
 import javax.xml.stream.XMLStreamException;
@@ -247,7 +250,51 @@ class Webapp implements Web.Handler {
         String output = String.valueOf(index.db.getLatestSequenceNumber());
         return new Response(OK, "text/html", output);
     }
-    
+
+    static class ChangeFeedJsonStream implements IStreamer {
+        TransactionLogIterator logReader;
+        long since;
+
+        ChangeFeedJsonStream(TransactionLogIterator logReader, long since) {
+            this.logReader = logReader;
+            this.since = since;
+        }
+
+        @Override
+        public void stream(OutputStream outputStream) throws IOException {
+            try {
+                JsonWriter output = GSON.newJsonWriter(new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8)));
+                output.beginArray();
+
+                while (logReader.isValid()) {
+                    BatchResult batch = logReader.getBatch();
+                    // only return results _after_ the 'since' number
+                    if ((Long) batch.sequenceNumber() < since) {
+                        logReader.next();
+                        continue;
+                    }
+
+                    output.beginObject();
+                    output.name("sequenceNumber").value(((Long) batch.sequenceNumber()).toString());
+                    String b64Batch;
+                    try {
+                        b64Batch = Base64.getEncoder().encodeToString(batch.writeBatch().data());
+                    } catch (RocksDBException e) {
+                        throw new IOException(e);
+                    }
+                    output.name("writeBatch").value(b64Batch);
+                    output.endObject();
+
+                    logReader.next();
+                }
+                output.endArray();
+                output.flush();
+            } finally {
+                logReader.close();
+            }
+        }
+    }
+
     Response changeFeed(Web.Request request) throws Web.ResponseException, IOException {
         String collection = request.param("collection");
         long since = Long.parseLong(request.param("since"));
@@ -258,39 +305,12 @@ class Webapp implements Web.Handler {
         }
 
         try {
+            /* This method must not close logReader (or you get a segfault).
+             * The response payload stream class ChangeFeedJsonStream closes it
+             * when it's finished with it. */
             TransactionLogIterator logReader = index.getUpdatesSince(since);
-            Response response = new Response(OK, "application/json", outputStream -> {
-                try {
-                    JsonWriter output = GSON.newJsonWriter(new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8)));
-                    output.beginArray();
 
-                    while (logReader.isValid()) {
-                        BatchResult batch = logReader.getBatch();
-                        // only return results _after_ the 'since' number
-                        if ((Long) batch.sequenceNumber() < since) {
-                            logReader.next();
-                            continue;
-                        }
-
-                        output.beginObject();
-                        output.name("sequenceNumber").value(((Long) batch.sequenceNumber()).toString());
-                        String base64WriteBatch;
-                        try {
-                            base64WriteBatch = Base64.getEncoder().encodeToString(batch.writeBatch().data());
-                        } catch (RocksDBException e) {
-                            throw new IOException(e);
-                        }
-                        output.name("writeBatch").value(base64WriteBatch);
-                        output.endObject();
-
-                        logReader.next();
-                    }
-                    output.endArray();
-                    output.flush();
-                } finally {
-                    logReader.close();
-                }
-            });
+            Response response = new Response(OK, "application/json", new ChangeFeedJsonStream(logReader, since));
             response.addHeader("Access-Control-Allow-Origin", "*");
             return response;
         } catch (RocksDBException e) {
@@ -307,7 +327,7 @@ class Webapp implements Web.Handler {
         if (verbose) {
             out.println(request);
         }
-    	
+
         Index index = getIndex(request);
         Map<String,String> params = request.params();
         if (params.containsKey("q")) {
