@@ -253,11 +253,11 @@ class Webapp implements Web.Handler {
 
     static class ChangeFeedJsonStream implements IStreamer {
         TransactionLogIterator logReader;
-        long since;
+        Long n;
 
-        ChangeFeedJsonStream(TransactionLogIterator logReader, long since) {
+        ChangeFeedJsonStream(TransactionLogIterator logReader, Long n) {
             this.logReader = logReader;
-            this.since = since;
+            this.n = n;
         }
 
         @Override
@@ -266,16 +266,12 @@ class Webapp implements Web.Handler {
                 JsonWriter output = GSON.newJsonWriter(new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8)));
                 output.beginArray();
 
-                while (logReader.isValid()) {
+                long i = 0l;
+                while (logReader.isValid() && (n == null || i < n)) {
                     BatchResult batch = logReader.getBatch();
-                    // only return results _after_ the 'since' number
-                    if ((Long) batch.sequenceNumber() < since) {
-                        logReader.next();
-                        continue;
-                    }
 
                     output.beginObject();
-                    output.name("sequenceNumber").value(((Long) batch.sequenceNumber()).toString());
+                    output.name("sequenceNumber").value(Long.toString(batch.sequenceNumber()));
                     String b64Batch;
                     try {
                         b64Batch = Base64.getEncoder().encodeToString(batch.writeBatch().data());
@@ -286,6 +282,8 @@ class Webapp implements Web.Handler {
                     output.endObject();
 
                     logReader.next();
+
+                    i++;
                 }
                 output.endArray();
                 output.flush();
@@ -297,7 +295,12 @@ class Webapp implements Web.Handler {
 
     Response changeFeed(Web.Request request) throws Web.ResponseException, IOException {
         String collection = request.param("collection");
-        long since = Long.parseLong(request.param("since"));
+        long since = Long.parseLong(request.param("since", "0"));
+        Long n = null;
+        if (request.param("n") != null) {
+            n = Long.parseLong(request.param("n"));
+        }
+
         final Index index = getIndex(request);
 
         if (verbose) {
@@ -305,12 +308,13 @@ class Webapp implements Web.Handler {
         }
 
         try {
-            /* This method must not close logReader (or you get a segfault).
+            /* This method must not close logReader, or you will get a segfault.
              * The response payload stream class ChangeFeedJsonStream closes it
              * when it's finished with it. */
             TransactionLogIterator logReader = index.getUpdatesSince(since);
 
-            Response response = new Response(OK, "application/json", new ChangeFeedJsonStream(logReader, since));
+            ChangeFeedJsonStream streamer = new ChangeFeedJsonStream(logReader, n);
+            Response response = new Response(OK, "application/json", streamer);
             response.addHeader("Access-Control-Allow-Origin", "*");
             return response;
         } catch (RocksDBException e) {
@@ -343,7 +347,7 @@ class Webapp implements Web.Handler {
         String collection = request.param("collection");
         final Index index = dataStore.getIndex(collection);
         if (index == null) {
-            throw new Web.ResponseException(new Response(NOT_FOUND, "text/plain", "Collection does not exist"));
+            throw new Web.ResponseException(new Response(NOT_FOUND, "text/plain", "Collection " + collection + " does not exist"));
         }
         return index;
     }
