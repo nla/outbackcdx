@@ -29,7 +29,7 @@ public class ChangePollingThread extends Thread {
     int pollingInterval = 10;
     DataStore dataStore = null;
     Index index = null;
-    Long sequenceNumber = Long.valueOf(0);
+    String since = "0";
     String finalUrl = null;
     String collection;
 
@@ -40,7 +40,6 @@ public class ChangePollingThread extends Thread {
         String[] splitCollectionUrl = this.primaryReplicationUrl.split("/");
         collection = splitCollectionUrl[splitCollectionUrl.length - 1];
         this.index = dataStore.getIndex(collection, true);
-        this.primaryReplicationUrl = this.primaryReplicationUrl + "/changes?since=";
     }
 
     public void run() {
@@ -50,16 +49,15 @@ public class ChangePollingThread extends Thread {
                 try {
                     byte[] output = this.index.db.get(SEQ_NUM_KEY);
                     if(output == null){
-                        sequenceNumber = 0l;
+                        since = "0";
                     } else {
-                        String sequence = new String(output);
-                        sequenceNumber = Long.valueOf(sequence) + 1;
+                        since = new String(output);
                     }
                 } catch (RocksDBException e) {
                     System.err.println("Received rocks db exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
                     e.printStackTrace();
                 }
-                finalUrl = primaryReplicationUrl + sequenceNumber;
+                finalUrl = primaryReplicationUrl + "/changes?since=" + since;
                 try {
                     replicate();
                 } catch (IOException e) {
