@@ -57,7 +57,7 @@ public class ChangePollingThread extends Thread {
                     System.err.println("Received rocks db exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
                     e.printStackTrace();
                 }
-                finalUrl = primaryReplicationUrl + "/changes?since=" + since;
+                finalUrl = primaryReplicationUrl + "/changes?n=50&since=" + since;
                 try {
                     replicate();
                 } catch (IOException e) {
