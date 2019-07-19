@@ -3,7 +3,6 @@ package outbackcdx;
 
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
-import com.google.gson.stream.JsonWriter;
 
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -11,7 +10,6 @@ import org.rocksdb.RocksDBException;
 import outbackcdx.NanoHTTPD.IStreamer;
 import outbackcdx.NanoHTTPD.Response;
 import outbackcdx.NanoHTTPD.Response.Status;
-import outbackcdx.Webapp.ChangeFeedJsonStream;
 import outbackcdx.auth.Permission;
 
 import javax.xml.stream.XMLStreamException;
@@ -64,7 +62,7 @@ class Webapp implements Web.Handler {
         this.filterPlugins = new ArrayList<FilterPlugin>();
         if (FeatureFlags.filterPlugins()) {
             System.out.println("Loading plugins");
-            for (FilterPlugin f : this.fpLoader) {
+            for (FilterPlugin f : Webapp.fpLoader) {
                 System.out.println("Loaded plugin");
                 this.filterPlugins.add(f);
             }
@@ -262,30 +260,35 @@ class Webapp implements Web.Handler {
 
         @Override
         public void stream(OutputStream outputStream) throws IOException {
+            // build and stream json as bytes to avoid overhead of utf-16 String
             try {
-                JsonWriter output = GSON.newJsonWriter(new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8)));
-                output.beginArray();
+                BufferedOutputStream output = new BufferedOutputStream(outputStream);
+                output.write("[\n".getBytes(UTF_8));
 
                 long i = 0l;
                 while (logReader.isValid() && (n == null || i < n)) {
                     BatchResult batch = logReader.getBatch();
 
-                    output.beginObject();
-                    output.name("sequenceNumber").value(Long.toString(batch.sequenceNumber()));
-                    String b64Batch;
+                    output.write("{\"sequenceNumber\": \"".getBytes(UTF_8));
+                    output.write(Long.toString(batch.sequenceNumber()).getBytes(UTF_8));
+                    output.write("\", \"writeBatch\": \"".getBytes(UTF_8));
+                    byte[] b64Batch;
                     try {
-                        b64Batch = Base64.getEncoder().encodeToString(batch.writeBatch().data());
+                        b64Batch = Base64.getEncoder().encode(batch.writeBatch().data());
                     } catch (RocksDBException e) {
                         throw new IOException(e);
                     }
-                    output.name("writeBatch").value(b64Batch);
-                    output.endObject();
+                    output.write(b64Batch);
+                    output.write("\"}".getBytes(UTF_8));
 
                     logReader.next();
-
                     i++;
+
+                    if (logReader.isValid() && (n == null || i < n)) {
+                        output.write(",\n".getBytes(UTF_8));
+                    }
                 }
-                output.endArray();
+                output.write("\n]\n".getBytes(UTF_8));
                 output.flush();
             } finally {
                 logReader.close();
