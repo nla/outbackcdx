@@ -31,7 +31,7 @@ public class WebappTest {
     public void setUp() throws IOException {
         FeatureFlags.setExperimentalAccessControl(true);
         File root = folder.newFolder();
-        DataStore manager = new DataStore(root, 0);
+        DataStore manager = new DataStore(root, null);
         webapp = new Webapp(manager, false, Collections.emptyMap());
     }
 

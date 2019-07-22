@@ -18,10 +18,9 @@ public class DataStore implements Closeable {
 
     private final File dataDir;
     private final Map<String, Index> indexes = new ConcurrentHashMap<String, Index>();
+    private final Long replicationWindow;
 
-    public long replicationWindow;
-
-    public DataStore(File dataDir, long replicationWindow) {
+    public DataStore(File dataDir, Long replicationWindow) {
         this.dataDir = dataDir;
         this.replicationWindow = replicationWindow;
     }
@@ -61,8 +60,9 @@ public class DataStore implements Closeable {
             dbOptions.setMaxBackgroundCompactions(Math.min(8, Runtime.getRuntime().availableProcessors()));
             dbOptions.setAvoidFlushDuringRecovery(true);
 
-            // replication will be available this far back in time (in seconds)
-            if (replicationWindow > 0) {
+            // if not null, replication data will be available this far back in
+            // time (in seconds)
+            if (replicationWindow != null) {
                 dbOptions.setWalTtlSeconds(replicationWindow);
             }
 

@@ -56,7 +56,7 @@ public class Main {
         Authorizer authorizer = new NullAuthorizer();
         int pollingInterval = 10;
         List<String> collectionUrls = new ArrayList<>();
-        long replicationWindow = 60 * 60 * 24 * 2; // two days
+        Long replicationWindow = null;
 
         Map<String,Object> dashboardConfig = new HashMap<>();
         dashboardConfig.put("featureFlags", FeatureFlags.asMap());
