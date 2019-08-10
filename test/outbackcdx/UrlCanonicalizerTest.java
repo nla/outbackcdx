@@ -47,7 +47,7 @@ public class UrlCanonicalizerTest {
         t("http://evil.com/foo#bar#baz", "http://evil.com/foo");
         t("http://evil.com/foo;", "http://evil.com/foo;");
         t("http://evil.com/foo?bar;", "http://evil.com/foo?bar;");
-        t("http://\1.com/", "http://%01.com/");
+        t("http://\u00c0.com/\u00c0", "http://xn--0ca.com/%c3%a0");
         t("http://notrailingslash.com", "http://notrailingslash.com/");
         t("http://www.gotaport.com:1234/", "http://gotaport.com:1234/");
         t("  http://www.google.com/  ", "http://google.com/");
