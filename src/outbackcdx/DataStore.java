@@ -55,6 +55,19 @@ public class DataStore implements Closeable {
             options.setCreateIfMissing(createAllowed);
             configureColumnFamily(options);
 
+            /*
+             * https://github.com/facebook/rocksdb/wiki/Memory-usage-in-RocksDB "If you're
+             * certain that Get() will mostly find a key you're looking for, you can set
+             * options.optimize_filters_for_hits = true. With this option turned on, we will
+             * not build bloom filters on the last level, which contains 90% of the
+             * database. Thus, the memory usage for bloom filters will be 10X less. You will
+             * pay one IO for each Get() that doesn't find data in the database, though."
+             *
+             * We expect a low miss rate (~17% per Alex). This setting should greatly reduce
+             * memory usage.
+             */
+            options.setOptimizeFiltersForHits(true);
+
             DBOptions dbOptions = new DBOptions();
             dbOptions.setCreateIfMissing(createAllowed);
             dbOptions.setMaxBackgroundCompactions(Math.min(8, Runtime.getRuntime().availableProcessors()));
