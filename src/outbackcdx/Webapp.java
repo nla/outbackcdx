@@ -127,6 +127,15 @@ class Webapp implements Web.Handler {
         Index index = getIndex(req);
         Map<String,Object> map = new HashMap<>();
         map.put("estimatedRecordCount", index.estimatedRecordCount());
+
+        for (String property : req.param("property", "").split(",")) {
+            try {
+                map.put(property, index.db.getProperty(property));
+            } catch (RocksDBException e) {
+                map.put(property, "ERROR: " + e);
+            }
+        }
+
         Response response = new Response(Response.Status.OK, "application/json",
                 GSON.toJson(map));
         response.addHeader("Access-Control-Allow-Origin", "*");

@@ -31,9 +31,19 @@ public class WbCdxApi {
         Iterable<Capture> captures = query.execute(index);
 
         boolean outputJson = "json".equals(request.param("output"));
-        Response response = new Response(OK, outputJson ? "application/json" : "text/plain", outputStream -> {
+        boolean outputJson2 = "jsondict".equals(request.param("output"));
+
+        Response response = new Response(OK, outputJson || outputJson2 ? "application/json" : "text/plain", outputStream -> {
             Writer out = new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8));
-            OutputFormat outf = outputJson ? new JsonFormat(out, query.fields) : new TextFormat(out, query.fields);
+            OutputFormat outf;
+
+            if (outputJson) {
+                outf = new JsonFormat(out, query.fields);
+            } else if (outputJson2) {
+                outf = new JsonDictFormat(out, query.fields);
+            } else {
+                outf = new TextFormat(out, query.fields);
+            }
 
             long row = 0;
             for (Capture capture : captures) {
@@ -54,6 +64,41 @@ public class WbCdxApi {
     interface OutputFormat {
         void writeCapture(Capture capture) throws IOException;
         void close() throws IOException;
+    }
+
+    static class JsonDictFormat implements OutputFormat {
+        private final JsonWriter out;
+        private final String[] fields;
+
+        JsonDictFormat(Writer out, String[] fields) throws IOException {
+            this.fields = fields;
+            this.out = GSON.newJsonWriter(out);
+            this.out.beginArray();
+        }
+
+        @Override
+        public void writeCapture(Capture capture) throws IOException {
+            out.beginObject();
+            for (String field : fields) {
+                Object value = capture.get(field);
+                if (value instanceof Long) {
+                    out.name(field).value((long) value);
+                } else if (value instanceof Integer) {
+                    out.name(field).value((int) value);
+                } else if (value instanceof String) {
+                    out.name(field).value((String) value);
+                } else {
+                    throw new UnsupportedOperationException("Don't know how to format: " + field + " (" + value.getClass() + ")");
+                }
+            }
+            out.endObject();
+        }
+
+        @Override
+        public void close() throws IOException {
+            out.endArray();
+            out.close();
+        }
     }
 
     /**

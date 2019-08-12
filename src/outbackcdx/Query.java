@@ -3,6 +3,8 @@ package outbackcdx;
 import java.util.function.Predicate;
 
 public class Query {
+    private static final String DEFAULT_FIELDS = "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename";
+    private static final String DEFAULT_FIELDS_CDX14 = DEFAULT_FIELDS + ",originalLength,originalOffset,originalFilename";
     String accessPoint;
     MatchType matchType;
     Sort sort;
@@ -28,7 +30,7 @@ public class Query {
             }
         }
 
-        String fl = params.getOrDefault("fl", "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename");
+        String fl = params.getOrDefault("fl", FeatureFlags.cdx14() ? DEFAULT_FIELDS_CDX14 : DEFAULT_FIELDS);
         fields = fl.split(",");
 
         String limitParam = params.get("limit");
