@@ -68,16 +68,19 @@ public class DataStore implements Closeable {
              */
             options.setOptimizeFiltersForHits(true);
 
-            /*
-             * It turns out that max_open_file=-1 is what blows up ram usage.
-             * https://github.com/facebook/rocksdb/issues/4112#issuecomment-407845168
-             */
+            // this one doesn't seem to be used? see dbOptions.setMaxOpenFiles()
             options.setMaxOpenFiles(256);
 
             DBOptions dbOptions = new DBOptions();
             dbOptions.setCreateIfMissing(createAllowed);
             dbOptions.setMaxBackgroundCompactions(Math.min(8, Runtime.getRuntime().availableProcessors()));
             dbOptions.setAvoidFlushDuringRecovery(true);
+
+            /*
+             * It turns out that max_open_file=-1 is what blows up ram usage.
+             * https://github.com/facebook/rocksdb/issues/4112#issuecomment-407845168
+             */
+            dbOptions.setMaxOpenFiles(256);
 
             // if not null, replication data will be available this far back in
             // time (in seconds)
