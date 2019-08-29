@@ -68,6 +68,8 @@ public class UrlCanonicalizerTest {
                 UrlCanonicalizer.surtCanonicalize("screenshot:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
         assertEquals("youtube-dl:au,gov,acma,web)/apservices/action/challenge?method=viewchallenge",
                 UrlCanonicalizer.surtCanonicalize("urn:transclusions:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
+        assertEquals("youtube-dl:00001:au,gov,acma,web)/apservices/action/challenge?method=viewchallenge",
+                UrlCanonicalizer.surtCanonicalize("youtube-dl:00001:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
     }
 
     @Test

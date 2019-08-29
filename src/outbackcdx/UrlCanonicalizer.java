@@ -103,7 +103,7 @@ public class UrlCanonicalizer {
     }
 
     protected static Pattern SPECIAL_URL_REGEX =
-            Pattern.compile("^((?:urn:)?[^:]+):(https?://.*)", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("^([^/]+):(https?://.*)", Pattern.CASE_INSENSITIVE);
 
     /**
      * Canonicalizes <code>url</code> and returns in SURT form, for use as a key in
@@ -115,6 +115,7 @@ public class UrlCanonicalizer {
      *
      * <ul>
      * <li><code>youtube-dl:http://example.com/</code>
+     * <li><code>youtube-dl:00001:http://example.com/</code>
      * <li><code>urn:transclusions:http://example.com/</code>
      * <li><code>screenshot:https://example.com/</code>
      * </ul>
