@@ -17,9 +17,11 @@ public class DataStore implements Closeable {
 
     private final File dataDir;
     private final Map<String, Index> indexes = new ConcurrentHashMap<String, Index>();
+    private final int maxOpenSstFiles;
 
-    public DataStore(File dataDir) {
+    public DataStore(File dataDir, int maxOpenSstFiles) {
         this.dataDir = dataDir;
+        this.maxOpenSstFiles = maxOpenSstFiles;
     }
 
     public Index getIndex(String collection) throws IOException {
@@ -55,6 +57,7 @@ public class DataStore implements Closeable {
             DBOptions dbOptions = new DBOptions();
             dbOptions.setCreateIfMissing(createAllowed);
             dbOptions.setMaxBackgroundCompactions(Math.min(8, Runtime.getRuntime().availableProcessors()));
+            dbOptions.setMaxOpenFiles(maxOpenSstFiles);
 
             ColumnFamilyOptions cfOptions = new ColumnFamilyOptions();
             configureColumnFamily(cfOptions);

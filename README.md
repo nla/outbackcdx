@@ -41,6 +41,7 @@ Command line options:
       -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)
       -j jwks-url perm-path Use JSON Web Tokens for authorization
       -k url realm clientid Use a Keycloak server for authorization
+      -m max-open-files     Limit the number of open .sst files (reduces memory usage)
       -p port               Local port to listen on
       -t count              Number of web server threads
       -u                    Use Undertow as the HTTP server instead of NanoHTTPD

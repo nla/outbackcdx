@@ -27,6 +27,7 @@ public class Main {
         System.err.println("  -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)");
         System.err.println("  -j jwks-url perm-path Use JSON Web Tokens for authorization");
         System.err.println("  -k url realm clientid Use a Keycloak server for authorization");
+        System.err.println("  -m max-open-files     Limit the number of open .sst files (reduces memory usage)");
         System.err.println("  -p port               Local port to listen on");
         System.err.println("  -t count              Number of web server threads");
         System.err.println("  -v                    Verbose logging");
@@ -41,6 +42,7 @@ public class Main {
         int webThreads = Runtime.getRuntime().availableProcessors();
         boolean inheritSocket = false;
         File dataPath = new File("data");
+        int maxOpenSstFiles = -1;
         boolean verbose = false;
         Authorizer authorizer = new NullAuthorizer();
 
@@ -77,6 +79,9 @@ public class Main {
                     authorizer = keycloakConfig.toAuthorizer();
                     dashboardConfig.put("keycloak", keycloakConfig);
                     break;
+                case "-m":
+                    maxOpenSstFiles = Integer.parseInt(args[++i]);
+                    break;
                 case "-v":
                     verbose = true;
                     break;
@@ -92,7 +97,7 @@ public class Main {
             }
         }
 
-        try (DataStore dataStore = new DataStore(dataPath)) {
+        try (DataStore dataStore = new DataStore(dataPath, maxOpenSstFiles)) {
             Webapp controller = new Webapp(dataStore, verbose, dashboardConfig);
             if (undertow) {
                 UWeb.UServer server = new UWeb.UServer(host, port, controller, authorizer);
