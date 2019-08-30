@@ -19,10 +19,16 @@ public class DataStore implements Closeable {
     private final File dataDir;
     private final Map<String, Index> indexes = new ConcurrentHashMap<String, Index>();
     private final Long replicationWindow;
+    private final long scanCap;
 
     public DataStore(File dataDir, Long replicationWindow) {
+        this(dataDir, replicationWindow, Long.MAX_VALUE);
+    }
+
+    public DataStore(File dataDir, Long replicationWindow, long scanCap) {
         this.dataDir = dataDir;
         this.replicationWindow = replicationWindow;
+        this.scanCap = scanCap;
     }
 
     public Index getIndex(String collection) throws IOException {
@@ -115,7 +121,7 @@ public class DataStore implements Closeable {
                 accessControl = new AccessControl(db, cfHandles.get(2), cfHandles.get(3));
             }
 
-            index = new Index(collection, db, cfHandles.get(0), cfHandles.get(1), accessControl);
+            index = new Index(collection, db, cfHandles.get(0), cfHandles.get(1), accessControl, scanCap);
             indexes.put(collection, index);
             return index;
         } catch (RocksDBException e) {

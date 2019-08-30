@@ -28,13 +28,19 @@ public class Index {
     final ColumnFamilyHandle defaultCF;
     final ColumnFamilyHandle aliasCF;
     final AccessControl accessControl;
+    final long scanCap;
 
     public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl) {
+        this(name, db, defaultCF, aliasCF, accessControl, Long.MAX_VALUE);
+    }
+
+    public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl, long scanCap) {
         this.name = name;
         this.db = db;
         this.defaultCF = defaultCF;
         this.aliasCF = aliasCF;
         this.accessControl = accessControl;
+        this.scanCap = scanCap;
     }
 
     public void flushWal() throws RocksDBException{
@@ -245,7 +251,7 @@ public class Index {
     }
 
     private Iterator<Capture> filteredCaptures(byte[] key, Predicate<Capture> scope, Predicate<Capture> filter, boolean reverse) {
-        Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope, reverse, 50000);
+        Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope, reverse, scanCap);
         if (filter != null) {
             captures = new FilteringIterator<>(captures, filter);
         }
@@ -254,7 +260,7 @@ public class Index {
 
     public Iterable<Alias> listAliases(String start) {
         byte[] key = start.getBytes(US_ASCII);
-        return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true, false, 50000);
+        return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true, false, scanCap);
     }
 
     public long estimatedRecordCount() {

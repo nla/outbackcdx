@@ -31,6 +31,7 @@ public class Main {
         System.err.println("  -k url realm clientid Use a Keycloak server for authorization");
         System.err.println("  -p port               Local port to listen on");
         System.err.println("  -t count              Number of web server threads");
+        System.err.println("  -r count              Cap on number of rocksdb records to scan to serve a single request");
         System.err.println("  -v                    Verbose logging");
         System.err.println();
         System.err.println("Primary mode (runs as a replication target for downstream Secondaries)");
@@ -58,6 +59,7 @@ public class Main {
         int pollingInterval = 10;
         List<String> collectionUrls = new ArrayList<>();
         Long replicationWindow = null;
+        long scanCap = Long.MAX_VALUE;
 
         Map<String,Object> dashboardConfig = new HashMap<>();
         dashboardConfig.put("featureFlags", FeatureFlags.asMap());
@@ -98,6 +100,9 @@ public class Main {
                 case "-t":
                     webThreads = Integer.parseInt(args[++i]);
                     break;
+                case "-r":
+                    scanCap = Long.parseLong(args[++i]);
+                    break;
                 case "--primary":
                     collectionUrls.add(args[++i]);
                     FeatureFlags.setSecondaryMode(true);
@@ -119,7 +124,7 @@ public class Main {
             }
         }
 
-        try (DataStore dataStore = new DataStore(dataPath, replicationWindow)) {
+        try (DataStore dataStore = new DataStore(dataPath, replicationWindow, scanCap)) {
             Webapp controller = new Webapp(dataStore, verbose, dashboardConfig);
             if (undertow) {
                 UWeb.UServer server = new UWeb.UServer(host, port, controller, authorizer);
