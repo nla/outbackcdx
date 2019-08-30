@@ -245,7 +245,7 @@ public class Index {
     }
 
     private Iterator<Capture> filteredCaptures(byte[] key, Predicate<Capture> scope, Predicate<Capture> filter, boolean reverse) {
-        Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope, reverse, 1000000);
+        Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope, reverse, 50000);
         if (filter != null) {
             captures = new FilteringIterator<>(captures, filter);
         }
@@ -254,7 +254,7 @@ public class Index {
 
     public Iterable<Alias> listAliases(String start) {
         byte[] key = start.getBytes(US_ASCII);
-        return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true, false, 1000000);
+        return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true, false, 50000);
     }
 
     public long estimatedRecordCount() {
