@@ -20,15 +20,13 @@ public class DataStore implements Closeable {
     private final Map<String, Index> indexes = new ConcurrentHashMap<String, Index>();
     private final Long replicationWindow;
     private final long scanCap;
+    private final int maxOpenSstFiles;
 
-    public DataStore(File dataDir, Long replicationWindow) {
-        this(dataDir, replicationWindow, Long.MAX_VALUE);
-    }
-
-    public DataStore(File dataDir, Long replicationWindow, long scanCap) {
+    public DataStore(File dataDir, int maxOpenSstFiles, Long replicationWindow, long scanCap) {
         this.dataDir = dataDir;
         this.replicationWindow = replicationWindow;
         this.scanCap = scanCap;
+        this.maxOpenSstFiles = maxOpenSstFiles;
     }
 
     public Index getIndex(String collection) throws IOException {
@@ -82,17 +80,13 @@ public class DataStore implements Closeable {
             dbOptions.setMaxBackgroundCompactions(Math.min(8, Runtime.getRuntime().availableProcessors()));
             dbOptions.setAvoidFlushDuringRecovery(true);
 
-            /*
-             * It turns out that max_open_file=-1 is what blows up ram usage.
-             * https://github.com/facebook/rocksdb/issues/4112#issuecomment-407845168
-             */
-            dbOptions.setMaxOpenFiles(256);
-
             // if not null, replication data will be available this far back in
             // time (in seconds)
             if (replicationWindow != null) {
                 dbOptions.setWalTtlSeconds(replicationWindow);
             }
+
+            dbOptions.setMaxOpenFiles(maxOpenSstFiles);
 
             ColumnFamilyOptions cfOptions = new ColumnFamilyOptions();
             configureColumnFamily(cfOptions);

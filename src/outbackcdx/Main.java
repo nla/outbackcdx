@@ -1,5 +1,7 @@
 package outbackcdx;
 
+import com.sun.management.OperatingSystemMXBean;
+import com.sun.management.UnixOperatingSystemMXBean;
 import outbackcdx.auth.Authorizer;
 import outbackcdx.auth.JwtAuthorizer;
 import outbackcdx.auth.KeycloakConfig;
@@ -7,6 +9,7 @@ import outbackcdx.auth.NullAuthorizer;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.ServerSocket;
@@ -29,6 +32,8 @@ public class Main {
         System.err.println("  -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)");
         System.err.println("  -j jwks-url perm-path Use JSON Web Tokens for authorization");
         System.err.println("  -k url realm clientid Use a Keycloak server for authorization");
+        System.err.println("  -m max-open-files     Limit the number of open .sst files to control memory usage");
+        System.err.println("                        (default " + maxOpenSstFilesHeuristic() + " based on system RAM and ulimit -n)");
         System.err.println("  -p port               Local port to listen on");
         System.err.println("  -t count              Number of web server threads");
         System.err.println("  -r count              Cap on number of rocksdb records to scan to serve a single request");
@@ -54,6 +59,7 @@ public class Main {
         int webThreads = Runtime.getRuntime().availableProcessors();
         boolean inheritSocket = false;
         File dataPath = new File("data");
+        int maxOpenSstFiles = maxOpenSstFilesHeuristic();
         boolean verbose = false;
         Authorizer authorizer = new NullAuthorizer();
         int pollingInterval = 10;
@@ -94,6 +100,9 @@ public class Main {
                     authorizer = keycloakConfig.toAuthorizer();
                     dashboardConfig.put("keycloak", keycloakConfig);
                     break;
+                case "-m":
+                    maxOpenSstFiles = Integer.parseInt(args[++i]);
+                    break;
                 case "-v":
                     verbose = true;
                     break;
@@ -124,7 +133,7 @@ public class Main {
             }
         }
 
-        try (DataStore dataStore = new DataStore(dataPath, replicationWindow, scanCap)) {
+        try (DataStore dataStore = new DataStore(dataPath, maxOpenSstFiles, replicationWindow, scanCap)) {
             Webapp controller = new Webapp(dataStore, verbose, dashboardConfig);
             if (undertow) {
                 UWeb.UServer server = new UWeb.UServer(host, port, controller, authorizer);
@@ -156,6 +165,45 @@ public class Main {
         } catch (InterruptedException | IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private static int maxOpenSstFilesHeuristic() {
+        Object bean = ManagementFactory.getOperatingSystemMXBean();
+        if (!(bean instanceof OperatingSystemMXBean)) {
+            System.err.println("Warning: unable to get OS memory information");
+            return -1;
+        }
+
+        // assume each open SST file takes 10MB of RAM
+        // allow RocksDB half of whatever's left after the JVM takes its share
+        OperatingSystemMXBean osBean = (OperatingSystemMXBean) bean;
+        long physicalMemory = osBean.getTotalPhysicalMemorySize();
+        long jvmMaxHeap = Runtime.getRuntime().maxMemory();
+        long memoryAvailableToRocksDB = physicalMemory / 2 - jvmMaxHeap;
+        long maxOpenFiles = memoryAvailableToRocksDB / (10 * 1024 * 1024);
+
+        // but if ulimit -n is lower use that instead so we don't hit IO errors
+        if (bean instanceof UnixOperatingSystemMXBean) {
+            UnixOperatingSystemMXBean unixBean = (UnixOperatingSystemMXBean) bean;
+            long maxFileDescriptors = unixBean.getMaxFileDescriptorCount() - unixBean.getOpenFileDescriptorCount() - 20;
+            if (maxOpenFiles > maxFileDescriptors) {
+                maxOpenFiles = maxFileDescriptors;
+            }
+        }
+
+        // if we've got 40 terabytes of RAM we can't actually apply a limit
+        // and hey we probably don't need one anyway!
+        if (maxOpenFiles > Integer.MAX_VALUE) {
+            return -1;
+        }
+
+        // we need to be able to open at least a few files
+        // if there's this little RAM we're in trouble anyway
+        if (maxOpenFiles < 16) {
+            return 16;
+        }
+
+        return (int)maxOpenFiles;
     }
 
     private static ServerSocket openSocket(String host, int port, boolean inheritSocket) throws IOException {
