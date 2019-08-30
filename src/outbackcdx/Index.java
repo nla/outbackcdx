@@ -245,7 +245,7 @@ public class Index {
     }
 
     private Iterator<Capture> filteredCaptures(byte[] key, Predicate<Capture> scope, Predicate<Capture> filter, boolean reverse) {
-        Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope, reverse);
+        Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope, reverse, 1000000);
         if (filter != null) {
             captures = new FilteringIterator<>(captures, filter);
         }
@@ -254,7 +254,7 @@ public class Index {
 
     public Iterable<Alias> listAliases(String start) {
         byte[] key = start.getBytes(US_ASCII);
-        return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true, false);
+        return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true, false, 1000000);
     }
 
     public long estimatedRecordCount() {
@@ -279,6 +279,8 @@ public class Index {
         private final boolean reverse;
         private T record = null;
         private boolean exhausted = false;
+        private long cap;
+        private long count = 0;
 
         @Override
         protected void finalize() throws Throwable {
@@ -286,7 +288,7 @@ public class Index {
             super.finalize();
         }
 
-        public Records(RocksDB db, ColumnFamilyHandle columnFamilyHandle, byte[] startKey, RecordConstructor<T> constructor, Predicate<T> scope, boolean reverse) {
+        public Records(RocksDB db, ColumnFamilyHandle columnFamilyHandle, byte[] startKey, RecordConstructor<T> constructor, Predicate<T> scope, boolean reverse, long cap) {
             final RocksIterator it = db.newIterator(columnFamilyHandle);
             it.seek(startKey);
             if (reverse) {
@@ -300,6 +302,7 @@ public class Index {
             this.scope = scope;
             this.it = it;
             this.reverse = reverse;
+            this.cap = cap;
         }
 
         public boolean hasNext() {
@@ -309,7 +312,7 @@ public class Index {
             if (record == null && it.isValid()) {
                 record = constructor.construct(it.key(), it.value());
             }
-            if (record == null || !scope.test(record)) {
+            if (record == null || !scope.test(record) || count >= cap) {
                 record = null;
                 exhausted = true;
                 it.close();
@@ -329,6 +332,7 @@ public class Index {
             } else {
                 it.next();
             }
+            count += 1;
             return record;
         }
     }

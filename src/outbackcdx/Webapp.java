@@ -340,10 +340,6 @@ class Webapp implements Web.Handler {
     }
 
     Response query(Web.Request request) throws IOException, Web.ResponseException {
-        if (verbose) {
-            out.println(request);
-        }
-
         Index index = getIndex(request);
         Map<String,String> params = request.params();
         if (params.containsKey("q")) {
