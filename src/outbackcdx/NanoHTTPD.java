@@ -476,9 +476,6 @@ public abstract class NanoHTTPD {
          * Sends given response to the socket.
          */
         protected void send(OutputStream rawOut) {
-            long start = System.currentTimeMillis();
-            CountingOutputStream outputStream = new CountingOutputStream(rawOut);
-
             String mime = mimeType;
             SimpleDateFormat gmtFrmt = new SimpleDateFormat("E, d MMM yyyy HH:mm:ss 'GMT'", Locale.US);
             gmtFrmt.setTimeZone(TimeZone.getTimeZone("GMT"));
@@ -487,7 +484,7 @@ public abstract class NanoHTTPD {
                 if (status == null) {
                     throw new Error("sendResponse(): Status can't be null.");
                 }
-                PrintWriter pw = new PrintWriter(outputStream);
+                PrintWriter pw = new PrintWriter(rawOut);
                 pw.print("HTTP/1.1 " + status.getDescription() + " \r\n");
 
                 if (mime != null) {
@@ -512,29 +509,25 @@ public abstract class NanoHTTPD {
                     pw.print("\r\n");
                     pw.flush();
                     if (streamer != null) {
-                        ChunkingOutputStream chunker = new ChunkingOutputStream(outputStream);
+                        ChunkingOutputStream chunker = new ChunkingOutputStream(rawOut);
                         try {
                             streamer.stream(chunker);
                         } finally {
-                            outputStream.write(String.format("0\r\n\r\n").getBytes());
-                            outputStream.flush();
+                            rawOut.write(String.format("0\r\n\r\n").getBytes());
+                            rawOut.flush();
                         }
                     } else {
-                        sendAsChunked(outputStream);
+                        sendAsChunked(rawOut);
                     }
                 } else {
                     int pending = data != null ? data.available() : 0;
                     sendContentLengthHeaderIfNotAlreadyPresent(pw, header, pending);
                     pw.print("\r\n");
                     pw.flush();
-                    sendAsFixedLength(outputStream, pending);
+                    sendAsFixedLength(rawOut, pending);
                 }
-                outputStream.flush();
+                rawOut.flush();
                 safeClose(data);
-
-                String elapsed = String.format("%.3f", 1.0 * (System.currentTimeMillis() - start) / 1000);
-                System.out.println(new Date() + " " + remoteAddr + " " + status.getRequestStatus() + " "
-                        + outputStream.count + " " + elapsed + "s " + requestMethod + " " + url);
             } catch (IOException ioe) {
                 // Couldn't write? No can do.
             }
@@ -733,6 +726,7 @@ public abstract class NanoHTTPD {
     protected class HTTPSession implements IHTTPSession {
         public static final int BUFSIZE = 8192;
         private final OutputStream outputStream;
+        private CountingInputStream countingInputStream;
         private PushbackInputStream inputStream;
         private BoundedInputStream bodyStream;
         private int splitbyte;
@@ -749,7 +743,8 @@ public abstract class NanoHTTPD {
         }
 
         public HTTPSession(InputStream inputStream, OutputStream outputStream, InetAddress inetAddress) {
-            this.inputStream = new PushbackInputStream(inputStream, BUFSIZE);
+            countingInputStream = new CountingInputStream(inputStream);
+            this.inputStream = new PushbackInputStream(countingInputStream, BUFSIZE);
             this.outputStream = outputStream;
             String remoteIp = inetAddress.isLoopbackAddress() || inetAddress.isAnyLocalAddress() ? "127.0.0.1" : inetAddress.getHostAddress().toString();
             headers = new HashMap<String, String>();
@@ -760,6 +755,8 @@ public abstract class NanoHTTPD {
 
         @Override
         public void execute() throws IOException {
+            long start = System.currentTimeMillis();
+
             String remoteAddr = null;
             try {
                 // Read the first 8192 bytes.
@@ -828,7 +825,11 @@ public abstract class NanoHTTPD {
 
                 // Ok, now do the serve()
                 Response r = serve(this);
-                r.url = getUri() + "?" + getQueryParameterString();
+                if (getQueryParameterString() != null) {
+                    r.url = getUri() + "?" + getQueryParameterString();
+                } else {
+                    r.url = getUri();
+                }
                 r.remoteAddr = remoteAddr;
 
                 // ensure body is consumed
@@ -836,12 +837,19 @@ public abstract class NanoHTTPD {
                     bodyStream.skip(contentLength);
                 }
 
+                CountingOutputStream countingOut = new CountingOutputStream(outputStream);
                 if (r == null) {
                     throw new ResponseException(Response.Status.INTERNAL_ERROR, "SERVER INTERNAL ERROR: Serve() returned a null response.");
                 } else {
                     r.setRequestMethod(method);
-                    r.send(outputStream);
+                    r.send(countingOut);
                 }
+
+                String elapsed = String.format("%.3f", 1.0 * (System.currentTimeMillis() - start) / 1000);
+                System.out.println(new Date() + " " + r.remoteAddr + " " + r.status.getRequestStatus() + " "
+                        + (countingInputStream.count + countingOut.count) + " " + elapsed + "s "
+                        + r.requestMethod + " " + r.url);
+
             } catch (SocketException e) {
                 // throw it out to close socket object (finalAccept)
                 throw e;
@@ -1045,6 +1053,61 @@ public abstract class NanoHTTPD {
         public void write(int b) throws IOException {
             out.write(b);
             count++;
+        }
+    }
+
+    // copied from guava
+    static final class CountingInputStream extends FilterInputStream {
+        long count;
+        private long mark = -1;
+
+        public CountingInputStream(InputStream in) {
+            super(in);
+        }
+
+        @Override
+        public int read() throws IOException {
+            int result = in.read();
+            if (result != -1) {
+                count++;
+            }
+            return result;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            int result = in.read(b, off, len);
+            if (result != -1) {
+                count += result;
+            }
+            return result;
+        }
+
+        @Override
+        public long skip(long n) throws IOException {
+            long result = in.skip(n);
+            count += result;
+            return result;
+        }
+
+        @Override
+        public synchronized void mark(int readlimit) {
+            in.mark(readlimit);
+            mark = count;
+            // it's okay to mark even if mark isn't supported, as reset won't work
+        }
+
+        @Override
+        public synchronized void reset() throws IOException {
+            if (!in.markSupported()) {
+                throw new IOException("Mark not supported");
+            }
+            if (mark == -1) {
+                throw new IOException("Mark not set");
+            }
+
+            in.reset();
+            count = mark;
         }
     }
 }
