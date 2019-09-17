@@ -119,13 +119,13 @@ public class ChangePollingThread extends Thread {
                 reader.endObject();
                 assert writeBatch != null;
                 commitWriteBatch(index, sequenceNumber, writeBatch);
-                System.out.println(new Date() + " " + getName() + ": replicated write batch of length "
-                        + writeBatch.length() + " from " + finalUrl + " : our latest sequence number is now "
-                        + index.getLatestSequenceNumber());
             } else if (JsonToken.END_ARRAY.equals(nextToken)){
                 reader.endArray();
             }
         }
+        System.out.println(new Date() + " " + getName() + ": replicated write batch of length "
+                + writeBatch.length() + " from " + finalUrl + " : our latest sequence number is now "
+                + index.getLatestSequenceNumber());
     }
 
     private void commitWriteBatch(Index index, long sequenceNumber, String writeBatch) throws RocksDBException {
