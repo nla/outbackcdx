@@ -94,9 +94,7 @@ public class ChangePollingThread extends Thread {
         HttpGet request = new HttpGet(finalUrl);
         long sequenceNumber = 0;
         String writeBatch = null;
-        System.out.println(new Date() + " " + getName() + ": requesting " + finalUrl);
         HttpResponse response = httpclient.execute(request);
-        System.out.println(new Date() + " " + getName() + ": received " + response.getStatusLine() + " from " + finalUrl);
 
         if(response.getStatusLine().getStatusCode() != 200){
             InputStream inputStream = response.getEntity().getContent();
@@ -121,6 +119,9 @@ public class ChangePollingThread extends Thread {
                 reader.endObject();
                 assert writeBatch != null;
                 commitWriteBatch(index, sequenceNumber, writeBatch);
+                System.out.println(new Date() + " " + getName() + ": replicated write batch of length "
+                        + writeBatch.length() + " from " + finalUrl + " : our latest sequence number is now "
+                        + index.getLatestSequenceNumber());
             } else if (JsonToken.END_ARRAY.equals(nextToken)){
                 reader.endArray();
             }
@@ -136,6 +137,5 @@ public class ChangePollingThread extends Thread {
         } catch (UnsupportedEncodingException e){
             throw new RuntimeException(e); // ASCII is everywhere; this shouldn't happen.
         }
-        System.out.println(new Date() + " " + getName() + ": Committed Write Batch number "+sequenceNumber+" with length "+writeBatch.length());
     }
 }
