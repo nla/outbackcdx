@@ -34,6 +34,7 @@ public class ChangePollingThread extends Thread {
     String collection;
 
     protected ChangePollingThread(String primaryReplicationUrl, int pollingInterval, DataStore dataStore) throws IOException {
+        super("ChangePollingThread(" + primaryReplicationUrl + ")");
         this.pollingInterval = pollingInterval;
         this.dataStore = dataStore;
         this.primaryReplicationUrl = primaryReplicationUrl.replaceFirst("/$", "");
@@ -54,20 +55,20 @@ public class ChangePollingThread extends Thread {
                         since = new String(output);
                     }
                 } catch (RocksDBException e) {
-                    System.err.println("Received rocks db exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
+                    System.err.println(new Date() + " " + getName() + ": Received rocks db exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
                     e.printStackTrace();
                 }
                 finalUrl = primaryReplicationUrl + "/changes?n=50&since=" + since;
                 try {
                     replicate();
                 } catch (IOException e) {
-                    System.err.println(new Date() + " ChangePollingThread: I/O exception processing " + finalUrl);
+                    System.err.println(new Date() + " " + getName() + ": I/O exception processing " + finalUrl);
                     e.printStackTrace();
                 } catch (RocksDBException e){
-                    System.err.println(new Date() + " ChangePollingThread: The plane has crashed into the mountain. RocksDB threw an exception during replication from "+ finalUrl);
+                    System.err.println(new Date() + " " + getName() + ": The plane has crashed into the mountain. RocksDB threw an exception during replication from "+ finalUrl);
                     e.printStackTrace();
                 } catch (Exception e) {
-                    System.err.println(new Date() + " ChangePollingThread: Dang! something happened while processing " + finalUrl);
+                    System.err.println(new Date() + " " + getName() + ": Dang! something happened while processing " + finalUrl);
                     e.printStackTrace();
                 }
 
@@ -76,12 +77,12 @@ public class ChangePollingThread extends Thread {
                     try {
                         Thread.sleep(sleepTime);
                     } catch (InterruptedException e) {
-                        System.out.println("Received interruption at " + System.currentTimeMillis());
+                        System.out.println(new Date() + " " + getName() + ": Received interruption at " + System.currentTimeMillis());
                         return;
                     }
                 }
             } catch (Exception e) {
-                System.err.println("proceeding after unexpected exception");
+                System.err.println(new Date() + " " + getName() + ": proceeding after unexpected exception");
                 e.printStackTrace();
             }
         }
@@ -93,9 +94,9 @@ public class ChangePollingThread extends Thread {
         HttpGet request = new HttpGet(finalUrl);
         long sequenceNumber = 0;
         String writeBatch = null;
-        System.out.println(new Date() + " requesting " + finalUrl);
+        System.out.println(new Date() + " " + getName() + ": requesting " + finalUrl);
         HttpResponse response = httpclient.execute(request);
-        System.out.println(new Date() + " received " + response.getStatusLine() + " from " + finalUrl);
+        System.out.println(new Date() + " " + getName() + ": received " + response.getStatusLine() + " from " + finalUrl);
 
         if(response.getStatusLine().getStatusCode() != 200){
             InputStream inputStream = response.getEntity().getContent();
@@ -135,6 +136,6 @@ public class ChangePollingThread extends Thread {
         } catch (UnsupportedEncodingException e){
             throw new RuntimeException(e); // ASCII is everywhere; this shouldn't happen.
         }
-        System.out.println(new Date() + " ChangePollingThread: Committed Write Batch number "+sequenceNumber+" with length "+writeBatch.length());
+        System.out.println(new Date() + " " + getName() + ": Committed Write Batch number "+sequenceNumber+" with length "+writeBatch.length());
     }
 }

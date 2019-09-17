@@ -78,6 +78,7 @@ public class UWeb {
         private final HttpServerExchange exchange;
         private final MultiMap<String,String> params;
         private final Permit permit;
+        private final String url;
 
         public URequest(HttpServerExchange exchange, Permit permit) {
             this.exchange = exchange;
@@ -88,6 +89,7 @@ public class UWeb {
                     params.add(pair.getKey(), value);
                 }
             }
+            this.url = rebuildUrl();
         }
 
         @Override
@@ -123,6 +125,11 @@ public class UWeb {
         @Override
         public String username() {
             return permit.username;
+        }
+
+        @Override
+        public String url() {
+            return url;
         }
     }
 }

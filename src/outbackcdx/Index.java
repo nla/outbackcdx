@@ -52,6 +52,10 @@ public class Index {
         return logReader;
     }
 
+    public long getLatestSequenceNumber() {
+        return db.getLatestSequenceNumber();
+    }
+
     /**
      * Returns all captures that match the given prefix.
      */

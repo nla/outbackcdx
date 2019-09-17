@@ -62,10 +62,12 @@ class Web {
     static class NRequest implements Request {
         private final IHTTPSession session;
         private final Permit permit;
+        private final String url;
 
         NRequest(IHTTPSession session, Permit permit) {
             this.session = session;
             this.permit = permit;
+            this.url = rebuildUrl();
         }
 
         @Override
@@ -101,6 +103,11 @@ class Web {
         @Override
         public String username() {
             return permit.username;
+        }
+
+        @Override
+        public String url() {
+            return url;
         }
     }
 
@@ -293,6 +300,11 @@ class Web {
 
             return handler.handle(request);
         }
+
+        @Override
+        public String toString() {
+            return method + " " + pattern;
+        }
     }
 
     public static interface Request {
@@ -326,7 +338,12 @@ class Web {
             return value;
         }
 
-        default String url() {
+        /**
+         * Should be called by constructor to stash the original url. Needs to happen
+         * before before Route.handle() because it adds path tokens to params(), making
+         * it impossible to compute the original url.
+         */
+        default String rebuildUrl() {
             StringBuilder buf = new StringBuilder(path());
             if (params() != null) {
                 boolean first = true;
@@ -346,5 +363,7 @@ class Web {
             }
             return buf.toString();
         }
+
+        String url();
     }
 }

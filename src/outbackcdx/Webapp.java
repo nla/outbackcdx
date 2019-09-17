@@ -243,6 +243,9 @@ class Webapp implements Web.Handler {
 
             batch.commit();
         }
+        System.out.println(new Date() + " " + request.method() + " " + request.url() + " Added " + added
+                + " records. latestSequenceNumber=" + index.getLatestSequenceNumber());
+
         return new Response(OK, "text/plain", "Added " + added + " records\n");
     }
 
