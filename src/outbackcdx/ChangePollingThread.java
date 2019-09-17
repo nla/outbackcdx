@@ -89,6 +89,7 @@ public class ChangePollingThread extends Thread {
     }
 
     private void replicate() throws IOException, RocksDBException {
+        long start = System.currentTimeMillis();
         // strip trailing slash if necessary
         CloseableHttpClient httpclient = HttpClients.createDefault();
         HttpGet request = new HttpGet(finalUrl);
@@ -123,9 +124,10 @@ public class ChangePollingThread extends Thread {
                 reader.endArray();
             }
         }
+        String elapsed = String.format("%.3f", 1.0 * (System.currentTimeMillis() - start) / 1000);
         System.out.println(new Date() + " " + getName() + ": replicated write batch of length "
-                + writeBatch.length() + " from " + finalUrl + " : our latest sequence number is now "
-                + index.getLatestSequenceNumber());
+                + writeBatch.length() + " from " + finalUrl + " in " + elapsed + "s: "
+                + "our latest sequence number is now " + index.getLatestSequenceNumber());
     }
 
     private void commitWriteBatch(Index index, long sequenceNumber, String writeBatch) throws RocksDBException {
