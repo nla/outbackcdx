@@ -90,6 +90,12 @@ public class ChangePollingThread extends Thread {
 
     private void replicate() throws IOException, RocksDBException {
         long start = System.currentTimeMillis();
+
+        int countCommitted = 0;
+        long totalLengthCommitted = 0;
+        Long firstCommitted = null;
+        Long lastCommitted = null;
+
         // strip trailing slash if necessary
         CloseableHttpClient httpclient = HttpClients.createDefault();
         HttpGet request = new HttpGet(finalUrl);
@@ -120,14 +126,23 @@ public class ChangePollingThread extends Thread {
                 reader.endObject();
                 assert writeBatch != null;
                 commitWriteBatch(index, sequenceNumber, writeBatch);
+                if (firstCommitted == null) {
+                    firstCommitted = sequenceNumber;
+                }
+                lastCommitted = sequenceNumber;
+                countCommitted++;
+                totalLengthCommitted += writeBatch.length();
             } else if (JsonToken.END_ARRAY.equals(nextToken)){
                 reader.endArray();
             }
         }
+
         String elapsed = String.format("%.3f", 1.0 * (System.currentTimeMillis() - start) / 1000);
-        System.out.println(new Date() + " " + getName() + ": replicated write batch of length "
-                + writeBatch.length() + " from " + finalUrl + " in " + elapsed + "s: "
-                + "our latest sequence number is now " + index.getLatestSequenceNumber());
+        System.out.println(new Date() + " " + getName() + ": replicated "
+                + countCommitted + " write batches (" + firstCommitted + ".."
+                + lastCommitted + ") with total length " + totalLengthCommitted
+                + " in " + elapsed + "s from " + finalUrl + " and our latest"
+                + " sequence number is now " + index.getLatestSequenceNumber());
     }
 
     private void commitWriteBatch(Index index, long sequenceNumber, String writeBatch) throws RocksDBException {
