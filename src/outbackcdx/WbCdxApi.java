@@ -144,14 +144,23 @@ public class WbCdxApi {
 
     static class TextFormat implements OutputFormat {
         private final Writer out;
+        private final String[] fields;
 
         TextFormat(Writer out, String[] fields) {
             this.out = out;
+            this.fields = fields;
         }
 
         @Override
         public void writeCapture(Capture capture) throws IOException {
-            out.write(capture.toString());
+            for (int i = 0; i < fields.length; i++) {
+                String field = fields[i];
+                Object value = capture.get(field);
+                out.write(value.toString());
+                if (i < fields.length - 1) {
+                    out.write(' ');
+                }
+            }
             out.write('\n');
         }
 
