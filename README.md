@@ -229,6 +229,24 @@ Aliases can be mixed with regular CDX lines either in the same file or separate 
 
 Deletion of aliases is not yet implemented.
 
+Tuning Memory Usage
+-------------------
+
+RocksDB some data in memory (binary search index, bloom filter) for each open SST file. This improves performance at
+the cost of using more memory. OutbackCDX uses the following heuristic by default to limit the maximum number of open
+SST files in an attempt not to exhaust the system's memory.
+
+    RocksDB max_open_files = (totalSystemRam / 2 - maxJvmHeap) / 10 MB
+
+This default may not be suitable when multiple large indexes are in use or when OutbackCDX is sharing a server with
+many other processes. You can override the limit OutbackCDX's `-m` option.
+
+If you find OutbackCDX using too much memory or you need more performance try adjusting the limit. The optimal setting
+will depend on your index size and hardware. If you have a lot of memory `-m -1` (no limit) will allow RocksDB to open
+all SST files on startup and should give the best query performance. However with slow disks it can also make startup
+very slow. You may also need to increase the kernel's max open file description limit (`ulimit -n`).
+ 
+
 Authorization
 -------------
 
