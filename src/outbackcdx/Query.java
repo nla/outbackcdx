@@ -41,6 +41,10 @@ public class Query {
                 addPredicate(filter);
             }
         }
+        if (params.containsKey("collapse")) {
+            Filter filter = Filter.collapser(params.get("collapse"));
+            addPredicate(filter);
+        }
 
         String fl = params.getOrDefault("fl", FeatureFlags.cdx14() ? DEFAULT_FIELDS_CDX14 : DEFAULT_FIELDS);
         fields = fl.split(",");

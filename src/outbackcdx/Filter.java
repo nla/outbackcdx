@@ -28,6 +28,38 @@ interface Filter extends Predicate<Capture> {
         }
     }
 
+    public static Filter collapser(String spec) {
+        String[] splits = spec.split(":", 2);
+        String field = splits[0];
+        Integer substringLength = null;
+        if (splits.length > 1) {
+            substringLength = Integer.parseInt(splits[1]);
+        }
+        return new Collapser(field, substringLength);
+    }
+
+    public class Collapser implements Filter {
+        private String field;
+        private Integer substringLength;
+        private String lastValue;
+
+        public Collapser(String field, Integer substringLength) {
+            this.field = field;
+            this.substringLength = substringLength;
+        }
+
+        @Override
+        public boolean test(Capture t) {
+            String value = t.get(field).toString();
+            if (substringLength != null) {
+                value = value.substring(0, substringLength);
+            }
+            boolean result = !value.equals(lastValue);
+            lastValue = value;
+            return result;
+        }
+    }
+
     abstract class BaseFilter implements Filter {
         protected String field;
         protected boolean inverted;
