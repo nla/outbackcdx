@@ -21,7 +21,6 @@ import org.rocksdb.WriteBatch;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 
-
 public class ChangePollingThread extends Thread {
     final byte[] SEQ_NUM_KEY = "#ReplicationSequence".getBytes();
 
@@ -32,6 +31,7 @@ public class ChangePollingThread extends Thread {
     String since = "0";
     String finalUrl = null;
     String collection;
+    boolean shuttingDown = false;
 
     protected ChangePollingThread(String primaryReplicationUrl, int pollingInterval, DataStore dataStore) throws IOException {
         super("ChangePollingThread(" + primaryReplicationUrl + ")");
@@ -41,10 +41,21 @@ public class ChangePollingThread extends Thread {
         String[] splitCollectionUrl = this.primaryReplicationUrl.split("/");
         collection = splitCollectionUrl[splitCollectionUrl.length - 1];
         this.index = dataStore.getIndex(collection, true);
+
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            @Override
+            public void run() {
+                shuttingDown = true;
+                try {
+                    ChangePollingThread.this.join(60000);
+                } catch (InterruptedException e) {
+                }
+            }
+        });
     }
 
     public void run() {
-        while (true) {
+        while (!shuttingDown) {
             try {
                 long startTime = System.currentTimeMillis();
                 try {
@@ -60,7 +71,9 @@ public class ChangePollingThread extends Thread {
                 }
                 finalUrl = primaryReplicationUrl + "/changes?n=50&since=" + since;
                 try {
-                    replicate();
+                    if (!shuttingDown) {
+                        replicate();
+                    }
                 } catch (IOException e) {
                     System.err.println(new Date() + " " + getName() + ": I/O exception processing " + finalUrl);
                     e.printStackTrace();
@@ -73,7 +86,7 @@ public class ChangePollingThread extends Thread {
                 }
 
                 long sleepTime = (pollingInterval * 1000) - (System.currentTimeMillis() - startTime);
-                if (sleepTime > 0) {
+                if (sleepTime > 0 && !shuttingDown) {
                     try {
                         Thread.sleep(sleepTime);
                     } catch (InterruptedException e) {
@@ -86,6 +99,8 @@ public class ChangePollingThread extends Thread {
                 e.printStackTrace();
             }
         }
+        System.err.println(new Date() + " " + getName() + ": finished gracefully");
+
     }
 
     private void replicate() throws IOException, RocksDBException {
@@ -111,7 +126,7 @@ public class ChangePollingThread extends Thread {
         InputStream content = response.getEntity().getContent();
         JsonReader reader = GSON.newJsonReader(new InputStreamReader(content));
         reader.beginArray();
-        while (reader.peek() != JsonToken.END_DOCUMENT) {
+        while (reader.peek() != JsonToken.END_DOCUMENT && !shuttingDown) {
             JsonToken nextToken = reader.peek();
             if (JsonToken.BEGIN_OBJECT.equals(nextToken)) {
                 reader.beginObject();
