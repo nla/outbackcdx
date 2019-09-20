@@ -88,7 +88,7 @@ public class Index {
     public Iterable<Capture> query(String surt, long from, long to, Predicate<Capture> filter) {
         String urlkey = resolveAlias(surt);
         byte[] key = Capture.encodeKey(urlkey, from);
-        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey) && record.timestamp < to, filter, false);
+        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey) && record.timestamp <= to, filter, false);
     }
 
     /**

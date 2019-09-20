@@ -28,10 +28,10 @@ public class Query {
         sort = Sort.valueOf(params.getOrDefault("sort", "default").toUpperCase());
         closest = params.get("closest");
         if (params.containsKey("from")) {
-            from = timestamp14Long(params.get("from"));
+            from = timestamp14Long(params.get("from"), '0');
         }
         if (params.containsKey("to")) {
-            to = timestamp14Long(params.get("to"));
+            to = timestamp14Long(params.get("to"), '9');
         }
 
         predicate = capture -> true;
@@ -52,7 +52,7 @@ public class Query {
     }
 
     /**
-     * Pads timestamp with trailing zeroes if shorter than 14 digits, or truncates
+     * Pads timestamp with {@code padDigit} if shorter than 14 digits, or truncates
      * to 14 digits if longer than 14 digits, and converts to long.
      *
      * For example:
@@ -61,14 +61,12 @@ public class Query {
      * <li>"20190128123456789" -> 20190128123456l
      * </ul>
      *
-     * TODO: doublecheck that this matches wayback implementations
-     *
      * @throws NumberFormatException if the string does not contain a parsable long.
      */
-    protected long timestamp14Long(String timestamp) {
+    protected long timestamp14Long(String timestamp, char padDigit) {
         StringBuilder buf = new StringBuilder(timestamp);
         while (buf.length() < 14) {
-            buf.append('0');
+            buf.append(padDigit);
         }
         buf.setLength(14);
         long result = Long.parseLong(buf.toString());
