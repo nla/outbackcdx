@@ -5,6 +5,10 @@ import java.util.function.Predicate;
 public class Query {
     private static final String DEFAULT_FIELDS = "urlkey,timestamp,original,mimetype,statuscode,digest,redirecturl,robotflags,length,offset,filename";
     private static final String DEFAULT_FIELDS_CDX14 = DEFAULT_FIELDS + ",originalLength,originalOffset,originalFilename";
+
+    public static final long MIN_TIMESTAMP = 0l;
+    public static final long MAX_TIMESTAMP = 99999999999999l;
+
     String accessPoint;
     MatchType matchType;
     Sort sort;
@@ -14,6 +18,8 @@ public class Query {
     boolean outputJson;
     long limit;
     Predicate<Capture> predicate;
+    long from = MIN_TIMESTAMP;
+    long to = MAX_TIMESTAMP;
 
     public Query(MultiMap<String,String> params) {
         accessPoint = params.get("accesspoint");
@@ -21,6 +27,12 @@ public class Query {
         matchType = MatchType.valueOf(params.getOrDefault("matchType", "default").toUpperCase());
         sort = Sort.valueOf(params.getOrDefault("sort", "default").toUpperCase());
         closest = params.get("closest");
+        if (params.containsKey("from")) {
+            from = timestamp14Long(params.get("from"));
+        }
+        if (params.containsKey("to")) {
+            to = timestamp14Long(params.get("to"));
+        }
 
         predicate = capture -> true;
         if (params.getAll("filter") != null) {
@@ -37,6 +49,30 @@ public class Query {
         limit = limitParam == null ? Long.MAX_VALUE : Long.parseLong(limitParam);
 
         outputJson = "json".equals(params.get("output"));
+    }
+
+    /**
+     * Pads timestamp with trailing zeroes if shorter than 14 digits, or truncates
+     * to 14 digits if longer than 14 digits, and converts to long.
+     *
+     * For example:
+     * <ul>
+     * <li>"2019" -> 20190000000000l
+     * <li>"20190128123456789" -> 20190128123456l
+     * </ul>
+     *
+     * TODO: doublecheck that this matches wayback implementations
+     *
+     * @throws NumberFormatException if the string does not contain a parsable long.
+     */
+    protected long timestamp14Long(String timestamp) {
+        StringBuilder buf = new StringBuilder(timestamp);
+        while (buf.length() < 14) {
+            buf.append('0');
+        }
+        buf.setLength(14);
+        long result = Long.parseLong(buf.toString());
+        return result;
     }
 
     public String getAccessPoint() {
@@ -72,6 +108,13 @@ public class Query {
         } else if (sort == Sort.REVERSE) {
             if (matchType != MatchType.EXACT) {
                 throw new IllegalArgumentException("sort=reverse is currently only implemented for exact matches");
+            }
+        } else if (from != MIN_TIMESTAMP || to != MAX_TIMESTAMP) {
+            if (matchType != MatchType.EXACT) {
+                throw new IllegalArgumentException("from={timestamp} and to={timestamp} are currently only implemented for exact matches");
+            }
+            if (sort == Sort.CLOSEST) {
+                throw new IllegalArgumentException("from={timestamp} and to={timestamp} are currently not implemented for sort=closest queries");
             }
         }
     }

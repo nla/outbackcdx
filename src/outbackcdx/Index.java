@@ -82,9 +82,13 @@ public class Index {
      * Returns all captures for the given url.
      */
     public Iterable<Capture> query(String surt, Predicate<Capture> filter) {
+        return query(surt, Query.MIN_TIMESTAMP, Query.MAX_TIMESTAMP, filter);
+    }
+
+    public Iterable<Capture> query(String surt, long from, long to, Predicate<Capture> filter) {
         String urlkey = resolveAlias(surt);
-        byte[] key = Capture.encodeKey(urlkey, 0);
-        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey), filter, false);
+        byte[] key = Capture.encodeKey(urlkey, from);
+        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey) && record.timestamp < to, filter, false);
     }
 
     /**
@@ -102,9 +106,13 @@ public class Index {
      * Returns all captures for the given url in reverse order.
      */
     public Iterable<Capture> reverseQuery(String surt, Predicate<Capture> filter) {
+        return reverseQuery(surt, Query.MIN_TIMESTAMP, Query.MAX_TIMESTAMP, filter);
+    }
+
+    public Iterable<Capture> reverseQuery(String surt, long from, long to, Predicate<Capture> filter) {
         String urlkey = resolveAlias(surt);
-        byte[] key = Capture.encodeKey(urlkey, 99999999999999L);
-        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey), filter, true);
+        byte[] key = Capture.encodeKey(urlkey, to);
+        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey) && record.timestamp >= from, filter, true);
     }
 
     /**
@@ -130,11 +138,11 @@ public class Index {
             case EXACT:
                 switch (query.sort) {
                     case DEFAULT:
-                        return query(surt, filter);
+                        return query(surt, query.from, query.to, filter);
                     case CLOSEST:
                         return closestQuery(UrlCanonicalizer.surtCanonicalize(query.url), Long.parseLong(query.closest), filter);
                     case REVERSE:
-                        return reverseQuery(UrlCanonicalizer.surtCanonicalize(query.url), filter);
+                        return reverseQuery(UrlCanonicalizer.surtCanonicalize(query.url), query.from, query.to, filter);
                 }
             case PREFIX:
                 if (query.url.endsWith("/") && !surt.endsWith("/")) {
@@ -152,7 +160,6 @@ public class Index {
                 throw new IllegalArgumentException("unknown matchType: " + query.matchType);
         }
     }
-
 
     /**
      * "org,example)/foo/bar" => "org,example"
