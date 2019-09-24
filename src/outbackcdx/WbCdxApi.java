@@ -24,10 +24,7 @@ import outbackcdx.NanoHTTPD.Response;
  */
 public class WbCdxApi {
     public static Response queryIndex(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins) {
-        Query query = new Query(request.params());
-        for (FilterPlugin filterPlugin : filterPlugins) {
-            query.addPredicate(filterPlugin.newFilter(query));
-        }
+        Query query = new Query(request.params(), filterPlugins);
         Iterable<Capture> captures = query.execute(index);
 
         boolean outputJson = "json".equals(request.param("output"));

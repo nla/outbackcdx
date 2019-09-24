@@ -21,7 +21,7 @@ public class Query {
     long from = MIN_TIMESTAMP;
     long to = MAX_TIMESTAMP;
 
-    public Query(MultiMap<String,String> params) {
+    public Query(MultiMap<String, String> params, Iterable<FilterPlugin> filterPlugins) {
         accessPoint = params.get("accesspoint");
         url = params.get("url");
         matchType = MatchType.valueOf(params.getOrDefault("matchType", "default").toUpperCase());
@@ -41,6 +41,14 @@ public class Query {
                 addPredicate(filter);
             }
         }
+
+        if (filterPlugins != null) {
+            for (FilterPlugin filterPlugin : filterPlugins) {
+                addPredicate(filterPlugin.newFilter(params));
+            }
+        }
+
+        // "collapse" has to be the last filter applied
         if (params.containsKey("collapse")) {
             Filter filter = Filter.collapser(params.get("collapse"));
             addPredicate(filter);
