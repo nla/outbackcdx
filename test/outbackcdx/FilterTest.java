@@ -61,10 +61,6 @@ public class FilterTest {
         Filter t13Collapser = Filter.collapser("timestamp:13");
         assertTrue(t13Collapser.test(one));
         assertFalse(t13Collapser.test(two));
-
-        Filter t11Collapser = Filter.collapser("timestamp:11");
-        assertTrue(t11Collapser.test(one));
-        assertFalse(t11Collapser.test(two));
     }
 
     @Test(expected = IllegalArgumentException.class)
