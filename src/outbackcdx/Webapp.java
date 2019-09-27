@@ -278,7 +278,8 @@ class Webapp implements Web.Handler {
                 output.write("[\n".getBytes(UTF_8));
 
                 long size = 0l;
-                while (logReader.isValid() && size < batchSize) {
+                long initialSeqNo = -1;
+                while (true) {
                     BatchResult batch = logReader.getBatch();
 
                     output.write("{\"sequenceNumber\": \"".getBytes(UTF_8));
@@ -296,8 +297,14 @@ class Webapp implements Web.Handler {
                     logReader.next();
                     size += b64Batch.length;
 
-                    if (logReader.isValid() && size < batchSize) {
+                    if (initialSeqNo < 0) {
+                        initialSeqNo = batch.sequenceNumber();
+                    }
+
+                    if (logReader.isValid() && (size < batchSize || batch.sequenceNumber() == initialSeqNo)) {
                         output.write(",\n".getBytes(UTF_8));
+                    } else {
+                        break;
                     }
                 }
                 output.write("\n]\n".getBytes(UTF_8));
