@@ -263,11 +263,11 @@ class Webapp implements Web.Handler {
 
     static class ChangeFeedJsonStream implements IStreamer {
         TransactionLogIterator logReader;
-        Long n;
+        long batchSize;
 
-        ChangeFeedJsonStream(TransactionLogIterator logReader, Long n) {
+        ChangeFeedJsonStream(TransactionLogIterator logReader, long batchSize) {
             this.logReader = logReader;
-            this.n = n;
+            this.batchSize = batchSize;
         }
 
         @Override
@@ -277,8 +277,8 @@ class Webapp implements Web.Handler {
                 BufferedOutputStream output = new BufferedOutputStream(outputStream);
                 output.write("[\n".getBytes(UTF_8));
 
-                long i = 0l;
-                while (logReader.isValid() && (n == null || i < n)) {
+                long size = 0l;
+                while (logReader.isValid() && size < batchSize) {
                     BatchResult batch = logReader.getBatch();
 
                     output.write("{\"sequenceNumber\": \"".getBytes(UTF_8));
@@ -294,9 +294,9 @@ class Webapp implements Web.Handler {
                     output.write("\"}".getBytes(UTF_8));
 
                     logReader.next();
-                    i++;
+                    size += b64Batch.length;
 
-                    if (logReader.isValid() && (n == null || i < n)) {
+                    if (logReader.isValid() && size < batchSize) {
                         output.write(",\n".getBytes(UTF_8));
                     }
                 }
@@ -311,9 +311,9 @@ class Webapp implements Web.Handler {
     Response changeFeed(Web.Request request) throws Web.ResponseException, IOException {
         String collection = request.param("collection");
         long since = Long.parseLong(request.param("since", "0"));
-        Long n = null;
-        if (request.param("n") != null) {
-            n = Long.parseLong(request.param("n"));
+        long size = 10*1024*1024;
+        if (request.param("size") != null) {
+            size = Long.parseLong(request.param("size"));
         }
 
         final Index index = getIndex(request);
@@ -328,7 +328,7 @@ class Webapp implements Web.Handler {
              * when it's finished with it. */
             TransactionLogIterator logReader = index.getUpdatesSince(since);
 
-            ChangeFeedJsonStream streamer = new ChangeFeedJsonStream(logReader, n);
+            ChangeFeedJsonStream streamer = new ChangeFeedJsonStream(logReader, size);
             Response response = new Response(OK, "application/json", streamer);
             response.addHeader("Access-Control-Allow-Origin", "*");
             return response;

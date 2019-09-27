@@ -32,8 +32,9 @@ public class ChangePollingThread extends Thread {
     String finalUrl = null;
     String collection;
     boolean shuttingDown = false;
+    long batchSize = 10*1024*1024;
 
-    protected ChangePollingThread(String primaryReplicationUrl, int pollingInterval, DataStore dataStore) throws IOException {
+    protected ChangePollingThread(String primaryReplicationUrl, int pollingInterval, long batchSize, DataStore dataStore) throws IOException {
         super("ChangePollingThread(" + primaryReplicationUrl + ")");
         this.pollingInterval = pollingInterval;
         this.dataStore = dataStore;
@@ -41,6 +42,7 @@ public class ChangePollingThread extends Thread {
         String[] splitCollectionUrl = this.primaryReplicationUrl.split("/");
         collection = splitCollectionUrl[splitCollectionUrl.length - 1];
         this.index = dataStore.getIndex(collection, true);
+        this.batchSize = batchSize;
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
@@ -69,7 +71,7 @@ public class ChangePollingThread extends Thread {
                     System.err.println(new Date() + " " + getName() + ": Received rocks db exception while looking up the value of the key " + new String(SEQ_NUM_KEY) + " locally");
                     e.printStackTrace();
                 }
-                finalUrl = primaryReplicationUrl + "/changes?n=50&since=" + since;
+                finalUrl = primaryReplicationUrl + "/changes?size=" + batchSize + "&since=" + since;
                 try {
                     if (!shuttingDown) {
                         replicate();

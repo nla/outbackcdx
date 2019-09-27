@@ -37,6 +37,7 @@ public class Main {
         System.err.println("  -p port               Local port to listen on");
         System.err.println("  -t count              Number of web server threads");
         System.err.println("  -r count              Cap on number of rocksdb records to scan to serve a single request");
+        System.err.println("  -x                    Output CDX14 by default (instead of CDX11)");
         System.err.println("  -v                    Verbose logging");
         System.err.println();
         System.err.println("Primary mode (runs as a replication target for downstream Secondaries)");
@@ -48,7 +49,7 @@ public class Main {
         System.err.println("  --primary collection-url           URL of collection on upstream primary to poll for changes");
         System.err.println("  --update-interval poll-interval    Polling frequency for upstream changes, in seconds. Default: 10");
         System.err.println("  --accept-writes                    Allow writes to this node, even though running as a secondary");
-        System.err.println("  -x                    Output CDX14 by default (instead of CDX11)");
+        System.err.println("  --batch-size                       Approximate max size (in bytes) per replication batch");
         System.exit(1);
     }
 
@@ -66,6 +67,7 @@ public class Main {
         List<String> collectionUrls = new ArrayList<>();
         Long replicationWindow = null;
         long scanCap = Long.MAX_VALUE;
+        long batchSize = 10*1024*1024;
 
         Map<String,Object> dashboardConfig = new HashMap<>();
         dashboardConfig.put("featureFlags", FeatureFlags.asMap());
@@ -124,6 +126,10 @@ public class Main {
                     break;
                 case "--replication-window":
                     replicationWindow = Long.parseLong(args[++i]);
+                    break;
+                case "--batch-size":
+                    batchSize = Long.parseLong(args[++i]);
+                    break;
                 case "-x":
                     FeatureFlags.setCdx14(true);
                     break;
@@ -145,7 +151,7 @@ public class Main {
                 Web.Server server = new Web.Server(socket, controller, authorizer);
                 ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
                 for (String collectionUrl: collectionUrls) {
-                    ChangePollingThread cpt = new ChangePollingThread(collectionUrl, pollingInterval, dataStore);
+                    ChangePollingThread cpt = new ChangePollingThread(collectionUrl, pollingInterval, batchSize, dataStore);
                     cpt.setDaemon(true);
                     cpt.start();
                 }
