@@ -28,8 +28,8 @@ public class ReplicationFeaturesTest {
     @Before
     public void setUp() throws IOException {
         File root = folder.newFolder();
-        manager = new DataStore(root, 256, null, Long.MAX_VALUE);
-        webapp = new Webapp(manager, false, Collections.emptyMap());
+        manager = new DataStore(root, 256, null, Long.MAX_VALUE, null);
+        webapp = new Webapp(manager, false, Collections.emptyMap(), null);
     }
 
     @After

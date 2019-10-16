@@ -29,18 +29,20 @@ public class Index {
     final ColumnFamilyHandle aliasCF;
     final AccessControl accessControl;
     final long scanCap;
+    final UrlCanonicalizer canonicalizer;
 
     public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl) {
-        this(name, db, defaultCF, aliasCF, accessControl, Long.MAX_VALUE);
+        this(name, db, defaultCF, aliasCF, accessControl, Long.MAX_VALUE, new UrlCanonicalizer());
     }
 
-    public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl, long scanCap) {
+    public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl, long scanCap, UrlCanonicalizer canonicalizer) {
         this.name = name;
         this.db = db;
         this.defaultCF = defaultCF;
         this.aliasCF = aliasCF;
         this.accessControl = accessControl;
         this.scanCap = scanCap;
+        this.canonicalizer = canonicalizer;
     }
 
     public void flushWal() throws RocksDBException{
@@ -133,16 +135,16 @@ public class Index {
             filter = filter.and(accessControl.filter(query.accessPoint, new Date()));
         }
 
-        String surt = UrlCanonicalizer.surtCanonicalize(query.url);
+        String surt = canonicalizer.surtCanonicalize(query.url);
         switch (query.matchType) {
             case EXACT:
                 switch (query.sort) {
                     case DEFAULT:
                         return query(surt, query.from, query.to, filter);
                     case CLOSEST:
-                        return closestQuery(UrlCanonicalizer.surtCanonicalize(query.url), Long.parseLong(query.closest), filter);
+                        return closestQuery(surt, Long.parseLong(query.closest), filter);
                     case REVERSE:
-                        return reverseQuery(UrlCanonicalizer.surtCanonicalize(query.url), query.from, query.to, filter);
+                        return reverseQuery(surt, query.from, query.to, filter);
                 }
             case PREFIX:
                 if (query.url.endsWith("/") && !surt.endsWith("/")) {
@@ -436,7 +438,7 @@ public class Index {
         void deleteCapture(Capture capture) throws IOException {
             capture.urlkey = resolveAlias(capture.urlkey);
             try {
-                dbBatch.remove(capture.encodeKey());
+                dbBatch.delete(capture.encodeKey());
             } catch (RocksDBException e) {
                 throw new IOException(e);
             }
@@ -492,7 +494,7 @@ public class Index {
         private void updateExistingRecordsWithNewAlias(WriteBatch wb, String aliasSurt, String targetSurt) throws IOException {
             for (Capture capture : rawQuery(aliasSurt, null, false)) {
                 try {
-                    wb.remove(capture.encodeKey());
+                    wb.delete(capture.encodeKey());
                 } catch (RocksDBException e) {
                     throw new IOException(e);
                 }

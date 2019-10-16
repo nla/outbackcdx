@@ -1,5 +1,9 @@
 package outbackcdx;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -10,8 +14,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.snakeyaml.engine.v2.api.Load;
+import org.snakeyaml.engine.v2.api.LoadSettings;
 
 /**
  * URL canonicalization rules.
@@ -35,6 +43,54 @@ public class UrlCanonicalizer {
     private static final Pattern TABS_OR_LINEFEEDS = Pattern.compile("[\t\r\n]");
     private static final Pattern UNDOTTED_IP = Pattern.compile("(?:0x)?[0-9]{1,12}");
     static final Pattern DOTTED_IP = Pattern.compile("[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}");
+
+    public static class CustomRule {
+        public Pattern pattern;
+        public String repl;
+        public CustomRule(String regex, String repl) {
+            this.pattern = Pattern.compile(regex);
+            this.repl = repl;
+        }
+    }
+    private List<CustomRule> customRules = new ArrayList<CustomRule>();
+
+    public static class ConfigurationException extends Exception {
+        private static final long serialVersionUID = 1L;
+        public ConfigurationException(String msg) {
+            super(msg);
+        }
+    }
+
+    public UrlCanonicalizer(String fuzzyYamlFile) throws FileNotFoundException, IOException, ConfigurationException {
+        if (fuzzyYamlFile != null) {
+            try (FileInputStream input = new FileInputStream(fuzzyYamlFile)) {
+                loadRules(input);
+            }
+        }
+    }
+
+    public UrlCanonicalizer(InputStream input) throws ConfigurationException {
+        loadRules(input);
+    }
+
+    private void loadRules(InputStream input) throws ConfigurationException {
+        LoadSettings yamlSettings = LoadSettings.builder().build();
+        Load yamlLoader = new Load(yamlSettings);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String,String>> fuzzyConfig = (List<Map<String, String>>) yamlLoader.loadFromInputStream(input);
+
+        for (Map<String, String> item: fuzzyConfig) {
+            CustomRule rule = new CustomRule(item.get("pattern"), item.get("repl"));
+            if (item.size() != 2) {
+                throw new ConfigurationException("fuzzy match custom canonicalization rule contains extraneous fields (should only have 'pattern' and 'repl'): " + item);
+            }
+            customRules.add(rule);
+        }
+    }
+
+    public UrlCanonicalizer() {
+    }
 
     private static URL makeUrl(String rawUrl) throws MalformedURLException {
         rawUrl = TABS_OR_LINEFEEDS.matcher(rawUrl).replaceAll("");
@@ -130,17 +186,28 @@ public class UrlCanonicalizer {
      * <code>urn:transclusions</code> to <code>youtube-dl</code>, since by
      * convention, both schemes indicate youtube-dl json.
      */
-    public static String surtCanonicalize(String url) {
+    public String surtCanonicalize(String url) {
         Matcher m = SPECIAL_URL_REGEX.matcher(url);
+        String surt;
         if (m.matches()) {
             String scheme = canonicalizeScheme(m.group(1));
             if ("urn:transclusions".equals(scheme)) {
                 scheme = "youtube-dl";
             }
-            return scheme + ":" + toUnschemedSurt(canonicalize(m.group(2)));
+            surt = scheme + ":" + toUnschemedSurt(canonicalize(m.group(2)));
         } else {
-            return toUnschemedSurt(canonicalize(url));
+            surt = toUnschemedSurt(canonicalize(url));
         }
+
+        for (CustomRule rule: customRules) {
+            Matcher fuzz = rule.pattern.matcher(surt);
+            if (fuzz.matches()) { // fuzz.group(1)
+                surt = fuzz.replaceFirst(rule.repl);
+                break;
+            }
+        }
+
+        return surt;
     }
 
     private static boolean hasScheme(String url) {

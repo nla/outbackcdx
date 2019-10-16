@@ -21,12 +21,17 @@ public class DataStore implements Closeable {
     private final Long replicationWindow;
     private final long scanCap;
     private final int maxOpenSstFiles;
+    private final UrlCanonicalizer canonicalizer;
 
-    public DataStore(File dataDir, int maxOpenSstFiles, Long replicationWindow, long scanCap) {
+    public DataStore(File dataDir, int maxOpenSstFiles, Long replicationWindow, long scanCap, UrlCanonicalizer canonicalizer) {
         this.dataDir = dataDir;
         this.replicationWindow = replicationWindow;
         this.scanCap = scanCap;
         this.maxOpenSstFiles = maxOpenSstFiles;
+        if (canonicalizer == null) {
+            canonicalizer = new UrlCanonicalizer();
+        }
+        this.canonicalizer = canonicalizer;
     }
 
     public Index getIndex(String collection) throws IOException {
@@ -115,7 +120,7 @@ public class DataStore implements Closeable {
                 accessControl = new AccessControl(db, cfHandles.get(2), cfHandles.get(3));
             }
 
-            index = new Index(collection, db, cfHandles.get(0), cfHandles.get(1), accessControl, scanCap);
+            index = new Index(collection, db, cfHandles.get(0), cfHandles.get(1), accessControl, scanCap, canonicalizer);
             indexes.put(collection, index);
             return index;
         } catch (RocksDBException e) {
@@ -156,7 +161,7 @@ public class DataStore implements Closeable {
                 .stream().map(bytes -> new String(bytes, UTF_8))
                 .collect(Collectors.toSet());
         for (ColumnFamilyDescriptor cfDesc : cfDescriptors) {
-            if (cfNames.remove(new String(cfDesc.columnFamilyName(), UTF_8))) {
+            if (cfNames.remove(new String(cfDesc.getName(), UTF_8))) {
                 existing.add(cfDesc);
             } else {
                 toCreate.add(cfDesc);

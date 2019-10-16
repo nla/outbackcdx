@@ -37,6 +37,7 @@ class Webapp implements Web.Handler {
     private final Web.Router router;
     private final Map<String,Object> dashboardConfig;
     private final ArrayList<FilterPlugin> filterPlugins;
+    private final UrlCanonicalizer canonicalizer;
 
     private static ServiceLoader<FilterPlugin> fpLoader = ServiceLoader.load(FilterPlugin.class);
 
@@ -54,10 +55,14 @@ class Webapp implements Web.Handler {
         return found ? ok() : notFound();
     }
 
-    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig) {
+    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer) {
         this.dataStore = dataStore;
         this.verbose = verbose;
         this.dashboardConfig = dashboardConfig;
+        if (canonicalizer == null) {
+            canonicalizer = new UrlCanonicalizer();
+        }
+        this.canonicalizer = canonicalizer;
 
         this.filterPlugins = new ArrayList<FilterPlugin>();
         if (FeatureFlags.filterPlugins()) {
@@ -185,7 +190,7 @@ class Webapp implements Web.Handler {
                         throw new UnsupportedOperationException("Deleting of aliases is not yet implemented");
                     }
 
-                    batch.deleteCapture(Capture.fromCdxLine(line));
+                    batch.deleteCapture(Capture.fromCdxLine(line, canonicalizer));
                     deleted++;
                 } catch (Exception e) {
                     return new Response(BAD_REQUEST, "text/plain", "At line: " + line + "\n" + formatStackTrace(e));
@@ -219,13 +224,13 @@ class Webapp implements Web.Handler {
                 try {
                     if (line.startsWith("@alias ")) {
                         String[] fields = line.split(" ");
-                        String aliasSurt = UrlCanonicalizer.surtCanonicalize(fields[1]);
-                        String targetSurt = UrlCanonicalizer.surtCanonicalize(fields[2]);
+                        String aliasSurt = canonicalizer.surtCanonicalize(fields[1]);
+                        String targetSurt = canonicalizer.surtCanonicalize(fields[2]);
                         batch.putAlias(aliasSurt, targetSurt);
                         added++;
                     } else {
                         try  {
-                            batch.putCapture(Capture.fromCdxLine(line));
+                            batch.putCapture(Capture.fromCdxLine(line, canonicalizer));
                             added++;
                         } catch (Exception e) {
                             if (skipBadLines) {
@@ -353,7 +358,7 @@ class Webapp implements Web.Handler {
         Index index = getIndex(request);
         Map<String,String> params = request.params();
         if (params.containsKey("q")) {
-            return XmlQuery.queryIndex(request, index, this.filterPlugins);
+            return XmlQuery.queryIndex(request, index, this.filterPlugins, canonicalizer);
         } else if (params.containsKey("url")) {
             return WbCdxApi.queryIndex(request, index, this.filterPlugins);
         } else {

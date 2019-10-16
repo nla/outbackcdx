@@ -2,6 +2,10 @@ package outbackcdx;
 
 import org.junit.Test;
 
+import outbackcdx.UrlCanonicalizer.ConfigurationException;
+
+import java.io.ByteArrayInputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 
@@ -60,21 +64,44 @@ public class UrlCanonicalizerTest {
 
         t("http://example.org/too/many/../../../dots", "http://example.org/dots");
 
-        assertEquals("au,gov,acma,web)/apservices/action/challenge?method=viewchallenge", UrlCanonicalizer.surtCanonicalize("http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
+        UrlCanonicalizer canon = new UrlCanonicalizer();
+        assertEquals("au,gov,acma,web)/apservices/action/challenge?method=viewchallenge", canon.surtCanonicalize("http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
 
         assertEquals("youtube-dl:au,gov,acma,web)/apservices/action/challenge?method=viewchallenge",
-                UrlCanonicalizer.surtCanonicalize("youtube-dl:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
+                canon.surtCanonicalize("youtube-dl:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
         assertEquals("screenshot:au,gov,acma,web)/apservices/action/challenge?method=viewchallenge",
-                UrlCanonicalizer.surtCanonicalize("screenshot:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
+                canon.surtCanonicalize("screenshot:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
         assertEquals("youtube-dl:au,gov,acma,web)/apservices/action/challenge?method=viewchallenge",
-                UrlCanonicalizer.surtCanonicalize("urn:transclusions:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
+                canon.surtCanonicalize("urn:transclusions:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
         assertEquals("youtube-dl:00001:au,gov,acma,web)/apservices/action/challenge?method=viewchallenge",
-                UrlCanonicalizer.surtCanonicalize("youtube-dl:00001:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
+                canon.surtCanonicalize("youtube-dl:00001:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
     }
 
     @Test
     public void pandoraUrlsShouldHaveQueryStringStripped() throws MalformedURLException, URISyntaxException {
         FeatureFlags.setPandoraHacks(true);
         t("http://pandora.nla.gov.au/pan/10075/20150801-0000/www.nlc.org.au/assets/CSS/style62ea.css?ver=1.2", "http://pandora.nla.gov.au/pan/10075/20150801-0000/www.nlc.org.au/assets/css/style62ea.css");
+    }
+
+    /*
+     * tests our equivalent of this pywb fuzzy match rule
+     *
+     * - url_prefix: 'com,facebook)/pages_reaction_units/more'
+     *   fuzzy_lookup:
+     *       - page_id
+     *       - cursor
+     */
+    @Test
+    public void testCustomCanon() throws UnsupportedEncodingException, ConfigurationException {
+        String yaml
+                = "- pattern: com,facebook\\)/pages_reaction_units/more.*?[?&](cursor=[^&]+).*?&(page_id=[^&]+).*\n"
+                + "  repl: com,facebook)/pages_reaction_units/more?$2&$1";
+        UrlCanonicalizer canon = new UrlCanonicalizer(new ByteArrayInputStream(yaml.getBytes("UTF-8")));
+
+        // fuzzy canon does not apply
+        assertEquals("au,gov,acma,web)/apservices/action/challenge?method=viewchallenge", canon.surtCanonicalize("http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
+
+        // fuzzy canon does apply
+        assertEquals("com,facebook)/pages_reaction_units/more?page_id=115681848447769&cursor={\"timeline_cursor\":\"timeline_unit:1:00000000001452384822:04611686018427387904:09223372036854775741:04611686018427387904\",\"timeline_section_cursor\":{},\"has_next_page\":true}", canon.surtCanonicalize("https://www.facebook.com/pages_reaction_units/more/?page_id=115681848447769&cursor=%7B%22timeline_cursor%22%3A%22timeline_unit%3A1%3A00000000001452384822%3A04611686018427387904%3A09223372036854775741%3A04611686018427387904%22%2C%22timeline_section_cursor%22%3A%7B%7D%2C%22has_next_page%22%3Atrue%7D&surface=www_pages_home&unit_count=8&dpr=1&__user=100011276852661&__a=1&__dyn=5V4cjEzUGByK5A9VoWWOGi9Fxrz9EZz8-iWF3ozGFi9LFGA4XG7VKEKGwThEnUF7yWCHAxiESmqaxuqE88HyWDyuipi28gyEnGieKmjBXDmEgF3ebByqAAxaFSifDxCaVQibVojB-qjyVfh6u-exvz8Gicx2jCoO8hqwzxmmayrhbAyFUSibBDCyVF88GxrUCaC-Rx2Qh1Gcy8C6rld13xivQFfxqHu4olDh4dy8gyVUkCyFFFK5p8BaUhKHWG4ui9K8nVQGmV7Gh6BJq8G8WDDio8lfBGq9gZ4jyXV98-8t2eZKqaHyoO5pEpJaroK8Fp8HZ3aXAnAz4&__af=h0&__req=1k&__be=-1&__pc=PHASED%3ADEFAULT&__rev=3237777&__spin_r=3237777&__spin_b=trunk&__spin_t=1503096999"));
     }
 }

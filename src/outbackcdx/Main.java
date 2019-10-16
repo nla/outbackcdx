@@ -2,6 +2,8 @@ package outbackcdx;
 
 import com.sun.management.OperatingSystemMXBean;
 import com.sun.management.UnixOperatingSystemMXBean;
+
+import outbackcdx.UrlCanonicalizer.ConfigurationException;
 import outbackcdx.auth.Authorizer;
 import outbackcdx.auth.JwtAuthorizer;
 import outbackcdx.auth.KeycloakConfig;
@@ -39,6 +41,7 @@ public class Main {
         System.err.println("  -r count              Cap on number of rocksdb records to scan to serve a single request");
         System.err.println("  -x                    Output CDX14 by default (instead of CDX11)");
         System.err.println("  -v                    Verbose logging");
+        System.err.println("  -y file               Custom fuzzy match canonicalization YAML configuration file");
         System.err.println();
         System.err.println("Primary mode (runs as a replication target for downstream Secondaries)");
         System.err.println("  --replication-window interval      interval, in seconds, to delete replication history from disk.");
@@ -68,6 +71,7 @@ public class Main {
         Long replicationWindow = null;
         long scanCap = Long.MAX_VALUE;
         long batchSize = 10*1024*1024;
+        String fuzzyYaml = null;
 
         Map<String,Object> dashboardConfig = new HashMap<>();
         dashboardConfig.put("featureFlags", FeatureFlags.asMap());
@@ -133,42 +137,47 @@ public class Main {
                 case "-x":
                     FeatureFlags.setCdx14(true);
                     break;
+                case "-y":
+                    fuzzyYaml = args[++i];
                 default:
                     usage();
                     break;
             }
         }
 
-        try (DataStore dataStore = new DataStore(dataPath, maxOpenSstFiles, replicationWindow, scanCap)) {
-            Webapp controller = new Webapp(dataStore, verbose, dashboardConfig);
-            if (undertow) {
-                UWeb.UServer server = new UWeb.UServer(host, port, controller, authorizer);
-                server.start();
-                System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port);
-                Thread.sleep(Long.MAX_VALUE);
-            } else {
-                ServerSocket socket = openSocket(host, port, inheritSocket);
-                Web.Server server = new Web.Server(socket, controller, authorizer);
-                ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
-                for (String collectionUrl: collectionUrls) {
-                    ChangePollingThread cpt = new ChangePollingThread(collectionUrl, pollingInterval, batchSize, dataStore);
-                    cpt.setDaemon(true);
-                    cpt.start();
-                }
-                try {
-                    server.setAsyncRunner(threadPool::execute);
+        try {
+            UrlCanonicalizer canonicalizer = new UrlCanonicalizer(fuzzyYaml);
+            try (DataStore dataStore = new DataStore(dataPath, maxOpenSstFiles, replicationWindow, scanCap, canonicalizer)) {
+                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer);
+                if (undertow) {
+                    UWeb.UServer server = new UWeb.UServer(host, port, controller, authorizer);
                     server.start();
-                    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                        server.stop();
-                        dataStore.close();
-                    }));
                     System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port);
                     Thread.sleep(Long.MAX_VALUE);
-                } finally {
-                    threadPool.shutdown();
+                } else {
+                    ServerSocket socket = openSocket(host, port, inheritSocket);
+                    Web.Server server = new Web.Server(socket, controller, authorizer);
+                    ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
+                    for (String collectionUrl: collectionUrls) {
+                        ChangePollingThread cpt = new ChangePollingThread(collectionUrl, pollingInterval, batchSize, dataStore);
+                        cpt.setDaemon(true);
+                        cpt.start();
+                    }
+                    try {
+                        server.setAsyncRunner(threadPool::execute);
+                        server.start();
+                        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                            server.stop();
+                            dataStore.close();
+                        }));
+                        System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port);
+                        Thread.sleep(Long.MAX_VALUE);
+                    } finally {
+                        threadPool.shutdown();
+                    }
                 }
             }
-        } catch (InterruptedException | IOException e) {
+        } catch (InterruptedException | IOException | ConfigurationException e) {
             e.printStackTrace();
         }
     }

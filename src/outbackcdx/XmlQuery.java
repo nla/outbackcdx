@@ -28,7 +28,7 @@ public class XmlQuery {
     final long limit;
     final String queryType;
 
-    public XmlQuery(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins) {
+    public XmlQuery(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins, UrlCanonicalizer canonicalizer) {
         this.index = index;
 
         Map<String, String> params = request.params();
@@ -36,7 +36,7 @@ public class XmlQuery {
 
         accessPoint = params.get("accesspoint");
         queryType = query.getOrDefault("type", "urlquery").toLowerCase();
-        queryUrl = UrlCanonicalizer.surtCanonicalize(query.get("url"));
+        queryUrl = canonicalizer.surtCanonicalize(query.get("url"));
 
         offset = Long.parseLong(query.getOrDefault("offset", "0"));
         limit = Long.parseLong(query.getOrDefault("limit", "10000"));
@@ -203,8 +203,8 @@ public class XmlQuery {
         out.writeEndElement();
     }
 
-    public static NanoHTTPD.Response queryIndex(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins) {
-        return new XmlQuery(request, index, filterPlugins).streamResults();
+    public static NanoHTTPD.Response queryIndex(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins, UrlCanonicalizer canonicalizer) {
+        return new XmlQuery(request, index, filterPlugins, canonicalizer).streamResults();
     }
 
     /**
