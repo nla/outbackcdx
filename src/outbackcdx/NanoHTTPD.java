@@ -6,6 +6,8 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * A simple, tiny, nicely embeddable HTTP server in Java
@@ -93,7 +95,7 @@ public abstract class NanoHTTPD {
     /**
      * Pluggable strategy for asynchronously executing requests.
      */
-    private AsyncRunner asyncRunner;
+    private Executor asyncRunner;
 
     /**
      * Constructs an HTTP server on given port.
@@ -170,7 +172,16 @@ public abstract class NanoHTTPD {
                         registerConnection(finalAccept);
                         finalAccept.setSoTimeout(SOCKET_READ_TIMEOUT);
                         final InputStream inputStream = finalAccept.getInputStream();
-                        asyncRunner.exec(new Runnable() {
+                        if (asyncRunner instanceof ThreadPoolExecutor) {
+                            ThreadPoolExecutor pool = (ThreadPoolExecutor) asyncRunner;
+                            int queuedRequests = pool.getQueue().size();
+                            if (queuedRequests > 0) {
+                                System.err.println(new Date() + " " + queuedRequests
+                                        + " requests queued, all " + pool.getMaximumPoolSize()
+                                        + " web server threads are busy");
+                            }
+                        }
+                        asyncRunner.execute(new Runnable() {
                             @Override
                             public void run() {
                                 OutputStream outputStream = null;
@@ -333,7 +344,7 @@ public abstract class NanoHTTPD {
      *
      * @param asyncRunner new strategy for handling threads.
      */
-    public void setAsyncRunner(AsyncRunner asyncRunner) {
+    public void setAsyncRunner(Executor asyncRunner) {
         this.asyncRunner = asyncRunner;
     }
 
@@ -353,12 +364,6 @@ public abstract class NanoHTTPD {
         }
     }
 
-    /**
-     * Pluggable strategy for asynchronously executing requests.
-     */
-    public interface AsyncRunner {
-        void exec(Runnable code);
-    }
 
     // ------------------------------------------------------------------------------- //
 
@@ -369,11 +374,11 @@ public abstract class NanoHTTPD {
      * to <i>daemon</i> status, and named according to the request number.  The name is
      * useful when profiling the application.</p>
      */
-    public static class DefaultAsyncRunner implements AsyncRunner {
+    public static class DefaultAsyncRunner implements Executor {
         private long requestCount;
 
         @Override
-        public void exec(Runnable code) {
+        public void execute(Runnable code) {
             ++requestCount;
             Thread t = new Thread(code);
             t.setDaemon(true);

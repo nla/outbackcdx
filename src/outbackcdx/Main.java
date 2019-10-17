@@ -164,7 +164,7 @@ public class Main {
                         cpt.start();
                     }
                     try {
-                        server.setAsyncRunner(threadPool::execute);
+                        server.setAsyncRunner(threadPool);
                         server.start();
                         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                             server.stop();
