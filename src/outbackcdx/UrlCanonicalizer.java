@@ -44,15 +44,125 @@ public class UrlCanonicalizer {
     private static final Pattern UNDOTTED_IP = Pattern.compile("(?:0x)?[0-9]{1,12}");
     static final Pattern DOTTED_IP = Pattern.compile("[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}");
 
-    public static class CustomRule {
-        public Pattern pattern;
-        public String repl;
-        public CustomRule(String regex, String repl) {
+    public static class FuzzyRule {
+        final List<String> urlPrefixes;
+        final Pattern pattern;
+        final String replaceAfter;
+        final boolean findAll;
+        final boolean isDomain;
+
+        private FuzzyRule(List<String> urlPrefixes, String regex, String replaceAfter, boolean findAll, boolean isDomain) {
+            this.urlPrefixes = urlPrefixes;
             this.pattern = Pattern.compile(regex);
-            this.repl = repl;
+            this.replaceAfter = replaceAfter;
+            this.findAll = findAll;
+            this.isDomain = isDomain;
+        }
+
+        @Override
+        public String toString() {
+            return "<urlPrefixes=" + urlPrefixes + ",pattern="+ pattern + "...>";
+        }
+
+        @SuppressWarnings("unchecked")
+        public static FuzzyRule from(Map<String, Object> item) {
+            // ignore stuff we don't recognize, for compatibility with
+            // irrelevant or future pywb settings
+            if (!item.containsKey("url_prefix") || !item.containsKey("fuzzy_lookup")) {
+                return null;
+            }
+
+            List<String> urlPrefixes;
+            if (item.get("url_prefix") instanceof String) {
+                urlPrefixes = Arrays.asList((String) item.get("url_prefix"));
+            } else {
+                urlPrefixes = (List<String>) item.get("url_prefix");
+            }
+
+            String regex = null;
+            String replaceAfter = "?";
+            boolean findAll = false;
+            boolean isDomain = false;
+
+            if (item.get("fuzzy_lookup") instanceof Map) {
+                Map<String, Object> fuzzyLookup = (Map<String,Object>) item.get("fuzzy_lookup");
+                regex = makeRegex(fuzzyLookup.get("match"));
+                replaceAfter = (String) fuzzyLookup.getOrDefault("replace", "?");
+                findAll = (boolean) fuzzyLookup.getOrDefault("find_all", false);
+                if ("domain".equals(fuzzyLookup.get("type"))) {
+                    isDomain = true;
+                }
+            } else {
+                regex = makeRegex(item.get("fuzzy_lookup"));
+            }
+
+            return new FuzzyRule(urlPrefixes, regex, replaceAfter, findAll, isDomain);
+        }
+
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        private static String makeRegex(Object config) {
+            if (config instanceof String) {
+                return (String) config;
+            } else if (config instanceof Map) {
+                String regex = (String) ((Map) config).getOrDefault("regex", "");
+                regex += makeQueryMatchRegex((List<String>) ((Map) config).getOrDefault("args", Collections.EMPTY_LIST));
+                return regex;
+            } else {
+                return makeQueryMatchRegex((List<String>) config);
+            }
+        }
+
+        private static String makeQueryMatchRegex(List<String> paramsList) {
+            List<String> tmpList = new ArrayList<String>(paramsList);
+            tmpList.sort(null);
+            for (int i = 0; i < tmpList.size(); i++) {
+                String escaped = Pattern.quote(tmpList.get(i));
+                String reSnip = "[?&](" + escaped + "=[^&]+)";
+                tmpList.set(i, reSnip);
+            }
+            String result = String.join(".*", tmpList);
+            return result;
+        }
+
+        public String apply(String surt) {
+            for (String prefix: urlPrefixes) {
+                if (surt.startsWith(prefix)) {
+                    Matcher m = pattern.matcher(surt);
+                    List<String> groups = new ArrayList<String>();
+                    if (findAll) {
+                        while (m.find()) {
+                            groups.add(m.group());
+                        }
+                    } else {
+                        if (m.find()) {
+                            for (int i = 1; i <= m.groupCount(); i++) {
+                                if (m.group(i) != null) {
+                                    groups.add(m.group(i));
+                                }
+                            }
+                        }
+                    }
+
+                    if (!groups.isEmpty()) {
+                        int replaceAfterIndex = surt.indexOf(replaceAfter);
+                        String pref;
+                        if (isDomain) {
+                            pref = prefix + '?';
+                        } else if (replaceAfterIndex >= 0) {
+                            pref = surt.substring(0, surt.indexOf(replaceAfter) + replaceAfter.length());
+                        } else {
+                            pref = surt + '?';
+                        }
+                        String newSurt = "fuzzy:" + pref + String.join("&", groups);
+                        return newSurt;
+                    }
+                }
+            }
+
+            return null;
         }
     }
-    private List<CustomRule> customRules = new ArrayList<CustomRule>();
+    List<FuzzyRule> fuzzyRules = new ArrayList<FuzzyRule>();
 
     public static class ConfigurationException extends Exception {
         private static final long serialVersionUID = 1L;
@@ -78,14 +188,16 @@ public class UrlCanonicalizer {
         Load yamlLoader = new Load(yamlSettings);
 
         @SuppressWarnings("unchecked")
-        List<Map<String,String>> fuzzyConfig = (List<Map<String, String>>) yamlLoader.loadFromInputStream(input);
+        Map<String,Object> rulesYaml = (Map<String, Object>) yamlLoader.loadFromInputStream(input);
 
-        for (Map<String, String> item: fuzzyConfig) {
-            CustomRule rule = new CustomRule(item.get("pattern"), item.get("repl"));
-            if (item.size() != 2) {
-                throw new ConfigurationException("fuzzy match custom canonicalization rule contains extraneous fields (should only have 'pattern' and 'repl'): " + item);
+        @SuppressWarnings("unchecked")
+        Iterable<Map<String,Object>> ruleConfigs = (Iterable<Map<String,Object>>) rulesYaml.get("rules");
+
+        for (Map<String, Object> config: ruleConfigs) {
+            FuzzyRule rule = FuzzyRule.from(config);
+            if (rule != null) {
+                fuzzyRules.add(rule);
             }
-            customRules.add(rule);
         }
     }
 
@@ -199,10 +311,10 @@ public class UrlCanonicalizer {
             surt = toUnschemedSurt(canonicalize(url));
         }
 
-        for (CustomRule rule: customRules) {
-            Matcher fuzz = rule.pattern.matcher(surt);
-            if (fuzz.matches()) { // fuzz.group(1)
-                surt = fuzz.replaceFirst(rule.repl);
+        for (FuzzyRule rule: fuzzyRules) {
+            String fuzz = rule.apply(surt);
+            if (fuzz != null) {
+                surt = fuzz;
                 break;
             }
         }
