@@ -139,6 +139,7 @@ public class Main {
                     break;
                 case "-y":
                     fuzzyYaml = args[++i];
+                    break;
                 default:
                     usage();
                     break;
