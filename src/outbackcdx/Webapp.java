@@ -263,7 +263,7 @@ class Webapp implements Web.Handler {
     Response sequence(Web.Request request) throws IOException, ResponseException {
         final Index index = getIndex(request);
         String output = String.valueOf(index.db.getLatestSequenceNumber());
-        return new Response(OK, "text/html", output);
+        return new Response(OK, "text/plain", output);
     }
 
     static class ChangeFeedJsonStream implements IStreamer {
