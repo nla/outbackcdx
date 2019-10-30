@@ -34,7 +34,15 @@
             "name": "url",
             "in": "query",
             "type": "string",
-            "description": "URL or SURT to look for"
+            "description": "URL to look for (outbackcdx will canonicalize the URL before running the query)",
+            "example": "https://www.example.com"
+          },
+          {
+            "name": "urlkey",
+            "in": "query",
+            "type": "string",
+            "description": "SURT to look for (bypassing outbackcdx canonicalization)",
+            "example": "com,example)/"
           },
           {
             "name": "matchType",
@@ -95,6 +103,27 @@
             "type": "string",
             "description": "Comma-separated list of fields to include in output",
             "example": "urlkey,timestamp,original,mimetype,statuscode,digest,length,offset,filename"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Minimum timestamp",
+            "type": "string",
+            "example": "20140101000000"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Maximum timestamp",
+            "type": "string",
+            "example": "20141231235959"
+          },
+          {
+            "name": "collapse",
+            "in": "query",
+            "description": "Field to collapse on, optionally with :number suffix to collapse on substring of field",
+            "type": "string",
+            "example": "timestamp:12",
           },
           {
             "name": "accesspoint",
