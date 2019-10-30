@@ -150,6 +150,9 @@ public class UrlCanonicalizerTest {
         assertEquals(
                 fuzzCanon.surtCanonicalize("https://bf1-farm2.staticflickr.com/1907/30471641737_4378b23f76_b.jpg"),
                 fuzzCanon.surtCanonicalize("https://bf1-farm2.staticflickr.com/1907/30471641737_4378b23f76_z.jpg?zz=1"));
+        assertEquals(
+                fuzzCanon.surtCanonicalize("https://bf1-farm2.staticflickr.com/1907/30471641737_4378b23f76_b.jpg"),
+                "fuzzy:com,staticflickr,bf1-farm2)/30471641737_4378b23f76");
 
         assertEquals(
                 fuzzCanon.surtCanonicalize("http://l.yimg.com/g/combo/1/3.40770.css"),
