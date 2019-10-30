@@ -357,12 +357,12 @@ class Webapp implements Web.Handler {
     Response query(Web.Request request) throws IOException, Web.ResponseException {
         Index index = getIndex(request);
         Map<String,String> params = request.params();
-        if (params.containsKey("q")) {
-            return XmlQuery.queryIndex(request, index, this.filterPlugins, canonicalizer);
-        } else if (params.containsKey("url")) {
-            return WbCdxApi.queryIndex(request, index, this.filterPlugins);
-        } else {
+        if (params.keySet().size() == 1 && params.containsKey("collection")) {
             return collectionDetails(index.db);
+        } else if (params.containsKey("q")) {
+            return XmlQuery.queryIndex(request, index, this.filterPlugins, canonicalizer);
+        } else {
+            return WbCdxApi.queryIndex(request, index, this.filterPlugins);
         }
     }
 

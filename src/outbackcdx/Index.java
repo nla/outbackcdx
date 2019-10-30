@@ -135,7 +135,12 @@ public class Index {
             filter = filter.and(accessControl.filter(query.accessPoint, new Date()));
         }
 
-        String surt = canonicalizer.surtCanonicalize(query.url);
+        String surt;
+        if (query.urlkey != null) {
+            surt = query.urlkey;
+        } else {
+            surt = canonicalizer.surtCanonicalize(query.url);
+        }
         switch (query.matchType) {
             case EXACT:
                 switch (query.sort) {
@@ -147,7 +152,7 @@ public class Index {
                         return reverseQuery(surt, query.from, query.to, filter);
                 }
             case PREFIX:
-                if (query.url.endsWith("/") && !surt.endsWith("/")) {
+                if (query.url != null && query.url.endsWith("/") && !surt.endsWith("/")) {
                     surt += "/";
                 }
                 return prefixQuery(surt, filter);

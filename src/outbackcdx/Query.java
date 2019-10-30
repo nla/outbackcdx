@@ -13,6 +13,7 @@ public class Query {
     MatchType matchType;
     Sort sort;
     String url;
+    String urlkey;
     String closest;
     String[] fields;
     boolean outputJson;
@@ -24,6 +25,7 @@ public class Query {
     public Query(MultiMap<String, String> params, Iterable<FilterPlugin> filterPlugins) {
         accessPoint = params.get("accesspoint");
         url = params.get("url");
+        urlkey = params.get("urlkey");
         matchType = MatchType.valueOf(params.getOrDefault("matchType", "default").toUpperCase());
         sort = Sort.valueOf(params.getOrDefault("sort", "default").toUpperCase());
         closest = params.get("closest");
@@ -95,10 +97,10 @@ public class Query {
 
     void expandWildcards() {
         if (matchType == MatchType.DEFAULT) {
-            if (url.endsWith("*")) {
+            if (url != null && url.endsWith("*")) {
                 matchType = MatchType.PREFIX;
                 url = url.substring(0, url.length() - 1);
-            } else if (url.startsWith("*.")) {
+            } else if (url != null && url.startsWith("*.")) {
                 matchType = MatchType.DOMAIN;
                 url = url.substring(2);
             } else {
@@ -108,6 +110,9 @@ public class Query {
     }
 
     void validate() {
+        if ((url == null && urlkey == null) || (url != null && urlkey != null)) {
+            throw new IllegalArgumentException("exactly one of 'url' or 'urlkey' is required");
+        }
         if (sort == Sort.CLOSEST) {
             if (matchType != MatchType.EXACT) {
                 throw new IllegalArgumentException("sort=closest is currently only implemented for exact matches");
