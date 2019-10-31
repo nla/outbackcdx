@@ -154,7 +154,9 @@ public class Main {
                     UWeb.UServer server = new UWeb.UServer(host, port, controller, authorizer);
                     server.start();
                     System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port);
-                    Thread.sleep(Long.MAX_VALUE);
+                    synchronized (Main.class) {
+                        Main.class.wait();
+                    }
                 } else {
                     ServerSocket socket = openSocket(host, port, inheritSocket);
                     Web.Server server = new Web.Server(socket, controller, authorizer);
@@ -172,7 +174,9 @@ public class Main {
                             dataStore.close();
                         }));
                         System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port);
-                        Thread.sleep(Long.MAX_VALUE);
+                        synchronized (Main.class) {
+                            Main.class.wait();
+                        }
                     } finally {
                         threadPool.shutdown();
                     }
