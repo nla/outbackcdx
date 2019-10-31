@@ -55,6 +55,7 @@ public class WbCdxApi {
             out.flush();
         });
         response.addHeader("Access-Control-Allow-Origin", "*");
+        response.addHeader("outbackcdx-urlkey", query.urlkey);
         return response;
     }
 

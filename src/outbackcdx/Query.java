@@ -138,6 +138,11 @@ public class Query {
         compatibilityHacks();
         expandWildcards();
         validate();
+
+        if (urlkey == null) {
+            urlkey = index.canonicalizer.surtCanonicalize(url);
+        }
+
         return index.execute(this);
     }
 

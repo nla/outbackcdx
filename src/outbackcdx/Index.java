@@ -135,34 +135,28 @@ public class Index {
             filter = filter.and(accessControl.filter(query.accessPoint, new Date()));
         }
 
-        String surt;
-        if (query.urlkey != null) {
-            surt = query.urlkey;
-        } else {
-            surt = canonicalizer.surtCanonicalize(query.url);
-        }
         switch (query.matchType) {
             case EXACT:
                 switch (query.sort) {
                     case DEFAULT:
-                        return query(surt, query.from, query.to, filter);
+                        return query(query.urlkey, query.from, query.to, filter);
                     case CLOSEST:
-                        return closestQuery(surt, Long.parseLong(query.closest), filter);
+                        return closestQuery(query.urlkey, Long.parseLong(query.closest), filter);
                     case REVERSE:
-                        return reverseQuery(surt, query.from, query.to, filter);
+                        return reverseQuery(query.urlkey, query.from, query.to, filter);
                 }
             case PREFIX:
-                if (query.url != null && query.url.endsWith("/") && !surt.endsWith("/")) {
-                    surt += "/";
+                if (query.url != null && query.url.endsWith("/") && !query.urlkey.endsWith("/")) {
+                    query.urlkey += "/";
                 }
-                return prefixQuery(surt, filter);
+                return prefixQuery(query.urlkey, filter);
             case HOST:
-                return prefixQuery(hostFromSurt(surt) + ")/", filter);
+                return prefixQuery(hostFromSurt(query.urlkey) + ")/", filter);
             case DOMAIN:
-                String host = hostFromSurt(surt);
+                String host = hostFromSurt(query.urlkey);
                 return rangeQuery(host, host + "-", filter);
             case RANGE:
-                return rangeQuery(surt, "~", filter);
+                return rangeQuery(query.urlkey, "~", filter);
             default:
                 throw new IllegalArgumentException("unknown matchType: " + query.matchType);
         }
