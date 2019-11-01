@@ -172,6 +172,7 @@ class Webapp implements Web.Handler {
             return new Response(FORBIDDEN, "text/plain", "This node is running in secondary mode to an upstream primary, and will not accept writes.");
         }
         String collection = request.param("collection");
+        boolean recanonicalize = !"0".equals(request.param("recanonicalize", "1"));
         final Index index = dataStore.getIndex(collection);
         BufferedReader in = new BufferedReader(new InputStreamReader(request.inputStream()));
         long deleted = 0;
@@ -190,7 +191,15 @@ class Webapp implements Web.Handler {
                         throw new UnsupportedOperationException("Deleting of aliases is not yet implemented");
                     }
 
-                    batch.deleteCapture(Capture.fromCdxLine(line, canonicalizer));
+                    if (recanonicalize) {
+                        batch.deleteCapture(Capture.fromCdxLine(line, canonicalizer));
+                    } else {
+                        String[] fields = line.split(" ", 3);
+                        Capture capture = new Capture();
+                        capture.urlkey = fields[0];
+                        capture.timestamp = Long.valueOf(fields[1]);
+                        batch.deleteCapture(capture);
+                    }
                     deleted++;
                 } catch (Exception e) {
                     return new Response(BAD_REQUEST, "text/plain", "At line: " + line + "\n" + formatStackTrace(e));
