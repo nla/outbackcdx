@@ -2,6 +2,8 @@ package outbackcdx;
 
 import org.junit.*;
 import org.junit.rules.TemporaryFolder;
+
+import outbackcdx.NanoHTTPD.Response.Status;
 import outbackcdx.auth.Permit;
 
 import java.io.*;
@@ -45,7 +47,7 @@ public class ReplicationFeaturesTest {
         FeatureFlags.setSecondaryMode(true);
         // make a request to a write-able url
         // it should 401.
-        POST("/test", "- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n", UNAUTHORIZED);
+        POST("/test", "- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n", Status.FORBIDDEN);
         FeatureFlags.setSecondaryMode(false);
     }
 
