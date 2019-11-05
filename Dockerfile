@@ -1,8 +1,5 @@
 FROM maven:3-jdk-8 as build-env
 
-RUN apt-get update && apt-get install -y libsnappy-dev \
- && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /build
 
 COPY pom.xml /build/pom.xml
