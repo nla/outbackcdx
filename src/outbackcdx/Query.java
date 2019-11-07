@@ -58,7 +58,7 @@ public class Query {
             addPredicate(filter);
         } else if (params.containsKey("collapseToLast")) {
             // collapseToLast can't be implemented as a predicate 
-            collapseToLastSpec = params.get("collapse");
+            collapseToLastSpec = params.get("collapseToLast");
         }
 
         String fl = params.getOrDefault("fl", FeatureFlags.cdx14() ? DEFAULT_FIELDS_CDX14 : DEFAULT_FIELDS);
