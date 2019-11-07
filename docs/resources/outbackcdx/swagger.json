@@ -119,9 +119,16 @@
             "example": "20141231235959"
           },
           {
-            "name": "collapse",
+            "name": "collapse / collapseToFirst",
             "in": "query",
-            "description": "Field to collapse on, optionally with :number suffix to collapse on substring of field",
+            "description": "Field to collapse on, optionally with :number suffix to collapse on substring of field; in other words, return only the **first** row when of the series multiple consecutive rows have the same value for the supplied field",
+            "type": "string",
+            "example": "timestamp:12",
+          },
+          {
+            "name": "collapseToLast",
+            "in": "query",
+            "description": "Field to collapse on, optionally with :number suffix to collapse on substring of field; in other words, return only the **last** row when of the series multiple consecutive rows have the same value for the supplied field",
             "type": "string",
             "example": "timestamp:12",
           },
