@@ -1,5 +1,7 @@
 package outbackcdx;
 
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -28,22 +30,22 @@ interface Filter extends Predicate<Capture> {
         }
     }
 
-    public static Filter collapser(String spec) {
+    public static Filter collapseToFirst(String spec) {
         String[] splits = spec.split(":", 2);
         String field = splits[0];
         Integer substringLength = null;
         if (splits.length > 1) {
             substringLength = Integer.parseInt(splits[1]);
         }
-        return new Collapser(field, substringLength);
+        return new CollapseToFirst(field, substringLength);
     }
 
-    public class Collapser implements Filter {
+    public class CollapseToFirst implements Filter {
         private String field;
         private Integer substringLength;
         private String lastValue;
 
-        public Collapser(String field, Integer substringLength) {
+        public CollapseToFirst(String field, Integer substringLength) {
             this.field = field;
             this.substringLength = substringLength;
         }
@@ -58,6 +60,81 @@ interface Filter extends Predicate<Capture> {
             lastValue = value;
             return result;
         }
+    }
+
+    public static Iterable<Capture> collapseToLast(Iterable<Capture> captures, String spec) {
+        return new Iterable<Capture>() {
+            @Override
+            public Iterator<Capture> iterator() {
+                return new CollapseToLast(captures.iterator(), spec);
+            }
+        };
+    }
+
+    /**
+     * Not a {@link Filter} because it needs to look ahead to the next line to know
+     * whether to include or exclude the current line.
+     */
+    public static class CollapseToLast implements Iterator<Capture> {
+
+        protected Iterator<Capture> inner;
+        protected String field;
+        protected Integer substringLength;
+        protected Capture next;
+        protected Capture innerNext;
+
+        public CollapseToLast(Iterator<Capture> inner, String spec) {
+            this.inner = inner;
+
+            String[] splits = spec.split(":", 2);
+            field = splits[0];
+            substringLength = null;
+            if (splits.length > 1) {
+                substringLength = Integer.parseInt(splits[1]);
+            }
+        }
+
+        protected boolean shouldCollapse(Capture cap1, Capture cap2) {
+            String value1 = cap1.get(field).toString();
+            String value2 = cap2.get(field).toString();
+            if (substringLength != null) {
+                value1 = value1.substring(0, substringLength);
+                value2 = value2.substring(0, substringLength);
+            }
+            return value1.equals(value2);
+        }
+
+        @Override
+        public boolean hasNext() {
+            while (next == null) {
+                Capture innerPrev = innerNext;
+                if (inner.hasNext()) {
+                    innerNext = inner.next();
+                } else {
+                    innerNext = null;
+                }
+
+                if (innerPrev != null && (innerNext == null || !shouldCollapse(innerPrev, innerNext))) {
+                    next = innerPrev;
+                }
+                if (innerNext == null) {
+                    break;
+                }
+            }
+            return next != null;
+        }
+
+        @Override
+        public Capture next() {
+            if (hasNext()) {
+                Capture tmp = next;
+                next = null;
+                return tmp;
+            } else {
+                throw new NoSuchElementException();
+            }
+        }
+
     }
 
     abstract class BaseFilter implements Filter {

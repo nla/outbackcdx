@@ -21,6 +21,7 @@ public class Query {
     Predicate<Capture> predicate;
     long from = MIN_TIMESTAMP;
     long to = MAX_TIMESTAMP;
+    String collapseToLastSpec;
 
     public Query(MultiMap<String, String> params, Iterable<FilterPlugin> filterPlugins) {
         accessPoint = params.get("accesspoint");
@@ -50,10 +51,14 @@ public class Query {
             }
         }
 
-        // "collapse" has to be the last filter applied
-        if (params.containsKey("collapse")) {
-            Filter filter = Filter.collapser(params.get("collapse"));
+        // collapse / collapseToFirst has to be the last filter applied
+        String collapseToFirstSpec = params.getOrDefault("collapseToFirst", params.get("collapse"));
+        if (collapseToFirstSpec != null) {
+            Filter filter = Filter.collapseToFirst(collapseToFirstSpec);
             addPredicate(filter);
+        } else if (params.containsKey("collapseToLast")) {
+            // collapseToLast can't be implemented as a predicate 
+            collapseToLastSpec = params.get("collapse");
         }
 
         String fl = params.getOrDefault("fl", FeatureFlags.cdx14() ? DEFAULT_FIELDS_CDX14 : DEFAULT_FIELDS);
@@ -143,7 +148,11 @@ public class Query {
             urlkey = index.canonicalizer.surtCanonicalize(url);
         }
 
-        return index.execute(this);
+        Iterable<Capture> captures = index.execute(this);
+        if (collapseToLastSpec != null) {
+            captures = Filter.collapseToLast(captures, collapseToLastSpec);
+        }
+        return captures;
     }
 
     private void compatibilityHacks() {
