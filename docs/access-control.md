@@ -1,8 +1,10 @@
-# Access Control
+# Access Control Rules
 
-OutbackCDX access control rules consist of three types of information.
+OutbackCDX access control rules are JSON objects containing three types of fields: criteria, actions and metadata.
 
-## Rule Criteria
+![Rule editor example](access-control-rule-example.png)
+
+## Criteria fields
 
 The rule applies to captured resources which match ALL of the present (non-null) criteria fields.
 
@@ -72,7 +74,7 @@ Example use case: To ensure only older versions of resources can be accessed so 
 access to current content.
 
 
-## Rule Actions
+## Action fields
 
 Action fields specify the effect the rule has on matching resources.
 
@@ -93,7 +95,7 @@ An explanatory message shown when this rule prevents access.
 "publicMessage": "This page is inaccessible for privacy reasons.",
 ```
 
-## Rule Metadata
+## Metadata fields
 
 Metadata fields have no functional effect but contain additional information for record keeping purposes.
 
