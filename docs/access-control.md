@@ -140,8 +140,8 @@ A flag which causes this rule show up at the top of the rule list.
 Records the user and time when the rule was created and last modified.
 
 ```
-"creator": "jsmith`,
+"creator": "jsmith",
 "created": "2019-10-04T12:00:00+1100,
-"modifier": "bjohnson`,
+"modifier": "bjohnson",
 "modified": "2019-11-07T14:30:00+1100,
 ```
