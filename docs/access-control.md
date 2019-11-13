@@ -23,6 +23,39 @@ OutbackCDX access control rules are JSON objects containing three types of field
 
 ![Rule editor example](access-control-rule-example.png)
 
+```json
+{
+  "id": 819,
+  "policyId": 4,
+  "urlPatterns": [
+    "*.example.org",
+    "http://example.org/foo/*",
+    "http://example.org.au/*"
+  ],
+  "captured": {
+    "start": "2015-08-01T01:00:00+1000",
+    "end": "2015-11-12T01:59:59+1100"
+  },
+  "accessed": {
+    "start": "2019-11-04T02:00:00+1100",
+    "end": "2019-11-07T01:59:59+1100"
+  },
+  "period": {
+    "years": 0,
+    "months": 1,
+    "days": 0
+  },
+  "publicMessage": "pub comment",
+  "pinned": false,
+  "privateComment": "priv commentd",
+  "reason": "Privacy (personal data)",
+  "created": "2019-11-13T23:09:56+1100",
+  "creator": "anonymous",
+  "modified": "2019-11-13T23:45:56+1100",
+  "modifier": "anonymous"
+}
+```
+
 ## Criteria fields
 
 The rule applies to captured resources which match ALL of the present (non-null) criteria fields.
