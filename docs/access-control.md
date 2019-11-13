@@ -3,18 +3,18 @@
 OutbackCDX's access control is built on three concept: access point, policies and rules.
 
 Access points represent locations (on-site vs off-site), groups of users (e.g. staff, students, researchers),
-or ways the content is reused (full text indexing). OutbackCDX itself does not define locations (by IP addresses
-or any other means) it leaves that up to the client. For example a client making querying collection `mycoll` 
+or ways the content is reused (full text indexing). OutbackCDX itself attempt to map usernames or IP addresses or 
+usernames to access points it leaves that up to the client. For example a client making querying collection `mycoll` 
 for `example.org` via the `staff` access point might would use: `/mycoll/ap/staff?url=http://example.org/`
 
-Access policies are sets of access points. Examples:
+Access policies define sets of access points which can be referenced in rules. For example:
 
-| Policy                  | Access points |
-|-------------------------|---------------|
-| Public (searchable)     | on-site, off-site, staff, solr |
-| Public (not searchable) | on-site, off-site, staff |
-| On-site only            | on-site, staff |
-| Staff only              | staff |
+| Policy ID | Policy Name   | Access points |
+|-|-------------------------|---------------|
+|1| Public (searchable)     | on-site, off-site, staff, solr |
+|2| Public (not searchable) | on-site, off-site, staff |
+|3| On-site only            | on-site, staff |
+|4| Staff only              | staff |
 
 
 # Rules
