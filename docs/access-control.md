@@ -1,4 +1,23 @@
-# Access Control Rules
+# Access Control
+
+OutbackCDX's access control is built on three concept: access point, policies and rules.
+
+Access points represent locations (on-site vs off-site), groups of users (e.g. staff, students, researchers),
+or ways the content is reused (full text indexing). OutbackCDX itself does not define locations (by IP addresses
+or any other means) it leaves that up to the client. For example a client making querying collection `mycoll` 
+for `example.org` via the `staff` access point might would use: `/mycoll/ap/staff?url=http://example.org/`
+
+Access policies are sets of access points. Examples:
+
+| Policy                  | Access points |
+|-------------------------|---------------|
+| Public (searchable)     | on-site, off-site, staff, solr |
+| Public (not searchable) | on-site, off-site, staff |
+| On-site only            | on-site, staff |
+| Staff only              | staff |
+
+
+# Rules
 
 OutbackCDX access control rules are JSON objects containing three types of fields: criteria, actions and metadata.
 
@@ -80,7 +99,7 @@ Action fields specify the effect the rule has on matching resources.
 
 ### Access Policy
 
-Specifies the id of the access policy this rule applies. Policies are configurable some examples might be: public, staff only, on-site only, public but not full text searchable.
+Specifies the id of the access policy this rule applies. See the introduction text above for an explanation of policies.
 
 ```
 "policyId": 4
