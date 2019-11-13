@@ -80,7 +80,7 @@ Action fields specify the effect the rule has on matching resources.
 
 ### Access Policy
 
-Specifies the id of the access policy this rule applies.
+Specifies the id of the access policy this rule applies. Policies are configurable some examples might be: public, staff only, on-site only, public but not full text searchable.
 
 ```
 "policyId": 4
