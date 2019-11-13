@@ -200,8 +200,7 @@ that allow OutbackCDX to be used as a source of deduplication data for Heritrix 
 Access Control
 --------------
 
-Experimental support for access control is under early development, experimental support for it can be
-can be enabled by setting the following environment variable:
+Access control can be enabled by setting the following environment variable:
 
     EXPERIMENTAL_ACCESS_CONTROL=1
 
@@ -209,6 +208,8 @@ Rules can be configured through the GUI. Have Wayback or other clients query a p
 point. For example to query the 'public' access point.
 
     http://localhost:8080/myindex/ap/public
+
+See [docs/access-control.md](docs/access-control.md) for details of the access control model.
 
 Canonicalisation Aliases
 ------------------------
