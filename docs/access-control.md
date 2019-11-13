@@ -107,6 +107,8 @@ A unique identifier for this rule.
 "id": 23,
 ```
 
+Use case: To refer to an existing rule for updating or to reference it in an external system.
+
 ## Reason
 
 A course grained category for the reason this rule was created.
@@ -114,6 +116,8 @@ A course grained category for the reason this rule was created.
 ```
 "reason": "Privacy (personal data)",
 ```
+
+Use case: Reporting statistics about the numbers of different types of rules.
 
 ## Private comment
 
