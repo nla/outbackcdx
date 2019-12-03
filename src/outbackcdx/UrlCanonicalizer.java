@@ -44,6 +44,53 @@ public class UrlCanonicalizer {
     private static final Pattern UNDOTTED_IP = Pattern.compile("(?:0x)?[0-9]{1,12}");
     static final Pattern DOTTED_IP = Pattern.compile("[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}");
 
+    /**
+     * TODO explain how these rules work.
+     *
+     * <ul>
+     * <li>{@link https://github.com/webrecorder/pywb/wiki/Fuzzy-Match-Rules}
+     * <li>{@link https://github.com/webrecorder/pywb/blob/5f938e68797/pywb/warcserver/index/fuzzymatcher.py}
+     * </ul>
+     *
+     * <pre>rules:
+     * - url_prefix: 'com,twitter)/i/profiles/show/'
+     *   fuzzy_lookup: '/profiles/show/.*with_replies\?.*(max_id=[^&]+)'
+     * - url_prefix: 'com,twitter)/i/timeline'
+     *   fuzzy_lookup:
+     *   - max_position
+     *   - include_entities
+     * - url_prefix: 'com,facebook)/ajax/pagelet/generic.php/photoviewerpagelet'
+     *   fuzzy_lookup:
+     *     match: '("(?:cursor|cursorindex)":["\d\w]+)'
+     *     find_all: true
+     * - url_prefix: 'com,staticflickr,'
+     *   fuzzy_lookup:
+     *     match: '([0-9]+_[a-z0-9]+).*?.jpg'
+     *     replace: '/'
+     *     # replace: 'staticflickr,'
+     * - url_prefix: ['com,yimg,l)/g/combo', 'com,yimg,s)/pw/combo', 'com,yahooapis,yui)/combo']
+     *   fuzzy_lookup: '([^/]+(?:\.css|\.js))'
+     * - url_prefix: 'com,vimeo,av)/'
+     *   # only use non query part of url, ignore query
+     *   fuzzy_lookup: '()'
+     * - url_prefix: 'com,googlevideo,'
+     *   fuzzy_lookup:
+     *     match:
+     *       regex: 'com,googlevideo.*&#47;videoplayback.*'
+     *       args:
+     *       - id
+     *       - itag
+     *       #- mime
+     *     filter:
+     *     - 'urlkey:{0}'
+     *     - '!mimetype:text/plain'
+     *     type: 'domain'
+     * - url_prefix: com,example,zuh)/
+     *   fuzzy_lookup: '[&?](?:.*)'
+     * </pre>
+     *
+     * @author nlevitt
+     */
     public static class FuzzyRule {
         final List<String> urlPrefixes;
         final Pattern pattern;
@@ -129,12 +176,15 @@ public class UrlCanonicalizer {
                 if (surt.startsWith(prefix)) {
                     Matcher m = pattern.matcher(surt);
                     List<String> groups = new ArrayList<String>();
+                    boolean regexMatches = false;
                     if (findAll) {
                         while (m.find()) {
+                            regexMatches = true;
                             groups.add(m.group());
                         }
                     } else {
                         if (m.find()) {
+                            regexMatches = true;
                             for (int i = 1; i <= m.groupCount(); i++) {
                                 if (m.group(i) != null) {
                                     groups.add(m.group(i));
@@ -143,7 +193,7 @@ public class UrlCanonicalizer {
                         }
                     }
 
-                    if (!groups.isEmpty()) {
+                    if (regexMatches) {
                         int replaceAfterIndex = surt.indexOf(replaceAfter);
                         String pref;
                         if (isDomain) {

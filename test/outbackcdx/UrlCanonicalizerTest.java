@@ -122,6 +122,8 @@ public class UrlCanonicalizerTest {
                 "    - 'urlkey:{0}'\n" +
                 "    - '!mimetype:text/plain'\n" +
                 "    type: 'domain'\n" +
+                "- url_prefix: com,example,zuh)/\n" +
+                "  fuzzy_lookup: '[&?](?:.*)'\n" +
                 "";
 
         fuzzCanon = new UrlCanonicalizer(new ByteArrayInputStream(yaml.getBytes("UTF-8")));
@@ -188,11 +190,18 @@ public class UrlCanonicalizerTest {
         assertEquals(
                 fuzzCanon.surtCanonicalize("http://o-o.preferred.nuq04t11.v3.cache1.googlevideo.com/videoplayback?id=1c98fe7da5ffb404&itag=5&app=blogger&ip=0.0.0.0&ipbits=0&expire=1335344084&sparams=id,itag,ip,ipbits,expire&signature=5371654FF54A9C169F2F42334235D096F41053A7.448A800D1DED819ED5C476E29BA69F38FEE48B26&key=ck1&redirect_counter=2&cms_options=map=ts_be&cms_redirect=yes"),
                 "fuzzy:com,googlevideo,?id=1c98fe7da5ffb404&itag=5");
+
+        assertEquals(
+                fuzzCanon.surtCanonicalize("http://zuh.example.com/?some=query&params"),
+                fuzzCanon.surtCanonicalize("http://zuh.example.com/?some=other&query=params"));
+        assertEquals(
+                fuzzCanon.surtCanonicalize("http://zuh.example.com/?some=query&params"),
+                "fuzzy:com,example,zuh)/?");
     }
 
     @Test
     public void testFuzzConfig() {
-        assertEquals(fuzzCanon.fuzzyRules.size(), 7);
+        assertEquals(fuzzCanon.fuzzyRules.size(), 8);
 
         assertEquals(fuzzCanon.fuzzyRules.get(0).urlPrefixes, Arrays.asList("com,twitter)/i/profiles/show/"));
         assertEquals(fuzzCanon.fuzzyRules.get(0).pattern.pattern(), "/profiles/show/.*with_replies\\?.*(max_id=[^&]+)");
@@ -235,5 +244,11 @@ public class UrlCanonicalizerTest {
         assertEquals(fuzzCanon.fuzzyRules.get(6).replaceAfter, "?");
         assertEquals(fuzzCanon.fuzzyRules.get(6).findAll, false);
         assertEquals(fuzzCanon.fuzzyRules.get(6).isDomain, true);
+
+        assertEquals(fuzzCanon.fuzzyRules.get(7).urlPrefixes, Arrays.asList("com,example,zuh)/"));
+        assertEquals(fuzzCanon.fuzzyRules.get(7).pattern.pattern(), "[&?](?:.*)");
+        assertEquals(fuzzCanon.fuzzyRules.get(7).replaceAfter, "?");
+        assertEquals(fuzzCanon.fuzzyRules.get(7).findAll, false);
+        assertEquals(fuzzCanon.fuzzyRules.get(7).isDomain, false);
     }
 }
