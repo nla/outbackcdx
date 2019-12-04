@@ -45,14 +45,46 @@ public class UrlCanonicalizer {
     static final Pattern DOTTED_IP = Pattern.compile("[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}");
 
     /**
-     * TODO explain how these rules work.
+     * This class implements pywb fuzzy matching as canonicalization rules.
      *
-     * <ul>
-     * <li>{@link https://github.com/webrecorder/pywb/wiki/Fuzzy-Match-Rules}
-     * <li>{@link https://github.com/webrecorder/pywb/blob/5f938e68797/pywb/warcserver/index/fuzzymatcher.py}
-     * </ul>
-     *
-     * <pre>rules:
+     * <p>
+     * Urls are sometimes created dynamically and include extraneous parameters that
+     * have no meaningful effect on the server response. Fuzzy matching helps to
+     * play back non-identical but equivalent urls, by ignoring the parts of the url
+     * that don't matter. The way it works in pywb, in a nutshell, is that it
+     * queries the cdx index for a surt prefix, and filters for urls that contain
+     * the meaningful substrings of the requested url. The "meaningful substrings"
+     * are the captured groups from the regular expression match. See
+     * {@link https://github.com/webrecorder/pywb/wiki/Fuzzy-Match-Rules} for more
+     * details.
+     * 
+     * <p>
+     * What we do here with the outbackcdx fuzzy canonicalization rules is to
+     * explicitly include only the meaningful parts of the url in the canonicalized
+     * version. Where pywb would do a scan over urls matching the prefix, grepping
+     * for the meaningful substrings, we instead canonicalize directly to something
+     * like <code>fuzzy:com,example)/url/prefix?meaningful&substring</code>.
+     * 
+     * <p>
+     * The advantage of this approach is performance. An O(n) prefix scan in pywb
+     * becomes an O(1) exact match. The downside is that urls in the index need to
+     * be recanonicalized when the fuzzy match rules change (TODO add some
+     * instructions). But the difference in performance is critical when you have
+     * millions of captures matching a prefix.
+     * 
+     * <p>
+     * {@link UrlCanonicalizer} can read a pywb rules.yaml file to configure the
+     * fuzzy canonicalization rules. The rules.yaml can be copied verbatim from
+     * pywb, modulo one change documented on
+     * {@link UrlCanonicalizer#UrlCanonicalizer(String)}. Settings irrelevant to
+     * fuzzy matching are ignored.
+     * 
+     * <p>
+     * Here are some example rules. TODO explain further all the supported
+     * configuration parameters.
+     * 
+     * <pre>
+     * rules:
      * - url_prefix: 'com,twitter)/i/profiles/show/'
      *   fuzzy_lookup: '/profiles/show/.*with_replies\?.*(max_id=[^&]+)'
      * - url_prefix: 'com,twitter)/i/timeline'
@@ -90,6 +122,8 @@ public class UrlCanonicalizer {
      * </pre>
      *
      * @author nlevitt
+     * @see {@link https://github.com/webrecorder/pywb/wiki/Fuzzy-Match-Rules}
+     * @see {@link https://github.com/webrecorder/pywb/blob/5f938e68797/pywb/warcserver/index/fuzzymatcher.py}
      */
     public static class FuzzyRule {
         final List<String> urlPrefixes;
@@ -221,6 +255,24 @@ public class UrlCanonicalizer {
         }
     }
 
+    /**
+     * Reads fuzzy canonicalization rules from <code>fuzzyYamlFile</code>, if
+     * provided. <code>fuzzyYamlFile</code> should be a pywb rules.yaml file.
+     * Unfortunately there is one change you'll want to make from the pywb
+     * rules.yaml: remove this last rule, which would force every url to be
+     * pointlessly fuzzy-canonicalized:
+     * 
+     * <pre>
+     *     # all domain rules -- fallback to this dataset
+     *     #=================================================================
+     *     # Applies to all urls -- should be last
+     *     - url_prefix: ''
+     *       fuzzy_lookup:
+     *         match: '()'
+     * </pre>
+     * 
+     * @param fuzzyYamlFile pywb rules.yaml file
+     */
     public UrlCanonicalizer(String fuzzyYamlFile) throws FileNotFoundException, IOException, ConfigurationException {
         if (fuzzyYamlFile != null) {
             try (FileInputStream input = new FileInputStream(fuzzyYamlFile)) {
@@ -229,6 +281,10 @@ public class UrlCanonicalizer {
         }
     }
 
+    /**
+     * @param input pywb rules.yaml input stream
+     * @see #UrlCanonicalizer(String)
+     */
     public UrlCanonicalizer(InputStream input) throws ConfigurationException {
         loadRules(input);
     }
