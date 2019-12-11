@@ -867,9 +867,13 @@ public abstract class NanoHTTPD {
                 }
 
                 String elapsed = String.format("%.3f", 1.0 * (System.currentTimeMillis() - start) / 1000);
-                System.out.println(new Date() + " " + r.remoteAddr + " " + r.status.getRequestStatus() + " "
+                String msg = new Date() + " " + r.remoteAddr + " " + r.status.getRequestStatus() + " "
                         + (countingInputStream.count + countingOut.count) + " " + elapsed + "s "
-                        + r.requestMethod + " " + r.url);
+                        + r.requestMethod + " " + r.url;
+                if (r.getHeader("outbackcdx-urlkey") != null) {
+                    msg += " urlkey=" + r.getHeader("outbackcdx-urlkey");
+                }
+                System.out.println(msg);
 
             } catch (SocketException e) {
                 // throw it out to close socket object (finalAccept)
