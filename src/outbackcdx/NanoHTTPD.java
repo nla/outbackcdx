@@ -756,6 +756,7 @@ public abstract class NanoHTTPD {
         private MultiMap<String, String> parms;
         private Map<String, String> headers;
         private String queryParameterString;
+        protected String remoteIp;
 
         public HTTPSession(InputStream inputStream, OutputStream outputStream) {
             this.inputStream = new PushbackInputStream(inputStream, BUFSIZE);
@@ -766,9 +767,10 @@ public abstract class NanoHTTPD {
             countingInputStream = new CountingInputStream(inputStream);
             this.inputStream = new PushbackInputStream(countingInputStream, BUFSIZE);
             this.outputStream = outputStream;
-            String remoteIp = inetAddress.isLoopbackAddress() || inetAddress.isAnyLocalAddress() ? "127.0.0.1" : inetAddress.getHostAddress().toString();
-            headers = new HashMap<String, String>();
 
+            remoteIp = inetAddress.isLoopbackAddress() || inetAddress.isAnyLocalAddress() ? "127.0.0.1" : inetAddress.getHostAddress().toString();
+
+            headers = new HashMap<String, String>();
             headers.put("remote-addr", remoteIp);
             headers.put("http-client-ip", remoteIp);
         }
@@ -777,7 +779,6 @@ public abstract class NanoHTTPD {
         public void execute() throws IOException {
             long start = System.currentTimeMillis();
 
-            String remoteAddr = null;
             try {
                 // Read the first 8192 bytes.
                 // The full header should fit in here.
@@ -817,14 +818,14 @@ public abstract class NanoHTTPD {
                     inputStream.unread(buf, splitbyte, rlen - splitbyte);
                 }
 
-                remoteAddr = headers.get("remote-addr");
-
                 parms = new MultiMap<String, String>();
                 if (null == headers) {
                     headers = new HashMap<String, String>();
                 } else {
                     headers.clear();
                 }
+                headers.put("remote-addr", remoteIp);
+                headers.put("http-client-ip", remoteIp);
 
                 // Create a BufferedReader for parsing the header.
                 BufferedReader hin = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(buf, 0, rlen)));
@@ -850,7 +851,7 @@ public abstract class NanoHTTPD {
                 } else {
                     r.url = getUri();
                 }
-                r.remoteAddr = remoteAddr;
+                r.remoteAddr = remoteIp;
 
                 // ensure body is consumed
                 if (contentLength > 0) {
@@ -878,13 +879,13 @@ public abstract class NanoHTTPD {
             } catch (IOException ioe) {
                 Response r = new Response(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "SERVER INTERNAL ERROR: IOException: " + ioe.getMessage());
                 r.url = getUri() + "?" + getQueryParameterString();
-                r.remoteAddr = remoteAddr;
+                r.remoteAddr = remoteIp;
                 r.send(outputStream);
                 safeClose(outputStream);
             } catch (ResponseException re) {
                 Response r = new Response(re.getStatus(), MIME_PLAINTEXT, re.getMessage());
                 r.url = getUri() + "?" + getQueryParameterString();
-                r.remoteAddr = remoteAddr;
+                r.remoteAddr = remoteIp;
                 r.send(outputStream);
                 safeClose(outputStream);
             }
