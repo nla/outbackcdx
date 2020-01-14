@@ -10,6 +10,7 @@ Features:
 * Speaks both [OpenWayback](https://github.com/iipc/openwayback/) (XML) and [PyWb](https://github.com/webrecorder/pywb) (JSON) CDX protocols
 * Realtime, incremental updates
 * Compressed indexes (varint packing + snappy), typically 1/4 - 1/5 the size of CDX files.
+* Primary-secondary replication
 * Access control (experimental, see below)
 
 Things it doesn't do (yet):
@@ -33,19 +34,34 @@ Run:
 
 Command line options:
 
-    $ java -jar target/outbackcdx-0.3.2.jar -h
-    Usage: java outbackcdx.Server [options...]
-    
-      -b bindaddr           Bind to a particular IP address
-      -d datadir            Directory to store index data under
-      -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)
-      -j jwks-url perm-path Use JSON Web Tokens for authorization
-      -k url realm clientid Use a Keycloak server for authorization
-      -m max-open-files     Limit the number of open .sst files (reduces memory usage)
-      -p port               Local port to listen on
-      -t count              Number of web server threads
-      -u                    Use Undertow as the HTTP server instead of NanoHTTPD
-      -v                    Verbose logging
+```
+Usage: java -jar outbackcdx.jar [options...]
+
+  -b bindaddr           Bind to a particular IP address
+  -d datadir            Directory to store index data under
+  -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)
+  -j jwks-url perm-path Use JSON Web Tokens for authorization
+  -k url realm clientid Use a Keycloak server for authorization
+  -m max-open-files     Limit the number of open .sst files to control memory usage
+                        (default 396 based on system RAM and ulimit -n)
+  -p port               Local port to listen on
+  -t count              Number of web server threads
+  -r count              Cap on number of rocksdb records to scan to serve a single request
+  -x                    Output CDX14 by default (instead of CDX11)
+  -v                    Verbose logging
+  -y file               Custom fuzzy match canonicalization YAML configuration file
+
+Primary mode (runs as a replication target for downstream Secondaries)
+  --replication-window interval      interval, in seconds, to delete replication history from disk.
+                                     0 disables automatic deletion. History files can be deleted manually by
+                                     POSTing a replication sequenceNumber to /<collection>/truncate_replication
+
+Secondary mode (runs read-only; polls upstream server on 'collection-url' for changes)
+  --primary collection-url           URL of collection on upstream primary to poll for changes
+  --update-interval poll-interval    Polling frequency for upstream changes, in seconds. Default: 10
+  --accept-writes                    Allow writes to this node, even though running as a secondary
+  --batch-size                       Approximate max size (in bytes) per replication batch
+```
 
 The server supports multiple named indexes as subdirectories.  Currently indexes
 are created automatically when you first write records to them.
