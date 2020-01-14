@@ -5,6 +5,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.rocksdb.*;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,12 +42,12 @@ public class IndexTest {
     }
 
     @Test
-    public void testClosest() {
+    public void testClosest() throws IOException {
         try (Index.Batch batch = index.beginUpdate()) {
-            batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://closest.org/ text/html 200 - - 0 w1"));
-            batch.putCapture(Capture.fromCdxLine("- 20060101000000 http://closest.org/ text/html 200 - - 0 w2"));
-            batch.putCapture(Capture.fromCdxLine("- 20060201000000 http://closest.org/ text/html 200 - - 0 w2"));
-            batch.putCapture(Capture.fromCdxLine("- 20070101000000 http://closest.org/ text/html 200 - - 0 w3"));
+            batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://closest.org/ text/html 200 - - 0 w1", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("- 20060101000000 http://closest.org/ text/html 200 - - 0 w2", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("- 20060201000000 http://closest.org/ text/html 200 - - 0 w2", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("- 20070101000000 http://closest.org/ text/html 200 - - 0 w3", index.canonicalizer));
             batch.commit();
         }
 
@@ -59,11 +60,11 @@ public class IndexTest {
     }
 
     @Test
-    public void testDelete() {
+    public void testDelete() throws IOException {
         try (Index.Batch batch = index.beginUpdate()) {
-            batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://a.org/ text/html 200 - - 0 w1"));
-            batch.putCapture(Capture.fromCdxLine("- 20060101000000 http://a.org/ text/html 200 - - 0 w2"));
-            batch.putCapture(Capture.fromCdxLine("- 20070101000000 http://a.org/ text/html 200 - - 0 w3"));
+            batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://a.org/ text/html 200 - - 0 w1", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("- 20060101000000 http://a.org/ text/html 200 - - 0 w2", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("- 20070101000000 http://a.org/ text/html 200 - - 0 w3", index.canonicalizer));
             batch.commit();
         }
 
@@ -77,7 +78,7 @@ public class IndexTest {
         }
 
         try (Index.Batch batch = index.beginUpdate()) {
-            batch.deleteCapture(Capture.fromCdxLine("- 20060101000000 http://a.org/ text/html 200 - - 0 w2"));
+            batch.deleteCapture(Capture.fromCdxLine("- 20060101000000 http://a.org/ text/html 200 - - 0 w2", index.canonicalizer));
             batch.commit();
         }
 
@@ -91,13 +92,13 @@ public class IndexTest {
     }
 
     @Test
-    public void testForwardAndReverse() {
+    public void testForwardAndReverse() throws IOException {
         try (Index.Batch batch = index.beginUpdate()) {
-            batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://a.org/ text/html 200 - - 0 w1"));
-            batch.putCapture(Capture.fromCdxLine("- 20060101000000 http://a.org/ text/html 200 - - 0 w2"));
-            batch.putCapture(Capture.fromCdxLine("- 20070101000000 http://a.org/ text/html 200 - - 0 w3"));
-            batch.putCapture(Capture.fromCdxLine("- 19960101000000 http://b.org/ text/html 200 - - 0 w3"));
-            batch.putCapture(Capture.fromCdxLine("- 19960101000000 http://c.org/ text/html 200 - - 0 w3"));
+            batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://a.org/ text/html 200 - - 0 w1", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("- 20060101000000 http://a.org/ text/html 200 - - 0 w2", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("- 20070101000000 http://a.org/ text/html 200 - - 0 w3", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("- 19960101000000 http://b.org/ text/html 200 - - 0 w3", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("- 19960101000000 http://c.org/ text/html 200 - - 0 w3", index.canonicalizer));
             batch.commit();
         }
 
@@ -127,4 +128,31 @@ public class IndexTest {
 
 
     }
+
+    @Test
+    public void testFromAndTo() throws IOException {
+        try (Index.Batch batch = index.beginUpdate()) {
+            batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://fromto.org/ text/html 200 - - 0 w1", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("- 20060101000000 http://fromto.org/ text/html 200 - - 0 w2", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("- 20070101000000 http://fromto.org/ text/html 200 - - 0 w3", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("- 20080101000000 http://fromto.org/ text/html 200 - - 0 w3", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("- 20090101000000 http://fromto.org/ text/html 200 - - 0 w3", index.canonicalizer));
+            batch.commit();
+        }
+
+        {
+            List<Capture> results = new ArrayList<>();
+            index.query("org,fromto)/", 20060000000000l, 20080000000000l, null).forEach(results::add);
+            assertEquals(20060101000000L, results.get(0).timestamp);
+            assertEquals(20070101000000L, results.get(1).timestamp);
+        }
+
+        {
+            List<Capture> results = new ArrayList<>();
+            index.reverseQuery("org,fromto)/", 20060000000000l, 20080000000000l, null).forEach(results::add);
+            assertEquals(20070101000000L, results.get(0).timestamp);
+            assertEquals(20060101000000L, results.get(1).timestamp);
+        }
+    }
+
 }

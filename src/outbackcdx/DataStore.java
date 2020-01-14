@@ -1,6 +1,7 @@
 package outbackcdx;
 
 import org.rocksdb.*;
+import org.rocksdb.Options;
 
 import java.io.Closeable;
 import java.io.File;
@@ -17,11 +18,20 @@ public class DataStore implements Closeable {
 
     private final File dataDir;
     private final Map<String, Index> indexes = new ConcurrentHashMap<String, Index>();
+    private final Long replicationWindow;
+    private final long scanCap;
     private final int maxOpenSstFiles;
+    private final UrlCanonicalizer canonicalizer;
 
-    public DataStore(File dataDir, int maxOpenSstFiles) {
+    public DataStore(File dataDir, int maxOpenSstFiles, Long replicationWindow, long scanCap, UrlCanonicalizer canonicalizer) {
         this.dataDir = dataDir;
+        this.replicationWindow = replicationWindow;
+        this.scanCap = scanCap;
         this.maxOpenSstFiles = maxOpenSstFiles;
+        if (canonicalizer == null) {
+            canonicalizer = new UrlCanonicalizer();
+        }
+        this.canonicalizer = canonicalizer;
     }
 
     public Index getIndex(String collection) throws IOException {
@@ -54,9 +64,33 @@ public class DataStore implements Closeable {
             options.setCreateIfMissing(createAllowed);
             configureColumnFamily(options);
 
+            /*
+             * https://github.com/facebook/rocksdb/wiki/Memory-usage-in-RocksDB "If you're
+             * certain that Get() will mostly find a key you're looking for, you can set
+             * options.optimize_filters_for_hits = true. With this option turned on, we will
+             * not build bloom filters on the last level, which contains 90% of the
+             * database. Thus, the memory usage for bloom filters will be 10X less. You will
+             * pay one IO for each Get() that doesn't find data in the database, though."
+             *
+             * We expect a low miss rate (~17% per Alex). This setting should greatly reduce
+             * memory usage.
+             */
+            options.setOptimizeFiltersForHits(true);
+
+            // this one doesn't seem to be used? see dbOptions.setMaxOpenFiles()
+            options.setMaxOpenFiles(256);
+
             DBOptions dbOptions = new DBOptions();
             dbOptions.setCreateIfMissing(createAllowed);
             dbOptions.setMaxBackgroundCompactions(Math.min(8, Runtime.getRuntime().availableProcessors()));
+            dbOptions.setAvoidFlushDuringRecovery(true);
+
+            // if not null, replication data will be available this far back in
+            // time (in seconds)
+            if (replicationWindow != null) {
+                dbOptions.setWalTtlSeconds(replicationWindow);
+            }
+
             dbOptions.setMaxOpenFiles(maxOpenSstFiles);
 
             ColumnFamilyOptions cfOptions = new ColumnFamilyOptions();
@@ -86,7 +120,7 @@ public class DataStore implements Closeable {
                 accessControl = new AccessControl(db, cfHandles.get(2), cfHandles.get(3));
             }
 
-            index = new Index(collection, db, cfHandles.get(0), cfHandles.get(1), accessControl);
+            index = new Index(collection, db, cfHandles.get(0), cfHandles.get(1), accessControl, scanCap, canonicalizer);
             indexes.put(collection, index);
             return index;
         } catch (RocksDBException e) {
@@ -94,7 +128,20 @@ public class DataStore implements Closeable {
         }
     }
 
-    private void configureColumnFamily(ColumnFamilyOptionsInterface cfOptions) throws RocksDBException {
+    private void configureColumnFamily(Options cfOptions) throws RocksDBException {
+        BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
+        tableConfig.setBlockSize(22 * 1024); // approximately compresses to < 8 kB
+
+        cfOptions.setCompactionStyle(CompactionStyle.LEVEL);
+        cfOptions.setWriteBufferSize(64 * 1024 * 1024);
+        cfOptions.setTargetFileSizeBase(64 * 1024 * 1024);
+        cfOptions.setMaxBytesForLevelBase(512 * 1024 * 1024);
+        cfOptions.setTargetFileSizeMultiplier(2);
+        cfOptions.setCompressionType(CompressionType.SNAPPY_COMPRESSION);
+        cfOptions.setTableFormatConfig(tableConfig);
+    }
+
+    private void configureColumnFamily(ColumnFamilyOptions cfOptions) throws RocksDBException {
         BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
         tableConfig.setBlockSize(22 * 1024); // approximately compresses to < 8 kB
 
@@ -114,7 +161,7 @@ public class DataStore implements Closeable {
                 .stream().map(bytes -> new String(bytes, UTF_8))
                 .collect(Collectors.toSet());
         for (ColumnFamilyDescriptor cfDesc : cfDescriptors) {
-            if (cfNames.remove(new String(cfDesc.columnFamilyName(), UTF_8))) {
+            if (cfNames.remove(new String(cfDesc.getName(), UTF_8))) {
                 existing.add(cfDesc);
             } else {
                 toCreate.add(cfDesc);

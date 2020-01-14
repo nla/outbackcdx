@@ -1,10 +1,15 @@
 package outbackcdx;
 
+import org.junit.Before;
 import org.junit.Test;
 
+import outbackcdx.UrlCanonicalizer.ConfigurationException;
+
+import java.io.ByteArrayInputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
-
+import java.util.Arrays;
 import static org.junit.Assert.assertEquals;
 
 public class UrlCanonicalizerTest {
@@ -60,19 +65,190 @@ public class UrlCanonicalizerTest {
 
         t("http://example.org/too/many/../../../dots", "http://example.org/dots");
 
-        assertEquals("au,gov,acma,web)/apservices/action/challenge?method=viewchallenge", UrlCanonicalizer.surtCanonicalize("http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
+        UrlCanonicalizer canon = new UrlCanonicalizer();
+        assertEquals("au,gov,acma,web)/apservices/action/challenge?method=viewchallenge", canon.surtCanonicalize("http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
 
         assertEquals("youtube-dl:au,gov,acma,web)/apservices/action/challenge?method=viewchallenge",
-                UrlCanonicalizer.surtCanonicalize("youtube-dl:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
+                canon.surtCanonicalize("youtube-dl:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
         assertEquals("screenshot:au,gov,acma,web)/apservices/action/challenge?method=viewchallenge",
-                UrlCanonicalizer.surtCanonicalize("screenshot:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
+                canon.surtCanonicalize("screenshot:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
         assertEquals("youtube-dl:au,gov,acma,web)/apservices/action/challenge?method=viewchallenge",
-                UrlCanonicalizer.surtCanonicalize("urn:transclusions:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
+                canon.surtCanonicalize("urn:transclusions:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
+        assertEquals("youtube-dl:00001:au,gov,acma,web)/apservices/action/challenge?method=viewchallenge",
+                canon.surtCanonicalize("youtube-dl:00001:http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
     }
 
     @Test
     public void pandoraUrlsShouldHaveQueryStringStripped() throws MalformedURLException, URISyntaxException {
         FeatureFlags.setPandoraHacks(true);
         t("http://pandora.nla.gov.au/pan/10075/20150801-0000/www.nlc.org.au/assets/CSS/style62ea.css?ver=1.2", "http://pandora.nla.gov.au/pan/10075/20150801-0000/www.nlc.org.au/assets/css/style62ea.css");
+    }
+
+
+    private UrlCanonicalizer fuzzCanon;
+    @Before
+    public void initFuzz() throws UnsupportedEncodingException, ConfigurationException {
+        String yaml =
+                "rules:\n" +
+                "- url_prefix: 'com,twitter)/i/profiles/show/'\n" +
+                "  fuzzy_lookup: '/profiles/show/.*with_replies\\?.*(max_id=[^&]+)'\n" +
+                "- url_prefix: 'com,twitter)/i/timeline'\n" +
+                "  fuzzy_lookup:\n" +
+                "  - max_position\n" +
+                "  - include_entities\n" +
+                "- url_prefix: 'com,facebook)/ajax/pagelet/generic.php/photoviewerpagelet'\n" +
+                "  fuzzy_lookup:\n" +
+                "    match: '(\"(?:cursor|cursorindex)\":[\"\\d\\w]+)'\n" +
+                "    find_all: true\n" +
+                "- url_prefix: 'com,staticflickr,'\n" +
+                "  fuzzy_lookup:\n" +
+                "    match: '([0-9]+_[a-z0-9]+).*?.jpg'\n" +
+                "    replace: '/'\n" +
+                "    # replace: 'staticflickr,'\n" +
+                "- url_prefix: ['com,yimg,l)/g/combo', 'com,yimg,s)/pw/combo', 'com,yahooapis,yui)/combo']\n" +
+                "  fuzzy_lookup: '([^/]+(?:\\.css|\\.js))'\n" +
+                "- url_prefix: 'com,vimeo,av)/'\n" +
+                "  # only use non query part of url, ignore query\n" +
+                "  fuzzy_lookup: '()'\n" +
+                "- url_prefix: 'com,googlevideo,'\n" +
+                "  fuzzy_lookup:\n" +
+                "    match:\n" +
+                "      regex: 'com,googlevideo.*/videoplayback.*'\n" +
+                "      args:\n" +
+                "      - id\n" +
+                "      - itag\n" +
+                "      #- mime\n" +
+                "    filter:\n" +
+                "    - 'urlkey:{0}'\n" +
+                "    - '!mimetype:text/plain'\n" +
+                "    type: 'domain'\n" +
+                "- url_prefix: com,example,zuh)/\n" +
+                "  fuzzy_lookup: '[&?](?:.*)'\n" +
+                "";
+
+        fuzzCanon = new UrlCanonicalizer(new ByteArrayInputStream(yaml.getBytes("UTF-8")));
+    }
+
+    @Test
+    public void testFuzzCanon() {
+        // fuzzy canon does not apply
+        assertEquals(
+                "au,gov,acma,web)/apservices/action/challenge?method=viewchallenge",
+                fuzzCanon.surtCanonicalize("http://web.acma.gov.au/apservices/action/challenge?method=viewChallenge"));
+
+        // fuzzy canon does apply
+        assertEquals(
+                fuzzCanon.surtCanonicalize("https://twitter.com/i/profiles/show/09Valenti/timeline/with_replies?include_available_features=1&include_entities=1&max_id=388760995968974848"),
+                "fuzzy:com,twitter)/i/profiles/show/09valenti/timeline/with_replies?max_id=388760995968974848");
+
+        assertEquals(
+                fuzzCanon.surtCanonicalize("https://twitter.com/i/timeline?include_available_features=1&include_entities=1&max_position=1000044390125944832&reset_error_state=false"),
+                "fuzzy:com,twitter)/i/timeline?include_entities=1&max_position=1000044390125944832");
+
+        assertEquals(
+                fuzzCanon.surtCanonicalize("https://www.facebook.com/ajax/pagelet/generic.php/PhotoViewerPagelet?fb_dtsg_ag&ajaxpipe=1&ajaxpipe_token=AXhc7hWnFHK7VBPx&no_script_path=1&data=%7B%22cursor%22%3A%221296369020399142%22%2C%22version%22%3A6%2C%22end%22%3A%22962309407138440%22%2C%22fetchSize%22%3A-12%2C%22opaqueCursor%22%3Anull%2C%22tagSuggestionMode%22%3A%22everyone%22%2C%22is_from_groups%22%3Afalse%2C%22set%22%3A%22a.540565829312802%22%2C%22type%22%3A3%2C%22total%22%3A14%2C%22cursorIndex%22%3A0%7D&__user=0&__a=1&__dyn=7AzHJ4zamaWxd2umeCExWyC5UOqfoOm9AKGgS8WGnJ4WqF1eU8Eqzob4q6oF4GbGqKi5azppEHoOqqGxSaUyGxeipi28gyElWAAzppenKtqx2AcUK4F98iGvxifGcgLAKibzUKmih4-vAZ4zogxu9AyAUOKbzAaUx5G3Cm4bKm8yFVpV8hyQdzUmDm495UO4KK4bh4u4pFEixbAJkUGrz9-vix6dGTx67kmdz8ObDK9y98GqfxG9hFEGWBBKunAxpu9iTy7GiumoWExFSkK25h8iyXy998KUKA5oOmKFKbUC13x3ximfALhaJeSh3oCi9lkRyWyV8V3kdz9eaDCxKQECiq9jgW5Abzp49BUFoN4KmbDzAUnyHxqKuiaz9qAm2DGEky44bAAxmqumHAK8J6Kh7x6cyU998BfgKUKu7AUyh4AFeWXK7pby9qGFEG8DAKq8gCVQqazWgK5FEOiEEwjihbCAyU&__req=jsonp_3&__be=0&__pc=PHASED%3ADEFAULT&dpr=1&__rev=4655486&__adt=3"),
+                "fuzzy:com,facebook)/ajax/pagelet/generic.php/photoviewerpagelet?\"cursor\":\"1296369020399142\"&\"cursorindex\":0");
+
+        assertEquals(
+                fuzzCanon.surtCanonicalize("https://bf1-farm2.staticflickr.com/1907/30471641737_4378b23f76_b.jpg"),
+                fuzzCanon.surtCanonicalize("https://bf1-farm2.staticflickr.com/1907/30471641737_4378b23f76_z.jpg?zz=1"));
+        assertEquals(
+                fuzzCanon.surtCanonicalize("https://bf1-farm2.staticflickr.com/1907/30471641737_4378b23f76_b.jpg"),
+                "fuzzy:com,staticflickr,bf1-farm2)/30471641737_4378b23f76");
+
+        assertEquals(
+                fuzzCanon.surtCanonicalize("http://l.yimg.com/g/combo/1/3.40770.css"),
+                fuzzCanon.surtCanonicalize("http://l.yimg.com/g/combo/1/3.40770.css?c/c_.J_nav.BC.vX3Ui&c/c_.J_.D.BC.vWpVt&c/c_.J_.D.BC.vWpVt&c/c_.EM_.D.BC.vW6Ji&c/c_.FW-.HN.BC."));
+        assertEquals(
+                fuzzCanon.surtCanonicalize("http://l.yimg.com/g/combo/1/3.40770.css?c/c_.J_nav.BC.vX3Ui&c/c_.J_.D.BC.vWpVt&c/c_.J_.D.BC.vWpVt&c/c_.EM_.D.BC.vW6Ji&c/c_.FW-.HN.BC."),
+                "fuzzy:com,yimg,l)/g/combo/1/3.40770.css?3.40770.css");
+
+        assertEquals(
+                fuzzCanon.surtCanonicalize("https://s.yimg.com/pw/combo/1/3.11.0?autocomplete-list/assets/skins/sam/autocomplete-list.css&c/c_.HO-3.BC.v223Nz&c/c_.JQ.BC.v25xKg"),
+                fuzzCanon.surtCanonicalize("https://s.yimg.com/pw/combo/1/3.11.0?autocomplete-list/assets/skins/sam/autocomplete-list.css&c/c_.HO-3.BC.v4cQs5o6&c/c_.JQ.BC.v3m1XDji"));
+        assertEquals(
+                fuzzCanon.surtCanonicalize("https://s.yimg.com/pw/combo/1/3.11.0?autocomplete-list/assets/skins/sam/autocomplete-list.css&c/c_.HO-3.BC.v223Nz&c/c_.JQ.BC.v25xKg"),
+                "fuzzy:com,yimg,s)/pw/combo/1/3.11.0?autocomplete-list.css");
+
+        assertEquals(
+                fuzzCanon.surtCanonicalize("http://yui.yahooapis.com/combo?2.8.2/build/logger/assets/skins/sam/logger.css"),
+                fuzzCanon.surtCanonicalize("http://yui.yahooapis.com/combo?2.8.2r1/build/logger/assets/skins/sam/logger.css"));
+        assertEquals(
+                fuzzCanon.surtCanonicalize("http://yui.yahooapis.com/combo?2.8.2/build/logger/assets/skins/sam/logger.css"),
+                "fuzzy:com,yahooapis,yui)/combo?logger.css");
+
+        assertEquals(
+                fuzzCanon.surtCanonicalize("http://av.vimeo.com/69311/481/44350578.mp4?token2=1383828275_643035b604bc4e836bd702cd28bab94c&aksessionid=41a52d830713bc2c&ns=4"),
+                fuzzCanon.surtCanonicalize("http://av.vimeo.com/69311/481/44350578.mp4?token2=1384356471_1486adf88d97f41b97cc73c029de6696&aksessionid=2b4f6c2c90b4f1f4&ns=4"));
+        assertEquals(
+                fuzzCanon.surtCanonicalize("http://av.vimeo.com/69311/481/44350578.mp4?token2=1383828275_643035b604bc4e836bd702cd28bab94c&aksessionid=41a52d830713bc2c&ns=4"),
+                "fuzzy:com,vimeo,av)/69311/481/44350578.mp4?");
+
+        assertEquals(
+                fuzzCanon.surtCanonicalize("http://o-o.preferred.nuq04t11.v3.cache1.googlevideo.com/videoplayback?id=1c98fe7da5ffb404&itag=5&app=blogger&ip=0.0.0.0&ipbits=0&expire=1335344084&sparams=id,itag,ip,ipbits,expire&signature=5371654FF54A9C169F2F42334235D096F41053A7.448A800D1DED819ED5C476E29BA69F38FEE48B26&key=ck1&redirect_counter=2&cms_options=map=ts_be&cms_redirect=yes"),
+                fuzzCanon.surtCanonicalize("http://tc.v3.cache1.googlevideo.com/videoplayback?id=1c98fe7da5ffb404&itag=5&app=blogger&ip=0.0.0.0&ipbits=0&expire=1335344878&sparams=id,itag,ip,ipbits,expire&signature=48F65E282E7965BDC97DD331CE25D851FB38C9D3.2DA7A8DC8FC4207F6EAD532CBE0E1AF4DB73317C&key=ck1&redirect_counter=1"));
+        assertEquals(
+                fuzzCanon.surtCanonicalize("http://o-o.preferred.nuq04t11.v3.cache1.googlevideo.com/videoplayback?id=1c98fe7da5ffb404&itag=5&app=blogger&ip=0.0.0.0&ipbits=0&expire=1335344084&sparams=id,itag,ip,ipbits,expire&signature=5371654FF54A9C169F2F42334235D096F41053A7.448A800D1DED819ED5C476E29BA69F38FEE48B26&key=ck1&redirect_counter=2&cms_options=map=ts_be&cms_redirect=yes"),
+                "fuzzy:com,googlevideo,?id=1c98fe7da5ffb404&itag=5");
+
+        assertEquals(
+                fuzzCanon.surtCanonicalize("http://zuh.example.com/?some=query&params"),
+                fuzzCanon.surtCanonicalize("http://zuh.example.com/?some=other&query=params"));
+        assertEquals(
+                fuzzCanon.surtCanonicalize("http://zuh.example.com/?some=query&params"),
+                "fuzzy:com,example,zuh)/?");
+    }
+
+    @Test
+    public void testFuzzConfig() {
+        assertEquals(fuzzCanon.fuzzyRules.size(), 8);
+
+        assertEquals(fuzzCanon.fuzzyRules.get(0).urlPrefixes, Arrays.asList("com,twitter)/i/profiles/show/"));
+        assertEquals(fuzzCanon.fuzzyRules.get(0).pattern.pattern(), "/profiles/show/.*with_replies\\?.*(max_id=[^&]+)");
+        assertEquals(fuzzCanon.fuzzyRules.get(0).replaceAfter, "?");
+        assertEquals(fuzzCanon.fuzzyRules.get(0).findAll, false);
+        assertEquals(fuzzCanon.fuzzyRules.get(0).isDomain, false);
+
+        assertEquals(fuzzCanon.fuzzyRules.get(1).urlPrefixes, Arrays.asList("com,twitter)/i/timeline"));
+        assertEquals(fuzzCanon.fuzzyRules.get(1).pattern.pattern(), "[?&](\\Qinclude_entities\\E=[^&]+).*[?&](\\Qmax_position\\E=[^&]+)");
+        assertEquals(fuzzCanon.fuzzyRules.get(1).replaceAfter, "?");
+        assertEquals(fuzzCanon.fuzzyRules.get(1).findAll, false);
+        assertEquals(fuzzCanon.fuzzyRules.get(1).isDomain, false);
+
+        assertEquals(fuzzCanon.fuzzyRules.get(2).urlPrefixes, Arrays.asList("com,facebook)/ajax/pagelet/generic.php/photoviewerpagelet"));
+        assertEquals(fuzzCanon.fuzzyRules.get(2).pattern.pattern(), "(\"(?:cursor|cursorindex)\":[\"\\d\\w]+)");
+        assertEquals(fuzzCanon.fuzzyRules.get(2).replaceAfter, "?");
+        assertEquals(fuzzCanon.fuzzyRules.get(2).findAll, true);
+        assertEquals(fuzzCanon.fuzzyRules.get(2).isDomain, false);
+
+        assertEquals(fuzzCanon.fuzzyRules.get(3).urlPrefixes, Arrays.asList("com,staticflickr,"));
+        assertEquals(fuzzCanon.fuzzyRules.get(3).pattern.pattern(), "([0-9]+_[a-z0-9]+).*?.jpg");
+        assertEquals(fuzzCanon.fuzzyRules.get(3).replaceAfter, "/");
+        assertEquals(fuzzCanon.fuzzyRules.get(3).findAll, false);
+        assertEquals(fuzzCanon.fuzzyRules.get(3).isDomain, false);
+
+        assertEquals(fuzzCanon.fuzzyRules.get(4).urlPrefixes, Arrays.asList("com,yimg,l)/g/combo", "com,yimg,s)/pw/combo", "com,yahooapis,yui)/combo"));
+        assertEquals(fuzzCanon.fuzzyRules.get(4).pattern.pattern(), "([^/]+(?:\\.css|\\.js))");
+        assertEquals(fuzzCanon.fuzzyRules.get(4).replaceAfter, "?");
+        assertEquals(fuzzCanon.fuzzyRules.get(4).findAll, false);
+        assertEquals(fuzzCanon.fuzzyRules.get(4).isDomain, false);
+
+        assertEquals(fuzzCanon.fuzzyRules.get(5).urlPrefixes, Arrays.asList("com,vimeo,av)/"));
+        assertEquals(fuzzCanon.fuzzyRules.get(5).pattern.pattern(), "()");
+        assertEquals(fuzzCanon.fuzzyRules.get(5).replaceAfter, "?");
+        assertEquals(fuzzCanon.fuzzyRules.get(5).findAll, false);
+        assertEquals(fuzzCanon.fuzzyRules.get(5).isDomain, false);
+
+        assertEquals(fuzzCanon.fuzzyRules.get(6).urlPrefixes, Arrays.asList("com,googlevideo,"));
+        assertEquals(fuzzCanon.fuzzyRules.get(6).pattern.pattern(), "com,googlevideo.*/videoplayback.*[?&](\\Qid\\E=[^&]+).*[?&](\\Qitag\\E=[^&]+)");
+        assertEquals(fuzzCanon.fuzzyRules.get(6).replaceAfter, "?");
+        assertEquals(fuzzCanon.fuzzyRules.get(6).findAll, false);
+        assertEquals(fuzzCanon.fuzzyRules.get(6).isDomain, true);
+
+        assertEquals(fuzzCanon.fuzzyRules.get(7).urlPrefixes, Arrays.asList("com,example,zuh)/"));
+        assertEquals(fuzzCanon.fuzzyRules.get(7).pattern.pattern(), "[&?](?:.*)");
+        assertEquals(fuzzCanon.fuzzyRules.get(7).replaceAfter, "?");
+        assertEquals(fuzzCanon.fuzzyRules.get(7).findAll, false);
+        assertEquals(fuzzCanon.fuzzyRules.get(7).isDomain, false);
     }
 }

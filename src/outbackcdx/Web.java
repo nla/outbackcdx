@@ -1,24 +1,30 @@
 package outbackcdx;
 
+import static outbackcdx.Json.GSON;
+import static outbackcdx.NanoHTTPD.Response.Status.BAD_REQUEST;
+import static outbackcdx.NanoHTTPD.Response.Status.FORBIDDEN;
+import static outbackcdx.NanoHTTPD.Response.Status.INTERNAL_ERROR;
+import static outbackcdx.NanoHTTPD.Response.Status.NOT_FOUND;
+import static outbackcdx.NanoHTTPD.Response.Status.OK;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.io.UnsupportedEncodingException;
+import java.net.ServerSocket;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import outbackcdx.NanoHTTPD.IHTTPSession;
 import outbackcdx.NanoHTTPD.Method;
 import outbackcdx.NanoHTTPD.Response;
 import outbackcdx.auth.Authorizer;
 import outbackcdx.auth.Permission;
 import outbackcdx.auth.Permit;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.net.ServerSocket;
-import java.net.URL;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import static outbackcdx.Json.GSON;
-import static outbackcdx.NanoHTTPD.Response.Status.*;
 
 class Web {
     private static final Map<String,String> versionCache = new HashMap<>();
@@ -56,10 +62,12 @@ class Web {
     static class NRequest implements Request {
         private final IHTTPSession session;
         private final Permit permit;
+        private final String url;
 
         NRequest(IHTTPSession session, Permit permit) {
             this.session = session;
             this.permit = permit;
+            this.url = rebuildUrl();
         }
 
         @Override
@@ -73,7 +81,7 @@ class Web {
         }
 
         @Override
-        public Map<String, String> params() {
+        public MultiMap<String, String> params() {
             return session.getParms();
         }
 
@@ -95,6 +103,11 @@ class Web {
         @Override
         public String username() {
             return permit.username;
+        }
+
+        @Override
+        public String url() {
+            return url;
         }
     }
 
@@ -287,6 +300,11 @@ class Web {
 
             return handler.handle(request);
         }
+
+        @Override
+        public String toString() {
+            return method + " " + pattern;
+        }
     }
 
     public static interface Request {
@@ -294,7 +312,7 @@ class Web {
 
         String path();
 
-        Map<String, String> params();
+        MultiMap<String, String> params();
 
         String header(String name);
 
@@ -320,5 +338,32 @@ class Web {
             return value;
         }
 
+        /**
+         * Should be called by constructor to stash the original url. Needs to happen
+         * before before Route.handle() because it adds path tokens to params(), making
+         * it impossible to compute the original url.
+         */
+        default String rebuildUrl() {
+            StringBuilder buf = new StringBuilder(path());
+            if (params() != null) {
+                boolean first = true;
+                for (String key: params().keySet()) {
+                    for (String value: params().getAll(key)) {
+                        buf.append(first ? '?' : '&');
+                        first = false;
+                        try {
+                            buf.append(URLEncoder.encode(key, "UTF-8"));
+                            buf.append('=');
+                            buf.append(URLEncoder.encode(value, "UTF-8"));
+                        } catch (UnsupportedEncodingException e) {
+                            throw new RuntimeException(e); // not possible
+                        }
+                    }
+                }
+            }
+            return buf.toString();
+        }
+
+        String url();
     }
 }

@@ -6,6 +6,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+
+import outbackcdx.UrlCanonicalizer.ConfigurationException;
 import outbackcdx.auth.Permit;
 
 import java.io.*;
@@ -28,11 +30,20 @@ public class WebappTest {
     private Webapp webapp;
 
     @Before
-    public void setUp() throws IOException {
+    public void setUp() throws IOException, ConfigurationException {
         FeatureFlags.setExperimentalAccessControl(true);
         File root = folder.newFolder();
-        DataStore manager = new DataStore(root, -1);
-        webapp = new Webapp(manager, false, Collections.emptyMap());
+        String yaml =
+                "rules:\n" +
+                "- url_prefix: 'com,facebook)/pages_reaction_units/more'\n" +
+                "  fuzzy_lookup:\n" +
+                "  - page_id\n" +
+                "  - cursor\n" +
+                "";
+        UrlCanonicalizer canon = new UrlCanonicalizer(new ByteArrayInputStream(yaml.getBytes("UTF-8")));
+
+        DataStore manager = new DataStore(root, -1, null, Long.MAX_VALUE, canon);
+        webapp = new Webapp(manager, false, Collections.emptyMap(), canon);
     }
 
     @After
@@ -71,9 +82,29 @@ public class WebappTest {
             String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F limit:2 offset:0");
             assertEquals(2, StringUtils.countMatches(response, "<result>"));
         }
-        
+
         POST("/test", "- 20060614070159 http://nla.gov.au/bad-wolf text/html bad-wolf XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n", BAD_REQUEST);
         POST("/test", "- 20060614070159 http://nla.gov.au/bad-wolf text/html bad-wolf XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n", OK, "badLines", "skip");
+    }
+
+    @Test
+    public void testFuzzyCanon() throws Exception {
+        POST("/test", "- 20170819040336 https://www.facebook.com/pages_reaction_units/more/?page_id=115681848447769&cursor=%7B%22timeline_cursor%22%3A%22timeline_unit%3A1%3A00000000001397435609%3A04611686018427387904%3A09223372036854775661%3A04611686018427387904%22%2C%22timeline_section_cursor%22%3A%7B%7D%2C%22has_next_page%22%3Atrue%7D&surface=www_pages_home&unit_count=8&dpr=1&__user=100011276852661&__a=1&__dyn=5V4cjEzUGByK5A9VoWWOGi9Fxrz9EZz8-iWF3ozGFi9LFGA4XG7VKEKGwThEnUF7yWCHAxiESmqaxuqE88HyWDyuipi28gyEnGieKmjBXDmEgF3ebByqAAxaFSifDxCaVQibVojB-qjyVfh6u-exvz8Gicx2jCoO8hqwzxmmayrhbAyFUSibBDCyVF88GxrUCaC-Rx2Qh1Gcy8C6rld13xivQFfxqHu4olDh4dy8gyVUkCyFFFK5p8BaUhKHWG4ui9K8nVQGmV7Gh6BJq8G8WDDio8lfBGq9gZ4jyXV98-8t2eZKqaHyoO5pEpJaroK8Fp8HZ3aXAnjz4&__af=h0&__req=20&__be=-1&__pc=PHASED%3ADEFAULT&__rev=3239300&__spin_r=3239300&__spin_b=trunk&__spin_t=1503115250 application/x-javascript 200 FX2Z63TWFPQCNL6WBH5XJIHMS64NADL6 - - 35812 402977796 foo.warc.gz\n");
+        {
+            // look up a different url that canonicalizes to the same
+            String response = GET("/test", "url", "https://www.facebook.com/pages_reaction_units/more/?page_id=115681848447769&cursor=%7B%22timeline_cursor%22%3A%22timeline_unit%3A1%3A00000000001397435609%3A04611686018427387904%3A09223372036854775661%3A04611686018427387904%22%2C%22timeline_section_cursor%22%3A%7B%7D%2C%22has_next_page%22%3Atrue%7D&surface=www_pages_home&unit_count=8&dpr=1&__user=100011276852661&__a=1&__dyn=5V4cjEzUGByK5A9VoWWOGi9Fxrz9EZz8-iWF3ozGFi9LFGA4XG7VKEKGwThEnUF7yWCHAxiESmqaxuqE88HyWDyuipi28gyEnGieKmjBXDmEgF3ebByqAAxaFSifDxCaVQibVojB-qjyVfh6u-exvz8Gicx2jCoO8hqwzxmmayrhbAyFUSibBDCyVF88GxrUCaC-Rx2Qh1Gcy8C6rld13xivQFfxqHu4olDh4dy8gyVUkCyFFFK5p8BaUhKHWG4ui9K8nVQGmV7Gh6BJq8G8WDDio8lfBGq9gZ4jyXV98-8t2eZKqaHyoO5pEpJaroK8Fp8HZ3aXAnjz4&__af=h0&__req=20&__be=-1&__pc=PHASED%3ADEFAULT&__rev=3239300&__spin_r=3239300&__spin_b=trunk&__spin_t=1503115250\n");
+            assertEquals(response, "fuzzy:com,facebook)/pages_reaction_units/more?cursor={\"timeline_cursor\":\"timeline_unit:1:00000000001397435609:04611686018427387904:09223372036854775661:04611686018427387904\",\"timeline_section_cursor\":{},\"has_next_page\":true}&page_id=115681848447769 20170819040336 https://www.facebook.com/pages_reaction_units/more/?page_id=115681848447769&cursor=%7B%22timeline_cursor%22%3A%22timeline_unit%3A1%3A00000000001397435609%3A04611686018427387904%3A09223372036854775661%3A04611686018427387904%22%2C%22timeline_section_cursor%22%3A%7B%7D%2C%22has_next_page%22%3Atrue%7D&surface=www_pages_home&unit_count=8&dpr=1&__user=100011276852661&__a=1&__dyn=5V4cjEzUGByK5A9VoWWOGi9Fxrz9EZz8-iWF3ozGFi9LFGA4XG7VKEKGwThEnUF7yWCHAxiESmqaxuqE88HyWDyuipi28gyEnGieKmjBXDmEgF3ebByqAAxaFSifDxCaVQibVojB-qjyVfh6u-exvz8Gicx2jCoO8hqwzxmmayrhbAyFUSibBDCyVF88GxrUCaC-Rx2Qh1Gcy8C6rld13xivQFfxqHu4olDh4dy8gyVUkCyFFFK5p8BaUhKHWG4ui9K8nVQGmV7Gh6BJq8G8WDDio8lfBGq9gZ4jyXV98-8t2eZKqaHyoO5pEpJaroK8Fp8HZ3aXAnjz4&__af=h0&__req=20&__be=-1&__pc=PHASED%3ADEFAULT&__rev=3239300&__spin_r=3239300&__spin_b=trunk&__spin_t=1503115250 application/x-javascript 200 FX2Z63TWFPQCNL6WBH5XJIHMS64NADL6 - - 35812 402977796 foo.warc.gz\n");
+            // look up a different url that canonicalizes to the same
+            response = GET("/test", "url", "https://www.facebook.com/pages_reaction_units/more?random&junk=blahblah&page_id=115681848447769&somethingwhatever&cursor=%7B%22timeline_cursor%22%3A%22timeline_unit%3A1%3A00000000001397435609%3A04611686018427387904%3A09223372036854775661%3A04611686018427387904%22%2C%22timeline_section_cursor%22%3A%7B%7D%2C%22has_next_page%22%3Atrue%7D&surface=jifdopsajfiodspajfidsopajfidsoapfdjisaop&unit_count=3482743829&dpr=1&__user=4936279463271496327&__a=1&__dyn=fjdIOPFEUOPEJIOCPWEJIFOPJIOFEPJIFOWPEJIFOPUFHFHFH-iWF3ozGFi9LFGA4XG7VKEKGwThEnUF7yWCHAxiESmqaxuqE88HyWDyuipi28gyEnGieKmjBXDmEgF3ebByqAAxaFSifDxCaVQibVojB-qjyVfh6u-jifopejwqiofpjewiqfojpewiqofpjewiqofpewjqifeopwqjfiewoqpfewq-Rx2Qh1Gcy8C6rld13xivQFfxqHu4olDh4dy8gyVUkCyFFFK5p8BaUhKHWG4ui9K8nVQGmV7Gh6BJq8G8WDDio8lfBGq9gZ4jyXV98-8t2eZKqaHyoO5pEpJaroK8Fp8HZ3aXAnjz4&__af=h0&__req=20&__be=-1&__pc=PHASED%3ADEFAULT&__rev=333333333333333&__spin_r=4444444444444444&__spin_b=frunkles&__spin_t=6363636363663363636\n");
+            assertEquals(response, "fuzzy:com,facebook)/pages_reaction_units/more?cursor={\"timeline_cursor\":\"timeline_unit:1:00000000001397435609:04611686018427387904:09223372036854775661:04611686018427387904\",\"timeline_section_cursor\":{},\"has_next_page\":true}&page_id=115681848447769 20170819040336 https://www.facebook.com/pages_reaction_units/more/?page_id=115681848447769&cursor=%7B%22timeline_cursor%22%3A%22timeline_unit%3A1%3A00000000001397435609%3A04611686018427387904%3A09223372036854775661%3A04611686018427387904%22%2C%22timeline_section_cursor%22%3A%7B%7D%2C%22has_next_page%22%3Atrue%7D&surface=www_pages_home&unit_count=8&dpr=1&__user=100011276852661&__a=1&__dyn=5V4cjEzUGByK5A9VoWWOGi9Fxrz9EZz8-iWF3ozGFi9LFGA4XG7VKEKGwThEnUF7yWCHAxiESmqaxuqE88HyWDyuipi28gyEnGieKmjBXDmEgF3ebByqAAxaFSifDxCaVQibVojB-qjyVfh6u-exvz8Gicx2jCoO8hqwzxmmayrhbAyFUSibBDCyVF88GxrUCaC-Rx2Qh1Gcy8C6rld13xivQFfxqHu4olDh4dy8gyVUkCyFFFK5p8BaUhKHWG4ui9K8nVQGmV7Gh6BJq8G8WDDio8lfBGq9gZ4jyXV98-8t2eZKqaHyoO5pEpJaroK8Fp8HZ3aXAnjz4&__af=h0&__req=20&__be=-1&__pc=PHASED%3ADEFAULT&__rev=3239300&__spin_r=3239300&__spin_b=trunk&__spin_t=1503115250 application/x-javascript 200 FX2Z63TWFPQCNL6WBH5XJIHMS64NADL6 - - 35812 402977796 foo.warc.gz\n");
+        }
+
+        // delete yet a different url that canonicalizes to the same
+        POST("/test/delete", "- 20170819040336 https://www.facebook.com/pages_reaction_units/more/randomjunk1?randomjunk2&page_id=115681848447769&cursor=%7B%22timeline_cursor%22%3A%22timeline_unit%3A1%3A00000000001397435609%3A04611686018427387904%3A09223372036854775661%3A04611686018427387904%22%2C%22timeline_section_cursor%22%3A%7B%7D%2C%22has_next_page%22%3Atrue%7D application/x-javascript 200 FX2Z63TWFPQCNL6WBH5XJIHMS64NADL6 - - 35812 402977796 foo.warc.gz\n");
+        {
+            String response = GET("/test", "url", "https://www.facebook.com/pages_reaction_units/more/whatever/foo?random&junk=blahblah&page_id=115681848447769&somethingwhatever&cursor=%7B%22timeline_cursor%22%3A%22timeline_unit%3A1%3A00000000001397435609%3A04611686018427387904%3A09223372036854775661%3A04611686018427387904%22%2C%22timeline_section_cursor%22%3A%7B%7D%2C%22has_next_page%22%3Atrue%7D&surface=jifdopsajfiodspajfidsopajfidsoapfdjisaop&unit_count=3482743829&dpr=1&__user=4936279463271496327&__a=1&__dyn=fjdIOPFEUOPEJIOCPWEJIFOPJIOFEPJIFOWPEJIFOPUFHFHFH-iWF3ozGFi9LFGA4XG7VKEKGwThEnUF7yWCHAxiESmqaxuqE88HyWDyuipi28gyEnGieKmjBXDmEgF3ebByqAAxaFSifDxCaVQibVojB-qjyVfh6u-jifopejwqiofpjewiqfojpewiqofpjewiqofpewjqifeopwqjfiewoqpfewq-Rx2Qh1Gcy8C6rld13xivQFfxqHu4olDh4dy8gyVUkCyFFFK5p8BaUhKHWG4ui9K8nVQGmV7Gh6BJq8G8WDDio8lfBGq9gZ4jyXV98-8t2eZKqaHyoO5pEpJaroK8Fp8HZ3aXAnjz4&__af=h0&__req=20&__be=-1&__pc=PHASED%3ADEFAULT&__rev=333333333333333&__spin_r=4444444444444444&__spin_b=frunkles&__spin_t=6363636363663363636\n");
+            assertEquals(response, "");
+        }
     }
 
     @Test
@@ -274,7 +305,7 @@ public class WebappTest {
     private static class DummySession implements NanoHTTPD.IHTTPSession {
         private final NanoHTTPD.Method method;
         InputStream stream = new ByteArrayInputStream(new byte[0]);
-        Map<String, String> parms = new HashMap<String, String>();
+        MultiMap<String, String> parms = new MultiMap<String, String>();
         String url;
 
         public DummySession(NanoHTTPD.Method method, String url) {
@@ -288,7 +319,7 @@ public class WebappTest {
         }
 
         public DummySession parm(String key, String value) {
-            parms.put(key, value);
+            parms.add(key, value);
             return this;
         }
 
@@ -298,7 +329,7 @@ public class WebappTest {
         }
 
         @Override
-        public Map<String, String> getParms() {
+        public MultiMap<String, String> getParms() {
             return parms;
         }
 

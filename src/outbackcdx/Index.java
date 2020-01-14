@@ -1,12 +1,23 @@
 package outbackcdx;
 
-import org.rocksdb.*;
+import static java.nio.charset.StandardCharsets.US_ASCII;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.function.Predicate;
 
-import static java.nio.charset.StandardCharsets.US_ASCII;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
+import org.rocksdb.RocksIterator;
+import org.rocksdb.TransactionLogIterator;
+import org.rocksdb.WriteBatch;
+import org.rocksdb.WriteOptions;
 
 /**
  * Wraps RocksDB with a higher-level query interface.
@@ -17,13 +28,34 @@ public class Index {
     final ColumnFamilyHandle defaultCF;
     final ColumnFamilyHandle aliasCF;
     final AccessControl accessControl;
+    final long scanCap;
+    final UrlCanonicalizer canonicalizer;
 
     public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl) {
+        this(name, db, defaultCF, aliasCF, accessControl, Long.MAX_VALUE, new UrlCanonicalizer());
+    }
+
+    public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl, long scanCap, UrlCanonicalizer canonicalizer) {
         this.name = name;
         this.db = db;
         this.defaultCF = defaultCF;
         this.aliasCF = aliasCF;
         this.accessControl = accessControl;
+        this.scanCap = scanCap;
+        this.canonicalizer = canonicalizer;
+    }
+
+    public void flushWal() throws RocksDBException{
+        this.db.flushWal(true);
+    }
+
+    public TransactionLogIterator getUpdatesSince(long sequenceNumber) throws RocksDBException {
+        TransactionLogIterator logReader = db.getUpdatesSince(sequenceNumber);
+        return logReader;
+    }
+
+    public long getLatestSequenceNumber() {
+        return db.getLatestSequenceNumber();
     }
 
     /**
@@ -52,9 +84,13 @@ public class Index {
      * Returns all captures for the given url.
      */
     public Iterable<Capture> query(String surt, Predicate<Capture> filter) {
+        return query(surt, Query.MIN_TIMESTAMP, Query.MAX_TIMESTAMP, filter);
+    }
+
+    public Iterable<Capture> query(String surt, long from, long to, Predicate<Capture> filter) {
         String urlkey = resolveAlias(surt);
-        byte[] key = Capture.encodeKey(urlkey, 0);
-        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey), filter, false);
+        byte[] key = Capture.encodeKey(urlkey, from);
+        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey) && record.timestamp <= to, filter, false);
     }
 
     /**
@@ -72,9 +108,13 @@ public class Index {
      * Returns all captures for the given url in reverse order.
      */
     public Iterable<Capture> reverseQuery(String surt, Predicate<Capture> filter) {
+        return reverseQuery(surt, Query.MIN_TIMESTAMP, Query.MAX_TIMESTAMP, filter);
+    }
+
+    public Iterable<Capture> reverseQuery(String surt, long from, long to, Predicate<Capture> filter) {
         String urlkey = resolveAlias(surt);
-        byte[] key = Capture.encodeKey(urlkey, 99999999999999L);
-        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey), filter, true);
+        byte[] key = Capture.encodeKey(urlkey, to);
+        return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey) && record.timestamp >= from, filter, true);
     }
 
     /**
@@ -90,39 +130,37 @@ public class Index {
     }
 
     public Iterable<Capture> execute(Query query) {
-        Predicate<Capture> filter = query.filter;
+        Predicate<Capture> filter = query.predicate;
         if (query.accessPoint != null && accessControl != null) {
             filter = filter.and(accessControl.filter(query.accessPoint, new Date()));
         }
 
-        String surt = UrlCanonicalizer.surtCanonicalize(query.url);
         switch (query.matchType) {
             case EXACT:
                 switch (query.sort) {
                     case DEFAULT:
-                        return query(surt, filter);
+                        return query(query.urlkey, query.from, query.to, filter);
                     case CLOSEST:
-                        return closestQuery(UrlCanonicalizer.surtCanonicalize(query.url), Long.parseLong(query.closest), filter);
+                        return closestQuery(query.urlkey, Long.parseLong(query.closest), filter);
                     case REVERSE:
-                        return reverseQuery(UrlCanonicalizer.surtCanonicalize(query.url), filter);
+                        return reverseQuery(query.urlkey, query.from, query.to, filter);
                 }
             case PREFIX:
-                if (query.url.endsWith("/") && !surt.endsWith("/")) {
-                    surt += "/";
+                if (query.url != null && query.url.endsWith("/") && !query.urlkey.endsWith("/")) {
+                    query.urlkey += "/";
                 }
-                return prefixQuery(surt, filter);
+                return prefixQuery(query.urlkey, filter);
             case HOST:
-                return prefixQuery(hostFromSurt(surt) + ")/", filter);
+                return prefixQuery(hostFromSurt(query.urlkey) + ")/", filter);
             case DOMAIN:
-                String host = hostFromSurt(surt);
+                String host = hostFromSurt(query.urlkey);
                 return rangeQuery(host, host + "-", filter);
             case RANGE:
-                return rangeQuery(surt, "~", filter);
+                return rangeQuery(query.urlkey, "~", filter);
             default:
                 throw new IllegalArgumentException("unknown matchType: " + query.matchType);
         }
     }
-
 
     /**
      * "org,example)/foo/bar" => "org,example"
@@ -225,7 +263,7 @@ public class Index {
     }
 
     private Iterator<Capture> filteredCaptures(byte[] key, Predicate<Capture> scope, Predicate<Capture> filter, boolean reverse) {
-        Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope, reverse);
+        Iterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope, reverse, scanCap);
         if (filter != null) {
             captures = new FilteringIterator<>(captures, filter);
         }
@@ -234,7 +272,7 @@ public class Index {
 
     public Iterable<Alias> listAliases(String start) {
         byte[] key = start.getBytes(US_ASCII);
-        return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true, false);
+        return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true, false, scanCap);
     }
 
     public long estimatedRecordCount() {
@@ -259,6 +297,8 @@ public class Index {
         private final boolean reverse;
         private T record = null;
         private boolean exhausted = false;
+        private long cap;
+        private long count = 0;
 
         @Override
         protected void finalize() throws Throwable {
@@ -266,7 +306,7 @@ public class Index {
             super.finalize();
         }
 
-        public Records(RocksDB db, ColumnFamilyHandle columnFamilyHandle, byte[] startKey, RecordConstructor<T> constructor, Predicate<T> scope, boolean reverse) {
+        public Records(RocksDB db, ColumnFamilyHandle columnFamilyHandle, byte[] startKey, RecordConstructor<T> constructor, Predicate<T> scope, boolean reverse, long cap) {
             final RocksIterator it = db.newIterator(columnFamilyHandle);
             it.seek(startKey);
             if (reverse) {
@@ -280,6 +320,7 @@ public class Index {
             this.scope = scope;
             this.it = it;
             this.reverse = reverse;
+            this.cap = cap;
         }
 
         public boolean hasNext() {
@@ -289,7 +330,7 @@ public class Index {
             if (record == null && it.isValid()) {
                 record = constructor.construct(it.key(), it.value());
             }
-            if (record == null || !scope.test(record)) {
+            if (record == null || !scope.test(record) || count >= cap) {
                 record = null;
                 exhausted = true;
                 it.close();
@@ -309,6 +350,7 @@ public class Index {
             } else {
                 it.next();
             }
+            count += 1;
             return record;
         }
     }
@@ -356,12 +398,10 @@ public class Index {
         return new Batch();
     }
 
-    private void commitBatch(WriteBatch writeBatch) {
+    public void commitBatch(WriteBatch writeBatch) throws RocksDBException {
         try (WriteOptions options = new WriteOptions()) {
             options.setSync(true);
             db.write(options, writeBatch);
-        } catch (RocksDBException e) {
-            throw new RuntimeException(e);
         }
     }
 
@@ -374,39 +414,58 @@ public class Index {
 
         /**
          * Add a new capture to the index.  Existing captures with the same urlkey and timestamp will be overwritten.
+         * @throws IOException 
          */
-        public void putCapture(Capture capture) {
+        public void putCapture(Capture capture) throws IOException {
             String resolved = newAliases.get(capture.urlkey);
             if (resolved != null) {
                 capture.urlkey = resolved;
             } else {
                 capture.urlkey = resolveAlias(capture.urlkey);
             }
-            dbBatch.put(capture.encodeKey(), capture.encodeValue());
+            try {
+                dbBatch.put(capture.encodeKey(), capture.encodeValue());
+            } catch (RocksDBException e) {
+                throw new IOException(e);
+            }
         }
 
         /**
          * Deletes a capture from the index. Does not actually check if the capture exists.
+         * @throws IOException 
          */
-        void deleteCapture(Capture capture) {
+        void deleteCapture(Capture capture) throws IOException {
             capture.urlkey = resolveAlias(capture.urlkey);
-            dbBatch.remove(capture.encodeKey());
+            try {
+                dbBatch.delete(capture.encodeKey());
+            } catch (RocksDBException e) {
+                throw new IOException(e);
+            }
         }
 
         /**
          * Adds a new alias to the index.  Updates existing captures affected by the new alias.
+         * @throws IOException 
          */
-        public void putAlias(String aliasSurt, String targetSurt) {
+        public void putAlias(String aliasSurt, String targetSurt) throws IOException {
             if (aliasSurt.equals(targetSurt)) {
                 return; // a self-referential alias is equivalent to no alias so don't bother storing it
             }
-            dbBatch.put(aliasCF, aliasSurt.getBytes(US_ASCII), targetSurt.getBytes(US_ASCII));
+            try {
+                dbBatch.put(aliasCF, aliasSurt.getBytes(US_ASCII), targetSurt.getBytes(US_ASCII));
+            } catch (RocksDBException e) {
+                throw new IOException(e);
+            }
             newAliases.put(aliasSurt, targetSurt);
             updateExistingRecordsWithNewAlias(dbBatch, aliasSurt, targetSurt);
         }
 
-        public void commit() {
-            commitBatch(dbBatch);
+        public void commit() throws IOException {
+            try {
+                commitBatch(dbBatch);
+            } catch (RocksDBException e) {
+                throw new RuntimeException(e);
+            }
 
             /*
              * Most of the time this will do nothing as we've already updated existing captures in putAlias, but there's
@@ -418,20 +477,32 @@ public class Index {
             updateExistingRecordsWithNewAliases();
         }
 
-        private void updateExistingRecordsWithNewAliases() {
+        private void updateExistingRecordsWithNewAliases() throws IOException {
             try (WriteBatch wb = new WriteBatch()) {
                 for (Map.Entry<String, String> entry : newAliases.entrySet()) {
                     updateExistingRecordsWithNewAlias(wb, entry.getKey(), entry.getValue());
                 }
-                commitBatch(wb);
+                try {
+                    commitBatch(wb);
+                } catch (RocksDBException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
 
-        private void updateExistingRecordsWithNewAlias(WriteBatch wb, String aliasSurt, String targetSurt) {
+        private void updateExistingRecordsWithNewAlias(WriteBatch wb, String aliasSurt, String targetSurt) throws IOException {
             for (Capture capture : rawQuery(aliasSurt, null, false)) {
-                wb.remove(capture.encodeKey());
+                try {
+                    wb.delete(capture.encodeKey());
+                } catch (RocksDBException e) {
+                    throw new IOException(e);
+                }
                 capture.urlkey = targetSurt;
-                wb.put(capture.encodeKey(), capture.encodeValue());
+                try {
+                    wb.put(capture.encodeKey(), capture.encodeValue());
+                } catch (RocksDBException e) {
+                    throw new IOException(e);
+                }
             }
         }
 

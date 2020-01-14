@@ -214,12 +214,12 @@ public class Capture {
         return out.toString();
     }
 
-    public static Capture fromCdxLine(String line) {
+    public static Capture fromCdxLine(String line, UrlCanonicalizer canonicalizer) {
         String[] fields = line.split(" ");
         Capture capture = new Capture();
         capture.timestamp = Long.parseLong(fields[1]);
         capture.original = fields[2];
-        capture.urlkey = UrlCanonicalizer.surtCanonicalize(capture.original);
+        capture.urlkey = canonicalizer.surtCanonicalize(capture.original);
         capture.mimetype = fields[3];
         capture.status = fields[4].equals("-") ? 0 : Integer.parseInt(fields[4]);
         capture.digest = fields[5];

@@ -11,7 +11,9 @@ import java.util.Map;
 public class FeatureFlags {
     private static boolean experimentalAccessControl;
     private static boolean pandoraHacks;
+    private static boolean secondaryMode;
     private static boolean filterPlugins;
+    private static boolean acceptWrites;
     private static boolean cdx14;
 
     static {
@@ -49,6 +51,14 @@ public class FeatureFlags {
         FeatureFlags.filterPlugins = enabled;
     }
 
+    public static void setSecondaryMode(boolean enabled){ secondaryMode = enabled; }
+
+    public static boolean isSecondary() { return secondaryMode; }
+
+    public static void setAcceptWrites(boolean enabled){ acceptWrites = enabled; }
+
+    public static boolean acceptsWrites() { return acceptWrites; }
+
     public static void setCdx14(boolean enabled) {
         cdx14 = enabled;
     }
@@ -57,7 +67,9 @@ public class FeatureFlags {
         Map<String,Boolean> map = new HashMap<>();
         map.put("experimentalAccessControl", experimentalAccessControl());
         map.put("pandoraHacks", pandoraHacks());
+        map.put("secondaryMode", isSecondary());
         map.put("filterPlugins", filterPlugins());
+        map.put("acceptsWrites", acceptsWrites());
         map.put("cdx14", cdx14);
         return map;
     }
