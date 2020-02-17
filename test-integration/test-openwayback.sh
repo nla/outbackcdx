@@ -13,8 +13,8 @@ function fetch {
 #
 
 mkdir -p deps
-fetch wayback.war http://central.maven.org/maven2/org/netpreserve/openwayback/openwayback-webapp/2.3.1/openwayback-webapp-2.3.1.war
-fetch jetty-runner.jar http://central.maven.org/maven2/org/eclipse/jetty/jetty-runner/9.4.0.M1/jetty-runner-9.4.0.M1.jar
+fetch wayback.war https://repo1.maven.org/maven2/org/netpreserve/openwayback/openwayback-webapp/2.3.1/openwayback-webapp-2.3.1.war
+fetch jetty-runner.jar https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-runner/9.4.0.M1/jetty-runner-9.4.0.M1.jar
 
 #
 # Prepare wayback
