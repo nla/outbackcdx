@@ -155,4 +155,24 @@ public class IndexTest {
         }
     }
 
+    @Test
+    public void indexV4ShouldPreserveDistinctRecordsWithTheSameUrlAndDate() throws IOException {
+        int oldVersion = FeatureFlags.indexVersion();
+        FeatureFlags.setIndexVersion(4);
+        try {
+            try (Index.Batch batch = index.beginUpdate()) {
+                batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://v4.org/ text/html 200 - - 0 w1", index.canonicalizer));
+                batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://v4.org/ text/html 200 - - 10 w1", index.canonicalizer));
+                batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://v4.org/ text/html 200 - - 0 w2", index.canonicalizer));
+                batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://v4.org/ text/html 200 - - 0 w2", index.canonicalizer));
+                batch.commit();
+            }
+
+            List<Capture> results = new ArrayList<>();
+            index.query("org,v4)/", null).forEach(results::add);
+            assertEquals(3, results.size());
+        } finally {
+            FeatureFlags.setIndexVersion(oldVersion);
+        }
+    }
 }

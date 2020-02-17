@@ -15,6 +15,7 @@ public class FeatureFlags {
     private static boolean filterPlugins;
     private static boolean acceptWrites;
     private static boolean cdx14;
+    private static int indexVersion = 3;
 
     static {
         experimentalAccessControl = "1".equals(System.getenv("EXPERIMENTAL_ACCESS_CONTROL"));
@@ -63,14 +64,26 @@ public class FeatureFlags {
         cdx14 = enabled;
     }
 
-    public static Map<String, Boolean> asMap() {
-        Map<String,Boolean> map = new HashMap<>();
+    public static Map<String, Object> asMap() {
+        Map<String,Object> map = new HashMap<>();
         map.put("experimentalAccessControl", experimentalAccessControl());
         map.put("pandoraHacks", pandoraHacks());
         map.put("secondaryMode", isSecondary());
         map.put("filterPlugins", filterPlugins());
         map.put("acceptsWrites", acceptsWrites());
         map.put("cdx14", cdx14);
+        map.put("indexVersion", indexVersion());
         return map;
+    }
+
+    public static int indexVersion() {
+        return indexVersion;
+    }
+
+    public static void setIndexVersion(int indexVersion) {
+        if (indexVersion != 3 && indexVersion != 4) {
+            throw new IllegalArgumentException("Only index versions 3 and 4 are supported, not " + indexVersion);
+        }
+        FeatureFlags.indexVersion = indexVersion;
     }
 }

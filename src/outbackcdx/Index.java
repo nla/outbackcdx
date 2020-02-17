@@ -62,7 +62,7 @@ public class Index {
      * Returns all captures that match the given prefix.
      */
     public Iterable<Capture> prefixQuery(String surtPrefix, Predicate<Capture> filter) {
-        return () -> filteredCaptures(Capture.encodeKey(surtPrefix, 0), record -> record.urlkey.startsWith(surtPrefix), filter, false);
+        return () -> filteredCaptures(Capture.encodeKeyV0(surtPrefix, 0), record -> record.urlkey.startsWith(surtPrefix), filter, false);
     }
 
     public Iterable<Capture> prefixQueryAP(String surtPrefix, String accessPoint) {
@@ -77,7 +77,7 @@ public class Index {
      * Returns all captures with keys in the given range.
      */
     public Iterable<Capture> rangeQuery(String startSurt, String endSurt, Predicate<Capture> filter) {
-        return () -> filteredCaptures(Capture.encodeKey(startSurt, 0), record -> record.urlkey.compareTo(endSurt) < 0, filter, false);
+        return () -> filteredCaptures(Capture.encodeKeyV0(startSurt, 0), record -> record.urlkey.compareTo(endSurt) < 0, filter, false);
     }
 
     /**
@@ -89,7 +89,7 @@ public class Index {
 
     public Iterable<Capture> query(String surt, long from, long to, Predicate<Capture> filter) {
         String urlkey = resolveAlias(surt);
-        byte[] key = Capture.encodeKey(urlkey, from);
+        byte[] key = Capture.encodeKeyV0(urlkey, from);
         return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey) && record.timestamp <= to, filter, false);
     }
 
@@ -113,7 +113,7 @@ public class Index {
 
     public Iterable<Capture> reverseQuery(String surt, long from, long to, Predicate<Capture> filter) {
         String urlkey = resolveAlias(surt);
-        byte[] key = Capture.encodeKey(urlkey, to);
+        byte[] key = Capture.encodeKeyV0(urlkey, to);
         return () -> filteredCaptures(key, record -> record.urlkey.equals(urlkey) && record.timestamp >= from, filter, true);
     }
 
@@ -122,7 +122,7 @@ public class Index {
      */
     public Iterable<Capture> closestQuery(String surt, long targetTimestamp, Predicate<Capture> filter) {
         String urlkey = resolveAlias(surt);
-        byte[] key = Capture.encodeKey(urlkey, targetTimestamp);
+        byte[] key = Capture.encodeKeyV0(urlkey, targetTimestamp);
         Predicate<Capture> scope = record -> record.urlkey.equals(urlkey);
         return () -> new ClosestTimestampIterator(targetTimestamp,
                 filteredCaptures(key, scope, filter, false),
@@ -239,14 +239,14 @@ public class Index {
      * Perform a query without first resolving aliases.
      */
     private Iterable<Capture> rawQuery(String key, Predicate<Capture> filter, boolean reverse) {
-        return () -> filteredCaptures(Capture.encodeKey(key, 0), record -> record.urlkey.equals(key), filter, reverse);
+        return () -> filteredCaptures(Capture.encodeKeyV0(key, 0), record -> record.urlkey.equals(key), filter, reverse);
     }
 
     /**
      * Returns all captures starting from the given key.
      */
     Iterable<Capture> capturesAfter(String start) {
-        return () -> filteredCaptures(Capture.encodeKey(start, 0), record -> true, null, false);
+        return () -> filteredCaptures(Capture.encodeKeyV0(start, 0), record -> true, null, false);
     }
 
     public String resolveAlias(String surt) {
