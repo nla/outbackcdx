@@ -31,6 +31,8 @@ public class Main {
         System.err.println();
         System.err.println("  -b bindaddr           Bind to a particular IP address");
         System.err.println("  -d datadir            Directory to store index data under");
+        System.err.println("  --hmac-field name algorithm message-template value-template key expiry-secs");
+        System.err.println("                        Defines a computed HMAC field (useful for storage authentication)");
         System.err.println("  -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)");
         System.err.println("  -j jwks-url perm-path Use JSON Web Tokens for authorization");
         System.err.println("  -k url realm clientid Use a Keycloak server for authorization");
@@ -77,6 +79,7 @@ public class Main {
         long scanCap = Long.MAX_VALUE;
         long batchSize = 10*1024*1024;
         String fuzzyYaml = null;
+        Map<String,ComputedField> computedFields = new HashMap<>();
 
         Map<String,Object> dashboardConfig = new HashMap<>();
         dashboardConfig.put("featureFlags", FeatureFlags.asMap());
@@ -94,6 +97,9 @@ public class Main {
                     break;
                 case "-d":
                     dataPath = new File(args[++i]);
+                    break;
+                case "--hmac-field":
+                    computedFields.put(args[++i], new HmacField(args[++i], args[++i], args[++i], args[++i], Integer.parseInt(args[++i])));
                     break;
                 case "-i":
                     inheritSocket = true;
@@ -159,7 +165,7 @@ public class Main {
         try {
             UrlCanonicalizer canonicalizer = new UrlCanonicalizer(fuzzyYaml);
             try (DataStore dataStore = new DataStore(dataPath, maxOpenSstFiles, replicationWindow, scanCap, canonicalizer)) {
-                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer);
+                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields);
                 if (undertow) {
                     UWeb.UServer server = new UWeb.UServer(host, port, controller, authorizer);
                     server.start();

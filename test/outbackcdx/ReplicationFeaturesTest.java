@@ -9,14 +9,13 @@ import outbackcdx.auth.Permit;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 
 import static org.junit.Assert.assertEquals;
 import static outbackcdx.NanoHTTPD.Method.*;
 import static outbackcdx.NanoHTTPD.Response.Status.OK;
-import static outbackcdx.NanoHTTPD.Response.Status.UNAUTHORIZED;
-
 
 
 public class ReplicationFeaturesTest {
@@ -31,7 +30,7 @@ public class ReplicationFeaturesTest {
     public void setUp() throws IOException {
         File root = folder.newFolder();
         manager = new DataStore(root, 256, null, Long.MAX_VALUE, null);
-        webapp = new Webapp(manager, false, Collections.emptyMap(), null);
+        webapp = new Webapp(manager, false, Collections.emptyMap(), null, Collections.emptyMap());
     }
 
     @After

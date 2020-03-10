@@ -38,6 +38,8 @@ class Webapp implements Web.Handler {
     private final Map<String,Object> dashboardConfig;
     private final ArrayList<FilterPlugin> filterPlugins;
     private final UrlCanonicalizer canonicalizer;
+    private final Map<String, ComputedField> computedFields;
+    private final WbCdxApi wbCdxApi;
 
     private static ServiceLoader<FilterPlugin> fpLoader = ServiceLoader.load(FilterPlugin.class);
 
@@ -55,7 +57,7 @@ class Webapp implements Web.Handler {
         return found ? ok() : notFound();
     }
 
-    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer) {
+    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields) {
         this.dataStore = dataStore;
         this.verbose = verbose;
         this.dashboardConfig = dashboardConfig;
@@ -63,6 +65,7 @@ class Webapp implements Web.Handler {
             canonicalizer = new UrlCanonicalizer();
         }
         this.canonicalizer = canonicalizer;
+        this.computedFields = computedFields;
 
         this.filterPlugins = new ArrayList<FilterPlugin>();
         if (FeatureFlags.filterPlugins()) {
@@ -72,6 +75,8 @@ class Webapp implements Web.Handler {
                 this.filterPlugins.add(f);
             }
         }
+
+        wbCdxApi = new WbCdxApi(filterPlugins, computedFields);
 
         router = new Router();
         router.on(GET, "/", interpolated("dashboard.html"));
@@ -371,7 +376,7 @@ class Webapp implements Web.Handler {
         } else if (params.containsKey("q")) {
             return XmlQuery.queryIndex(request, index, this.filterPlugins, canonicalizer);
         } else {
-            return WbCdxApi.queryIndex(request, index, this.filterPlugins);
+            return wbCdxApi.queryIndex(request, index);
         }
     }
 
