@@ -28,7 +28,7 @@ import java.util.concurrent.Executors;
 public class Main {
     public static void usage() {
         System.err.println("Usage: java " + Main.class.getName() + " [options...]");
-        System.err.println("");
+        System.err.println();
         System.err.println("  -b bindaddr           Bind to a particular IP address");
         System.err.println("  -d datadir            Directory to store index data under");
         System.err.println("  -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)");
@@ -53,10 +53,15 @@ public class Main {
         System.err.println("  --update-interval poll-interval    Polling frequency for upstream changes, in seconds. Default: 10");
         System.err.println("  --accept-writes                    Allow writes to this node, even though running as a secondary");
         System.err.println("  --batch-size                       Approximate max size (in bytes) per replication batch");
+        System.err.println();
+        System.err.println("Enable experimental index versions. DANGER: Upgrading a version 3 index to version 4 is not yet supported and " +
+                "updating or deleting existing version 3 records will silently fail.");
+        System.err.println("  --index-version 4     Treats records as distinct if they have a different filename or offset" +
+                "                                   even if they have identical url and date");
         System.exit(1);
     }
 
-    public static void main(String args[]) {
+    public static void main(String[] args) {
         boolean undertow = false;
         String host = null;
         int port = 8080;
@@ -92,6 +97,11 @@ public class Main {
                     break;
                 case "-i":
                     inheritSocket = true;
+                    break;
+                case "--index-version":
+                    System.err.println("WARNING: Experimental index version 4 enabled. Do not use this option (yet) on an " +
+                            "pre-existing version 3 index. Updating or deleting older records will silently fail.");
+                    FeatureFlags.setIndexVersion(Integer.parseInt(args[++i]));
                     break;
                 case "-j":
                     try {

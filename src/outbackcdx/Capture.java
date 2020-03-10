@@ -11,6 +11,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.Map;
 
+import static java.nio.charset.StandardCharsets.US_ASCII;
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
  * A CDX record which can be encoded to a reasonable space-efficient packed representation.
  * <p>
@@ -23,12 +26,19 @@ import java.util.Map;
  *     | ASCII urlkey | 64-bit big-endian timestamp |
  *     +--------------+-----------------------------+
  * </pre>
+ * <p>Version 4 keys are extended to include the WARC filename and record offset and two NUL bytes. The first NUL used
+ * to determine the length of filename (searching backwards from the end). The second is a flag indicating this is the
+ * new key version.
+ * <pre>
+ *     +---------+------------------+-----|----------+-----+---------------+
+ *     | urlkey  | 64-bit timestamp | NUL | filename | NUL | 64-bit offset |
+ *     +---------+------------------+-----|----------+-----+---------------+
+ * </pre>
  * <p>
- * The record's consists of a static list fields packed using {@link outbackcdx.VarInt}.  The first field in the
+ * The record's value consists of a static list fields packed using {@link outbackcdx.VarInt}.  The first field in the
  * value is a schema version number to allow fields to be added or removed in later versions.
  */
 public class Capture {
-    private static int CURRENT_VERSION = 3;
     static final DateTimeFormatter arcTimeFormat = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     static final Base32 base32 = new Base32();
 
@@ -62,14 +72,33 @@ public class Capture {
     }
 
     public void decodeKey(byte[] key) {
-        urlkey = new String(key, 0, key.length - 8, StandardCharsets.US_ASCII);
+        if (key.length > 8 && key[key.length - 9] == 0) {
+            decodeKeyV4(key);
+        } else {
+            decodeKeyV0(key);
+        }
+    }
+
+    private void decodeKeyV0(byte[] key) {
+        urlkey = new String(key, 0, key.length - 8, US_ASCII);
         ByteBuffer keyBuf = ByteBuffer.wrap(key);
-        keyBuf.order(ByteOrder.BIG_ENDIAN);
         timestamp = keyBuf.getLong(key.length - 8);
     }
 
-    public static byte[] encodeKey(String keyurl, long timestamp) {
-        byte[] urlBytes = keyurl.getBytes(StandardCharsets.US_ASCII);
+    @SuppressWarnings("StatementWithEmptyBody")
+    private void decodeKeyV4(byte[] key) {
+        int i;
+        for (i = key.length - 10; i >= 0 && key[i] != 0; i--);
+        if (i <= 8) throw new IllegalArgumentException("bad key");
+        ByteBuffer keyBuf = ByteBuffer.wrap(key);
+        urlkey = new String(key, 0, i - 8, US_ASCII);
+        timestamp = keyBuf.getLong(i - 8);
+        file = new String(key, i + 1, key.length - i - 10);
+        compressedoffset = keyBuf.getLong(key.length - 8);
+    }
+
+    public static byte[] encodeKeyV0(String keyurl, long timestamp) {
+        byte[] urlBytes = keyurl.getBytes(US_ASCII);
         ByteBuffer bb = ByteBuffer.allocate(urlBytes.length + 8);
         bb.order(ByteOrder.BIG_ENDIAN);
         bb.put(urlBytes);
@@ -77,8 +106,36 @@ public class Capture {
         return bb.array();
     }
 
+    public static byte[] encodeKeyV4(String keyurl, long timestamp, String file, long offset) {
+        byte[] urlBytes = keyurl.getBytes(US_ASCII);
+        byte[] fileBytes = file.getBytes(UTF_8);
+        ByteBuffer bb = ByteBuffer.allocate(urlBytes.length + 8 + 1 + fileBytes.length + 1 + 8);
+        bb.order(ByteOrder.BIG_ENDIAN);
+        bb.put(urlBytes);
+        bb.putLong(timestamp);
+        bb.put((byte)0);
+        bb.put(fileBytes);
+        bb.put((byte)0);
+        bb.putLong(offset);
+        return bb.array();
+    }
+
     public byte[] encodeKey() {
-        return encodeKey(urlkey, timestamp);
+        return encodeKey(FeatureFlags.indexVersion());
+    }
+
+    public byte[] encodeKey(int version) {
+        switch (version) {
+            case 0:
+            case 1:
+            case 2:
+            case 3:
+                return encodeKeyV0(urlkey, timestamp);
+            case 4:
+                return encodeKeyV4(urlkey, timestamp, file, compressedoffset);
+            default:
+                throw new IllegalArgumentException("unsupported version: " + 4);
+        }
     }
 
     public void decodeValue(ByteBuffer bb) {
@@ -96,9 +153,11 @@ public class Capture {
             case 3:
                 decodeValueV3(bb);
                 break;
+            case 4:
+                decodeValueV4(bb);
+                break;
             default:
-                throw new IllegalArgumentException("CDX encoding is too new (v" + version + ") only versions up to v"
-                        + CURRENT_VERSION + " are supported");
+                throw new IllegalArgumentException("CDX encoding is too new (v" + version + ") only versions up to v4 are supported");
         }
     }
 
@@ -138,8 +197,36 @@ public class Capture {
         originalCompressedoffset = VarInt.decode(bb);
     }
 
+    private void decodeValueV4(ByteBuffer bb) {
+        original = VarInt.decodeAscii(bb);
+        status = (int) VarInt.decode(bb);
+        mimetype = VarInt.decodeAscii(bb);
+        length = VarInt.decode(bb);
+        digest = base32.encodeAsString(VarInt.decodeBytes(bb));
+        redirecturl = VarInt.decodeAscii(bb);
+        robotflags = VarInt.decodeAscii(bb);
+        originalLength = VarInt.decode(bb);
+        originalFile = VarInt.decodeAscii(bb);
+        originalCompressedoffset = VarInt.decode(bb);
+    }
+
     public int sizeValue() {
-        return VarInt.size(CURRENT_VERSION) +
+        return sizeValue(FeatureFlags.indexVersion());
+    }
+
+    public int sizeValue(int version) {
+        switch (version) {
+            case 3:
+                return sizeValueV3();
+            case 4:
+                return sizeValueV4();
+            default:
+                throw new IllegalArgumentException("Unsupported version " + version);
+        }
+    }
+
+    private int sizeValueV3() {
+        return VarInt.size(3) +
                 VarInt.sizeAscii(original) +
                 VarInt.size(status) +
                 VarInt.sizeAscii(mimetype) +
@@ -154,8 +241,40 @@ public class Capture {
                 VarInt.size(originalCompressedoffset);
     }
 
+    private int sizeValueV4() {
+        return VarInt.size(4) +
+                VarInt.sizeAscii(original) +
+                VarInt.size(status) +
+                VarInt.sizeAscii(mimetype) +
+                VarInt.size(length) +
+                VarInt.sizeBytes(base32.decode(digest)) +
+                VarInt.sizeAscii(redirecturl) +
+                VarInt.sizeAscii(robotflags) +
+                VarInt.size(originalLength) +
+                VarInt.sizeAscii(originalFile) +
+                VarInt.size(originalCompressedoffset);
+    }
+
+
     public void encodeValue(ByteBuffer bb) {
-        VarInt.encode(bb, CURRENT_VERSION);
+        encodeValue(bb, FeatureFlags.indexVersion());
+    }
+
+    private void encodeValue(ByteBuffer bb, int version) {
+        switch (version) {
+            case 3:
+                encodeValueV3(bb);
+                break;
+            case 4:
+                encodeValueV4(bb);
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported version " + version);
+        }
+    }
+
+    private void encodeValueV3(ByteBuffer bb) {
+        VarInt.encode(bb, 3);
         VarInt.encodeAscii(bb, original);
         VarInt.encode(bb, status);
         VarInt.encodeAscii(bb, mimetype);
@@ -170,10 +289,28 @@ public class Capture {
         VarInt.encode(bb, originalCompressedoffset);
     }
 
-    public byte[] encodeValue() {
-        ByteBuffer bb = ByteBuffer.allocate(sizeValue());
-        encodeValue(bb);
+    private void encodeValueV4(ByteBuffer bb) {
+        VarInt.encode(bb, 4);
+        VarInt.encodeAscii(bb, original);
+        VarInt.encode(bb, status);
+        VarInt.encodeAscii(bb, mimetype);
+        VarInt.encode(bb, length);
+        VarInt.encodeBytes(bb, base32.decode(digest));
+        VarInt.encodeAscii(bb, redirecturl);
+        VarInt.encodeAscii(bb, robotflags);
+        VarInt.encode(bb, originalLength);
+        VarInt.encodeAscii(bb, originalFile);
+        VarInt.encode(bb, originalCompressedoffset);
+    }
+
+    public byte[] encodeValue(int version) {
+        ByteBuffer bb = ByteBuffer.allocate(sizeValue(version));
+        encodeValue(bb, version);
         return bb.array();
+    }
+
+    public byte[] encodeValue() {
+        return encodeValue(FeatureFlags.indexVersion());
     }
 
     /**
@@ -193,7 +330,7 @@ public class Capture {
         out.append(compressedoffset).append(" ");
         out.append(file);
 
-        if (CURRENT_VERSION == 3) {
+        if (FeatureFlags.indexVersion() >= 3) {
             out.append(" ");
 
             if (originalLength > 0) {
