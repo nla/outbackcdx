@@ -370,7 +370,7 @@ Corresponding OutbackCDX option:
 
 ```
 --hmac-field url md5 '$expires|/warcs/$filename|$secret_key'
-     'http://nginx.example.org/warcs/$filename?expires=$expires&md5=$hmac_hex'
+     'http://nginx.example.org/warcs/$filename?expires=$expires&md5=$hmac_base64_url'
      secret 3600
 ```
 
