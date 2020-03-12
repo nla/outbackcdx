@@ -360,7 +360,7 @@ Example nginx configuration:
 ```nginx
 location /warcs/ {
    secure_link $arg_md5,$arg_expires;
-   secure_link_md5 "$secure_link_expires|$uri|secret";
+   secure_link_md5 "$secure_link_expires|$uri|$http_range|secret";
    if ($secure_link != "1") { return 403; }
    ...
 }
@@ -369,7 +369,7 @@ location /warcs/ {
 Corresponding OutbackCDX option:
 
 ```
---hmac-field url md5 '$expires|/warcs/$filename|$secret_key'
+--hmac-field url md5 '$expires|/warcs/$filename|$range|$secret_key'
      'http://nginx.example.org/warcs/$filename?expires=$expires&md5=$hmac_base64_url'
      secret 3600
 ```
@@ -385,7 +385,7 @@ location /warcs/ {
    secure_link_hmac  $arg_st,$arg_ts,$arg_e;
    secure_link_hmac_algorithm sha256;
    secure_link_hmac_secret secret;
-   secure_link_hmac_message $uri|$arg_ts|$arg_e;
+   secure_link_hmac_message $uri|$arg_ts|$arg_e|$http_range;
    if ($secure_link_hmac != "1") { return 403; }
    ...
 }
@@ -394,7 +394,7 @@ location /warcs/ {
 Corresponding OutbackCDX option:
 
 ```
---hmac-field url Hmacsha256 '/warcs/$filename|$now|3600'
+--hmac-field url Hmacsha256 '/warcs/$filename|$now|3600|$http_range'
      'http://nginx.example.org/warcs/$filename?st=$hmac_base64_url&ts=$now&e=3600
      secret 0
 ```

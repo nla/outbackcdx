@@ -433,6 +433,8 @@ public class Capture {
                 return (originalCompressedoffset != -1) ? originalCompressedoffset : "-";
             case "originalFilename":
                 return originalFile;
+            case "range":
+                return "bytes=" + compressedoffset + "-" + (compressedoffset + length - 1);
             default:
                 throw new IllegalArgumentException("no such capture field: " + field);
         }

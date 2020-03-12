@@ -33,6 +33,11 @@ public class CaptureTest {
         assertFieldsEqual(src, dst);
     }
 
+    @Test
+    public void testRange() {
+        assertEquals("bytes=1234-13578", dummyRecord().get("range"));
+    }
+
     static void assertFieldsEqual(Capture src, Capture dst) {
         assertEquals(src.compressedoffset, dst.compressedoffset);
         assertEquals(src.digest, dst.digest);
