@@ -38,6 +38,8 @@ Command line options:
 Usage: java -jar outbackcdx.jar [options...]
 
   -b bindaddr           Bind to a particular IP address
+  -c, --context-path url-prefix
+                        Set a URL prefix for the application to be mounted under
   -d datadir            Directory to store index data under
   -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)
   -j jwks-url perm-path Use JSON Web Tokens for authorization
