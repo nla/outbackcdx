@@ -83,7 +83,7 @@ public class ReplicationFeaturesTest {
 
     private String GET(String url, NanoHTTPD.Response.Status expectedStatus) throws Exception {
         ReplicationFeaturesTest.DummySession session = new ReplicationFeaturesTest.DummySession(GET, url);
-	NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
+	NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
@@ -93,14 +93,14 @@ public class ReplicationFeaturesTest {
         for (int i = 0; i < parmKeysAndValues.length; i += 2) {
 	    session.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
 	}
-	NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
+	NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
 
     private String DELETE(String url, NanoHTTPD.Response.Status expectedStatus) throws Exception {
         ReplicationFeaturesTest.DummySession session = new ReplicationFeaturesTest.DummySession(DELETE, url);
-        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
+        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
@@ -108,7 +108,7 @@ public class ReplicationFeaturesTest {
     private String POST(String url, String data, NanoHTTPD.Response.Status expectedStatus) throws Exception {
         ReplicationFeaturesTest.DummySession session = new ReplicationFeaturesTest.DummySession(POST, url);
         session.data(data);
-        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
+        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }

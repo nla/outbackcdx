@@ -18,10 +18,12 @@ public class UWeb {
         private final Undertow undertow;
         private final Authorizer authorizer;
         private final Web.Handler handler;
+        private final String contextPath;
 
-        UServer(String host, int port, Web.Handler handler, Authorizer authorizer) {
+        UServer(String host, int port, String contextPath, Web.Handler handler, Authorizer authorizer) {
             this.handler = handler;
             this.authorizer = authorizer;
+            this.contextPath = contextPath;
             undertow = Undertow.builder()
                     .setHandler(new BlockingHandler(this::dispatch))
                     .addHttpListener(port, host)
@@ -35,7 +37,7 @@ public class UWeb {
             }
             try {
                 Permit permit = authorizer.verify(authnHeader);
-                URequest request = new URequest(exchange, permit);
+                URequest request = new URequest(exchange, permit, contextPath);
                 NanoHTTPD.Response response = handler.handle(request);
                 sendResponse(exchange, response);
             } catch (Web.ResponseException e) {
@@ -79,10 +81,12 @@ public class UWeb {
         private final MultiMap<String,String> params;
         private final Permit permit;
         private final String url;
+        private final String contextPath;
 
-        public URequest(HttpServerExchange exchange, Permit permit) {
+        public URequest(HttpServerExchange exchange, Permit permit, String contextPath) {
             this.exchange = exchange;
             this.permit = permit;
+            this.contextPath = contextPath;
             params = new MultiMap<>();
             for (Map.Entry<String, Deque<String>> pair : exchange.getQueryParameters().entrySet()) {
                 for (String value: pair.getValue()) {
@@ -100,6 +104,11 @@ public class UWeb {
         @Override
         public String path() {
             return exchange.getRequestPath();
+        }
+
+        @Override
+        public String contextPath() {
+            return contextPath;
         }
 
         @Override
