@@ -1,11 +1,7 @@
 package outbackcdx;
 
 import static outbackcdx.Json.GSON;
-import static outbackcdx.NanoHTTPD.Response.Status.BAD_REQUEST;
-import static outbackcdx.NanoHTTPD.Response.Status.FORBIDDEN;
-import static outbackcdx.NanoHTTPD.Response.Status.INTERNAL_ERROR;
-import static outbackcdx.NanoHTTPD.Response.Status.NOT_FOUND;
-import static outbackcdx.NanoHTTPD.Response.Status.OK;
+import static outbackcdx.NanoHTTPD.Response.Status.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -36,9 +32,11 @@ class Web {
     static class Server extends NanoHTTPD {
         private final Handler handler;
         private final Authorizer authorizer;
+        private final String contextPath;
 
-        Server(ServerSocket socket, Handler handler, Authorizer authorizer) {
+        Server(ServerSocket socket, String contextPath, Handler handler, Authorizer authorizer) {
             super(socket);
+            this.contextPath = contextPath;
             this.handler = handler;
             this.authorizer = authorizer;
         }
@@ -48,7 +46,7 @@ class Web {
             try {
                 String authnHeader = session.getHeaders().getOrDefault("authorization", "");
                 Permit permit = authorizer.verify(authnHeader);
-                NRequest request = new NRequest(session, permit);
+                NRequest request = new NRequest(session, permit, contextPath);
                 return handler.handle(request);
             } catch (Web.ResponseException e) {
                 return e.response;
@@ -63,10 +61,12 @@ class Web {
         private final IHTTPSession session;
         private final Permit permit;
         private final String url;
+        private final String contextPath;
 
-        NRequest(IHTTPSession session, Permit permit) {
+        NRequest(IHTTPSession session, Permit permit, String contextPath) {
             this.session = session;
             this.permit = permit;
+            this.contextPath = contextPath;
             this.url = rebuildUrl();
         }
 
@@ -78,6 +78,11 @@ class Web {
         @Override
         public String path() {
             return session.getUri();
+        }
+
+        @Override
+        public String contextPath() {
+            return contextPath;
         }
 
         @Override
@@ -216,6 +221,12 @@ class Web {
         return new Response(BAD_REQUEST, "text/plain", message);
     }
 
+    static Response redirect(String location) {
+        Response response = new Response(TEMPORARY_REDIRECT, "text/plain", "Temporary Redirect");
+        response.addHeader("Location", location);
+        return response;
+    }
+
     static class Router implements Handler {
         private final List<Route> routes = new ArrayList<>();
 
@@ -285,7 +296,7 @@ class Web {
                 return null;
             }
 
-            Matcher match = re.matcher(request.path());
+            Matcher match = re.matcher(request.relativePath());
             if (!match.matches()) {
                 return null;
             }
@@ -310,7 +321,19 @@ class Web {
     public static interface Request {
         String method();
 
+        /**
+         * The full request path including the context path.
+         */
         String path();
+
+        /**
+         * The request path relative to the context path.
+         */
+        default String relativePath() {
+            return path().substring(contextPath().length());
+        }
+
+        String contextPath();
 
         MultiMap<String, String> params();
 

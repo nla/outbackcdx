@@ -30,6 +30,8 @@ public class Main {
         System.err.println("Usage: java " + Main.class.getName() + " [options...]");
         System.err.println();
         System.err.println("  -b bindaddr           Bind to a particular IP address");
+        System.err.println("  -c, --context-path url-prefix");
+        System.err.println("                        Set a URL prefix for the application to be mounted under");
         System.err.println("  -d datadir            Directory to store index data under");
         System.err.println("  --hmac-field name algorithm message-template value-template key expiry-secs");
         System.err.println("                        Defines a computed HMAC field (useful for storage authentication)");
@@ -67,6 +69,7 @@ public class Main {
         boolean undertow = false;
         String host = null;
         int port = 8080;
+        String contextPath = "";
         int webThreads = Runtime.getRuntime().availableProcessors();
         boolean inheritSocket = false;
         File dataPath = new File("data");
@@ -94,6 +97,13 @@ public class Main {
                     break;
                 case "-b":
                     host = args[++i];
+                    break;
+                case "-c":
+                case "--context-path":
+                    contextPath = args[++i].replaceFirst("/+$", "");
+                    if (!contextPath.startsWith("/")) {
+                        throw new IllegalArgumentException("context path (-c) must start with /");
+                    }
                     break;
                 case "-d":
                     dataPath = new File(args[++i]);
@@ -167,7 +177,7 @@ public class Main {
             try (DataStore dataStore = new DataStore(dataPath, maxOpenSstFiles, replicationWindow, scanCap, canonicalizer)) {
                 Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields);
                 if (undertow) {
-                    UWeb.UServer server = new UWeb.UServer(host, port, controller, authorizer);
+                    UWeb.UServer server = new UWeb.UServer(host, port, contextPath, controller, authorizer);
                     server.start();
                     System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port);
                     synchronized (Main.class) {
@@ -175,7 +185,7 @@ public class Main {
                     }
                 } else {
                     ServerSocket socket = openSocket(host, port, inheritSocket);
-                    Web.Server server = new Web.Server(socket, controller, authorizer);
+                    Web.Server server = new Web.Server(socket, contextPath, controller, authorizer);
                     ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
                     for (String collectionUrl: collectionUrls) {
                         ChangePollingThread cpt = new ChangePollingThread(collectionUrl, pollingInterval, batchSize, dataStore);
@@ -189,7 +199,7 @@ public class Main {
                             server.stop();
                             dataStore.close();
                         }));
-                        System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port);
+                        System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port + contextPath);
                         synchronized (Main.class) {
                             Main.class.wait();
                         }
