@@ -334,6 +334,7 @@ variables are available in templates:
 
 * `$dollar` - a dollar sign ("$")
 * `$expires` - expiry time in seconds since unix epoch
+* `$expires_hex` - expiry time in hexadecimal seconds since unix epoch
 * `$expires_iso8601` - expiry time as a UTC ISO 8601 timestamp
 * `$hmac_base64` - computed hmac/digest value as a base64 string (only available in value template)
 * `$hmac_base64_pct` - computed hmac/digest value as a base64 string with + encoded as %2B
@@ -341,6 +342,7 @@ variables are available in templates:
 * `$hmac_hex` - computed hmac/digest value as a hex string (only available in value template)
 * `$secret_key` - the secret key (only available in message template)
 * `$now` - current time in seconds since unix epoch
+* `$now_hex` - current time in hexadecimal seconds since unix epoch
 * `$now_iso8601` - current time as a UTC ISO 8601 timestamp
 * `$CR` - a carriage return ("\r")
 * `$CRLF` - a carriage return line feed ("\r\n")
@@ -369,7 +371,7 @@ location /warcs/ {
 Corresponding OutbackCDX option:
 
 ```
---hmac-field url md5 '$expires|/warcs/$filename|$range|$secret_key'
+--hmac-field warcurl md5 '$expires|/warcs/$filename|$range|$secret_key'
      'http://nginx.example.org/warcs/$filename?expires=$expires&md5=$hmac_base64_url'
      secret 3600
 ```
@@ -394,9 +396,28 @@ location /warcs/ {
 Corresponding OutbackCDX option:
 
 ```
---hmac-field url Hmacsha256 '/warcs/$filename|$now|3600|$http_range'
+--hmac-field warcurl Hmacsha256 '/warcs/$filename|$now|3600|$http_range'
      'http://nginx.example.org/warcs/$filename?st=$hmac_base64_url&ts=$now&e=3600
      secret 0
+```
+
+#### lighttpd [mod_secdownload](https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ModSecDownload)
+
+Example lighttpd configuration:
+
+```
+secdownload.algorithm       = "hmac-sha256" 
+secdownload.secret          = "secret" 
+secdownload.document-root   = "/data/warcs/" 
+secdownload.uri-prefix      = "/warcs/" 
+secdownload.timeout         = 3600
+```
+
+Corresponding OutbackCDX option:
+
+```
+--hmac-field warcurl Hmacsha256 /$now_hex/$filename
+   http://lighttpd.example.org/warcs/$hmac_base64_url/$now_hex/$filename secret 0
 ```
 
 #### S3 signed URLs

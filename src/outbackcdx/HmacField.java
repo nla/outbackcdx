@@ -96,23 +96,29 @@ public class HmacField implements ComputedField {
                 case "expires":
                     value = Long.toString(expires.getEpochSecond());
                     break;
+                case "expires_hex":
+                    value = Long.toHexString(expires.getEpochSecond());
+                    break;
                 case "hmac_hex":
                     value = Hex.encodeHexString(hmac);
                     break;
                 case "hmac_base64":
-                    value = Base64.getEncoder().encodeToString(hmac);
+                    value = Base64.getEncoder().withoutPadding().encodeToString(hmac);
                     break;
                 case "hmac_base64_pct":
-                    value = Base64.getEncoder().encodeToString(hmac).replace("+", "%2B");
+                    value = Base64.getEncoder().withoutPadding().encodeToString(hmac).replace("+", "%2B");
                     break;
                 case "hmac_base64_url":
-                    value = Base64.getUrlEncoder().encodeToString(hmac);
+                    value = Base64.getUrlEncoder().withoutPadding().encodeToString(hmac);
                     break;
                 case "now_iso8601":
                     value = now.toString();
                     break;
                 case "now":
                     value = Long.toString(now.getEpochSecond());
+                    break;
+                case "now_hex":
+                    value = Long.toHexString(now.getEpochSecond());
                     break;
                 case "secret_key":
                     value = key;
