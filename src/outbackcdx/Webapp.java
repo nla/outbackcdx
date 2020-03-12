@@ -581,6 +581,9 @@ class Webapp implements Web.Handler {
 
     @Override
     public Response handle(Web.Request request) throws Exception {
+        if (!request.path().startsWith(request.contextPath() + "/")) {
+            return redirect(request.contextPath() + "/");
+        }
         Response response = router.handle(request);
         if (response != null) {
             response.addHeader("Access-Control-Allow-Origin", "*");
