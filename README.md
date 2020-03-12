@@ -416,8 +416,8 @@ secdownload.timeout         = 3600
 Corresponding OutbackCDX option:
 
 ```
---hmac-field warcurl Hmacsha256 /$now_hex/$filename
-   http://lighttpd.example.org/warcs/$hmac_base64_url/$now_hex/$filename secret 0
+--hmac-field warcurl Hmacsha256 '/$now_hex/$filename'
+   'http://lighttpd.example.org/warcs/$hmac_base64_url/$now_hex/$filename' secret 0
 ```
 
 #### S3 signed URLs
