@@ -390,8 +390,14 @@ public class Capture {
         return parseTimestamp(timestamp);
     }
 
+    static final String PAD_TIMESTAMP = "00000000000000"; // we expect 14 chars
+
     public static Date parseTimestamp(long timestamp) {
-        return Date.from(LocalDateTime.parse(Long.toString(timestamp), arcTimeFormat).toInstant(ZoneOffset.UTC));
+        String timestampstr = Long.toString(timestamp);
+        if (timestampstr.length() < 14) {
+            timestampstr = timestampstr + PAD_TIMESTAMP.substring(timestampstr.length());
+        }
+        return Date.from(LocalDateTime.parse(timestampstr, arcTimeFormat).toInstant(ZoneOffset.UTC));
     }
 
     /**
