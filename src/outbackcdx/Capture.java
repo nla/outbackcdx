@@ -9,6 +9,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
@@ -39,6 +41,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * value is a schema version number to allow fields to be added or removed in later versions.
  */
 public class Capture {
+    private static final Logger log = Logger.getLogger(Capture.class.getName());
     static final DateTimeFormatter arcTimeFormat = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     static final Base32 base32 = new Base32();
 
@@ -390,8 +393,15 @@ public class Capture {
         return parseTimestamp(timestamp);
     }
 
+    static final String PAD_TIMESTAMP = "00000000000000"; // we expect 14 chars
+
     public static Date parseTimestamp(long timestamp) {
-        return Date.from(LocalDateTime.parse(Long.toString(timestamp), arcTimeFormat).toInstant(ZoneOffset.UTC));
+        String timestampstr = Long.toString(timestamp);
+        if (timestampstr.length() < 14) {
+            log.log(Level.WARNING, "Padding timestamp shorter then 14 chars: " + timestampstr);
+            timestampstr = timestampstr + PAD_TIMESTAMP.substring(timestampstr.length());
+        }
+        return Date.from(LocalDateTime.parse(timestampstr, arcTimeFormat).toInstant(ZoneOffset.UTC));
     }
 
     /**
