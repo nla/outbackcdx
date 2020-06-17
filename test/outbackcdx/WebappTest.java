@@ -43,7 +43,7 @@ public class WebappTest {
         UrlCanonicalizer canon = new UrlCanonicalizer(new ByteArrayInputStream(yaml.getBytes("UTF-8")));
 
         DataStore manager = new DataStore(root, -1, null, Long.MAX_VALUE, canon);
-        webapp = new Webapp(manager, false, Collections.emptyMap(), canon);
+        webapp = new Webapp(manager, false, Collections.emptyMap(), canon, Collections.emptyMap());
     }
 
     @After

@@ -8,6 +8,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.util.Map;
 
 import com.google.gson.stream.JsonWriter;
 
@@ -23,7 +24,15 @@ import outbackcdx.NanoHTTPD.Response;
  * pywb: https://github.com/ikreymer/pywb/wiki/CDX-Server-API
  */
 public class WbCdxApi {
-    public static Response queryIndex(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins) {
+    private final Iterable<FilterPlugin> filterPlugins;
+    private final Map<String, ComputedField> computedFields;
+
+    public WbCdxApi(Iterable<FilterPlugin> filterPlugins, Map<String, ComputedField> computedFields) {
+        this.filterPlugins = filterPlugins;
+        this.computedFields = computedFields;
+    }
+
+    public Response queryIndex(Web.Request request, Index index) {
         Query query = new Query(request.params(), filterPlugins);
         Iterable<Capture> captures = query.execute(index);
 
@@ -59,12 +68,20 @@ public class WbCdxApi {
         return response;
     }
 
+    private Object computeField(Capture capture, String field) {
+        ComputedField computed = computedFields.get(field);
+        if (computed != null) {
+            return computed.get(capture);
+        }
+        return capture.get(field);
+    }
+
     interface OutputFormat {
         void writeCapture(Capture capture) throws IOException;
         void close() throws IOException;
     }
 
-    static class JsonDictFormat implements OutputFormat {
+    class JsonDictFormat implements OutputFormat {
         private final JsonWriter out;
         private final String[] fields;
 
@@ -78,7 +95,7 @@ public class WbCdxApi {
         public void writeCapture(Capture capture) throws IOException {
             out.beginObject();
             for (String field : fields) {
-                Object value = capture.get(field);
+                Object value = computeField(capture, field);
                 if (value instanceof Long) {
                     out.name(field).value((long) value);
                 } else if (value instanceof Integer) {
@@ -103,7 +120,7 @@ public class WbCdxApi {
      * Formats captures as a JSON array. Supports the field names used by both
      * pywb and wayback-cdx-server.
      */
-    static class JsonFormat implements OutputFormat {
+    class JsonFormat implements OutputFormat {
         private final JsonWriter out;
         private final String[] fields;
 
@@ -117,7 +134,7 @@ public class WbCdxApi {
         public void writeCapture(Capture capture) throws IOException {
             out.beginArray();
             for (String field : fields) {
-                Object value = capture.get(field);
+                Object value = computeField(capture, field);
                 if (value instanceof Long) {
                     out.value((long) value);
                 } else if (value instanceof Integer) {
@@ -138,7 +155,7 @@ public class WbCdxApi {
         }
     }
 
-    static class TextFormat implements OutputFormat {
+    class TextFormat implements OutputFormat {
         private final Writer out;
         private final String[] fields;
 
@@ -151,7 +168,7 @@ public class WbCdxApi {
         public void writeCapture(Capture capture) throws IOException {
             for (int i = 0; i < fields.length; i++) {
                 String field = fields[i];
-                Object value = capture.get(field);
+                Object value = computeField(capture, field);
                 out.write(value.toString());
                 if (i < fields.length - 1) {
                     out.write(' ');
