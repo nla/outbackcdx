@@ -52,12 +52,16 @@ public class WbCdxApi {
             }
 
             long row = 0;
-            for (Capture capture : captures) {
-                if (row >= query.limit) {
-                    break;
+            try {
+                for (Capture capture : captures) {
+                    if (row >= query.limit) {
+                        break;
+                    }
+                    outf.writeCapture(capture);
+                    row++;
                 }
-                outf.writeCapture(capture);
-                row++;
+            } catch (Exception e) {
+                e.printStackTrace();
             }
 
             outf.close();
