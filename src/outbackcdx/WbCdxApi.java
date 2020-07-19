@@ -8,6 +8,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.util.Date;
 
 import com.google.gson.stream.JsonWriter;
 
@@ -52,7 +53,9 @@ public class WbCdxApi {
                     row++;
                 }
             } catch (Exception e) {
+                System.err.println(new Date() + ": exception " + e + " thrown processing captures");
                 e.printStackTrace();
+                out.write("warning: output may be incomplete, error occurred processing captures\n");
             }
 
             outf.close();
