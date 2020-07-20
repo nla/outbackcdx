@@ -10,6 +10,7 @@ Features:
 * Speaks both [OpenWayback](https://github.com/iipc/openwayback/) (XML) and [PyWb](https://github.com/webrecorder/pywb) (JSON) CDX protocols
 * Realtime, incremental updates
 * Compressed indexes (varint packing + snappy), typically 1/4 - 1/5 the size of CDX files.
+* Primary-secondary replication
 * Access control (experimental, see below)
 
 Things it doesn't do (yet):
@@ -33,19 +34,36 @@ Run:
 
 Command line options:
 
-    $ java -jar target/outbackcdx-0.3.2.jar -h
-    Usage: java outbackcdx.Server [options...]
-    
-      -b bindaddr           Bind to a particular IP address
-      -d datadir            Directory to store index data under
-      -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)
-      -j jwks-url perm-path Use JSON Web Tokens for authorization
-      -k url realm clientid Use a Keycloak server for authorization
-      -m max-open-files     Limit the number of open .sst files (reduces memory usage)
-      -p port               Local port to listen on
-      -t count              Number of web server threads
-      -u                    Use Undertow as the HTTP server instead of NanoHTTPD
-      -v                    Verbose logging
+```
+Usage: java -jar outbackcdx.jar [options...]
+
+  -b bindaddr           Bind to a particular IP address
+  -c, --context-path url-prefix
+                        Set a URL prefix for the application to be mounted under
+  -d datadir            Directory to store index data under
+  -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)
+  -j jwks-url perm-path Use JSON Web Tokens for authorization
+  -k url realm clientid Use a Keycloak server for authorization
+  -m max-open-files     Limit the number of open .sst files to control memory usage
+                        (default 396 based on system RAM and ulimit -n)
+  -p port               Local port to listen on
+  -t count              Number of web server threads
+  -r count              Cap on number of rocksdb records to scan to serve a single request
+  -x                    Output CDX14 by default (instead of CDX11)
+  -v                    Verbose logging
+  -y file               Custom fuzzy match canonicalization YAML configuration file
+
+Primary mode (runs as a replication target for downstream Secondaries)
+  --replication-window interval      interval, in seconds, to delete replication history from disk.
+                                     0 disables automatic deletion. History files can be deleted manually by
+                                     POSTing a replication sequenceNumber to /<collection>/truncate_replication
+
+Secondary mode (runs read-only; polls upstream server on 'collection-url' for changes)
+  --primary collection-url           URL of collection on upstream primary to poll for changes
+  --update-interval poll-interval    Polling frequency for upstream changes, in seconds. Default: 10
+  --accept-writes                    Allow writes to this node, even though running as a secondary
+  --batch-size                       Approximate max size (in bytes) per replication batch
+```
 
 The server supports multiple named indexes as subdirectories.  Currently indexes
 are created automatically when you first write records to them.
@@ -200,8 +218,7 @@ that allow OutbackCDX to be used as a source of deduplication data for Heritrix 
 Access Control
 --------------
 
-Experimental support for access control is under early development, experimental support for it can be
-can be enabled by setting the following environment variable:
+Access control can be enabled by setting the following environment variable:
 
     EXPERIMENTAL_ACCESS_CONTROL=1
 
@@ -209,6 +226,8 @@ Rules can be configured through the GUI. Have Wayback or other clients query a p
 point. For example to query the 'public' access point.
 
     http://localhost:8080/myindex/ap/public
+
+See [docs/access-control.md](docs/access-control.md) for details of the access control model.
 
 Canonicalisation Aliases
 ------------------------
@@ -244,8 +263,7 @@ many other processes. You can override the limit OutbackCDX's `-m` option.
 If you find OutbackCDX using too much memory or you need more performance try adjusting the limit. The optimal setting
 will depend on your index size and hardware. If you have a lot of memory `-m -1` (no limit) will allow RocksDB to open
 all SST files on startup and should give the best query performance. However with slow disks it can also make startup
-very slow. You may also need to increase the kernel's max open file description limit (`ulimit -n`).
- 
+very slow. You may also need to increase the kernel's max open file description limit (`ulimit -n`). 
 
 Authorization
 -------------
@@ -284,3 +302,134 @@ OutbackCDX can use [Keycloak](https://www.keycloak.org/) as an auth server to se
 ```
 
 Note: JWT authentication will be enabled automatically when using Keycloak. You don't need to set the `-j` option.
+
+## HMAC fields
+
+OutbackCDX can be configured to compute a field using a HMAC or cryptographic digest. This feature is intended to be used
+in conjunction with a web server or cloud storage provider which provides temporary access to WARC files using a signed
+URL. To allow compatibility with a variety of different storage servers the structure of the message and field values
+are configured using templates.
+
+    --hmac-field name algorithm message-template field-template secret-key expiry-secs     
+
+The field will be made available as `name` to the `fl` CDX query parameter. Multiple HMAC fields can be defined
+as long as they have different names.
+
+The `algorithm` may be one of `HmacSHA256`, `HmacSHA1`, `HmacMD5`, `SHA-256`, `SHA-1`, `MD5` or any other MAC or
+MessageDigest from a Java security provider. Your system may have additional algorithms available depending on the
+version and configuration of Java.
+
+The `message-template` configures the input to the HMAC or digest function. See the list of templates variables below.
+
+The `field-template` configures the field value returned and is typically used to construct a URL. See the list of templates variables below.
+
+The `secret-key` is the key of the HMAC functions. When using non-HMAC digest functions (which don't have a natural key
+parameter) the key may be substituted into the `message-template` using `$secret_value`. 
+
+The `expiry-secs` parameter is used to calculate an expiry time for this secure link. If you don't use the `$expires`
+variable just set it to zero.
+
+### Template variables
+
+In addition to the fields of each capture record (`$filename`, `$length`, `$offset` etc) the following extra
+variables are available in templates:
+
+* `$dollar` - a dollar sign ("$")
+* `$expires` - expiry time in seconds since unix epoch
+* `$expires_hex` - expiry time in hexadecimal seconds since unix epoch
+* `$expires_iso8601` - expiry time as a UTC ISO 8601 timestamp
+* `$hmac_base64` - computed hmac/digest value as a base64 string (only available in value template)
+* `$hmac_base64_pct` - computed hmac/digest value as a base64 string with + encoded as %2B
+* `$hmac_base64_url` - computed hmac/digest value as a base64 url-safe string
+* `$hmac_hex` - computed hmac/digest value as a hex string (only available in value template)
+* `$secret_key` - the secret key (only available in message template)
+* `$now` - current time in seconds since unix epoch
+* `$now_hex` - current time in hexadecimal seconds since unix epoch
+* `$now_iso8601` - current time as a UTC ISO 8601 timestamp
+* `$CR` - a carriage return ("\r")
+* `$CRLF` - a carriage return line feed ("\r\n")
+* `$LF` - a line feed ("\n")
+
+The alternative variable syntax `${filename}` may also be used.
+
+### HMAC field examples
+
+#### [nginx HTTP secure link module](https://nginx.org/en/docs/http/ngx_http_secure_link_module.html)
+
+**Note:** The secure link module bundled with nginx uses the insecure MD5 algorithm. Consider using the
+community-developed HMAC secure link module instead.
+
+Example nginx configuration:
+
+```nginx
+location /warcs/ {
+   secure_link $arg_md5,$arg_expires;
+   secure_link_md5 "$secure_link_expires|$uri|$http_range|secret";
+   if ($secure_link != "1") { return 403; }
+   ...
+}
+```
+
+Corresponding OutbackCDX option:
+
+```
+--hmac-field warcurl md5 '$expires|/warcs/$filename|$range|$secret_key'
+     'http://nginx.example.org/warcs/$filename?expires=$expires&md5=$hmac_base64_url'
+     secret 3600
+```
+
+#### [nginx HTTP HMAC secure link module](https://github.com/nginx-modules/ngx_http_hmac_secure_link_module)
+
+(As yet untested.)
+
+Example nginx configuration:
+
+```nginx
+location /warcs/ {
+   secure_link_hmac  $arg_st,$arg_ts,$arg_e;
+   secure_link_hmac_algorithm sha256;
+   secure_link_hmac_secret secret;
+   secure_link_hmac_message $uri|$arg_ts|$arg_e|$http_range;
+   if ($secure_link_hmac != "1") { return 403; }
+   ...
+}
+```
+
+Corresponding OutbackCDX option:
+
+```
+--hmac-field warcurl Hmacsha256 '/warcs/$filename|$now|3600|$http_range'
+     'http://nginx.example.org/warcs/$filename?st=$hmac_base64_url&ts=$now&e=3600
+     secret 0
+```
+
+#### lighttpd [mod_secdownload](https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ModSecDownload)
+
+Example lighttpd configuration:
+
+```
+secdownload.algorithm       = "hmac-sha256" 
+secdownload.secret          = "secret" 
+secdownload.document-root   = "/data/warcs/" 
+secdownload.uri-prefix      = "/warcs/" 
+secdownload.timeout         = 3600
+```
+
+Corresponding OutbackCDX option:
+
+```
+--hmac-field warcurl Hmacsha256 '/$now_hex/$filename'
+   'http://lighttpd.example.org/warcs/$hmac_base64_url/$now_hex/$filename' secret 0
+```
+
+#### S3 signed URLs
+
+(Based on the [S3 documentation](https://s3.amazonaws.com/doc/s3-developer-guide/RESTAuthentication.html) but as yet untested.)
+
+Replace `s3-access-key-id`, `s3-secret-key` and `bucket` with appropriate values:
+
+```
+--hmac-field url Hmacsha1 'GET$LF$LF$LF$expires$LF/bucket/$filename'
+     'https://s3.amazonaws.com/bucket/$filename?AWSAccessKeyId=s3-access-key-id&Expires=$expires&Signature=$hmac_base64_pct'
+     s3-secret-key 3600 
+```

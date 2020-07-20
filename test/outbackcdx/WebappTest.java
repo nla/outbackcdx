@@ -43,7 +43,7 @@ public class WebappTest {
         UrlCanonicalizer canon = new UrlCanonicalizer(new ByteArrayInputStream(yaml.getBytes("UTF-8")));
 
         DataStore manager = new DataStore(root, -1, null, Long.MAX_VALUE, canon);
-        webapp = new Webapp(manager, false, Collections.emptyMap(), canon);
+        webapp = new Webapp(manager, false, Collections.emptyMap(), canon, Collections.emptyMap());
     }
 
     @After
@@ -261,7 +261,7 @@ public class WebappTest {
         for (int i = 0; i < parmKeysAndValues.length; i += 2) {
             session.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
         }
-        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
+        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
@@ -271,14 +271,14 @@ public class WebappTest {
         for (int i = 0; i < parmKeysAndValues.length; i += 2) {
             session.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
         }
-        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
+        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
         assertEquals(OK, response.getStatus());
         return slurp(response);
     }
 
     private String DELETE(String url) throws Exception {
         DummySession session = new DummySession(DELETE, url);
-        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
+        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
         assertEquals(OK, response.getStatus());
         return slurp(response);
     }

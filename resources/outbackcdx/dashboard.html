@@ -470,7 +470,7 @@
                     fl: this.fields.join(","),
                     output: 'json'
                 };
-                fetchApi(urlTemplate("/{collection}", this.$route.params, query))
+                fetchApi(urlTemplate("{collection}", this.$route.params, query))
                         .then(r => r.json())
                         .then(rows => this.rows = rows ? rows.slice(1) : []);
             }, 250),
@@ -705,7 +705,7 @@
             },
             save: function () {
                 this.rule.urlPatterns = this.rule.urlPatterns.filter(function(pattern) { return pattern != ""; });
-                fetchApi(urlTemplate("/{collection}/access/rules", this.$route.params),
+                fetchApi(urlTemplate("{collection}/access/rules", this.$route.params),
                         {method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify(this.rule)})
@@ -741,7 +741,7 @@
                 });
             },
             deleteRule: function () {
-                fetchApi(urlTemplate("/{collection}/access/rules/{ruleId}", this.$route.params), {method: 'DELETE'})
+                fetchApi(urlTemplate("{collection}/access/rules/{ruleId}", this.$route.params), {method: 'DELETE'})
                         .then(() => this.cancel());
             },
             fetchData: function () {

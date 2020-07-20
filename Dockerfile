@@ -1,8 +1,5 @@
 FROM maven:3-jdk-8 as build-env
 
-RUN apt-get update && apt-get install -y libsnappy-dev \
- && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /build
 
 COPY pom.xml /build/pom.xml
@@ -17,9 +14,6 @@ RUN export JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF8 && \
     mvn package
 
 FROM java:8
-
-RUN apt-get update && apt-get install -y libsnappy-dev \
- && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build-env /build/target/outbackcdx-*.jar outbackcdx.jar
 

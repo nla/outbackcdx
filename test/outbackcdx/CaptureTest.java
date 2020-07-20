@@ -24,6 +24,20 @@ public class CaptureTest {
         assertEquals(src.date().getTime(), 1388579640000L);
     }
 
+    @Test
+    public void testV4Encoding() {
+        Capture src = dummyRecord();
+        byte[] key = src.encodeKey(4);
+        byte[] value = src.encodeValue(4);
+        Capture dst = new Capture(key, value);
+        assertFieldsEqual(src, dst);
+    }
+
+    @Test
+    public void testRange() {
+        assertEquals("bytes=1234-13578", dummyRecord().get("range"));
+    }
+
     static void assertFieldsEqual(Capture src, Capture dst) {
         assertEquals(src.compressedoffset, dst.compressedoffset);
         assertEquals(src.digest, dst.digest);

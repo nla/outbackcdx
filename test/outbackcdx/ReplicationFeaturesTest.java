@@ -9,14 +9,13 @@ import outbackcdx.auth.Permit;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 
 import static org.junit.Assert.assertEquals;
 import static outbackcdx.NanoHTTPD.Method.*;
 import static outbackcdx.NanoHTTPD.Response.Status.OK;
-import static outbackcdx.NanoHTTPD.Response.Status.UNAUTHORIZED;
-
 
 
 public class ReplicationFeaturesTest {
@@ -31,7 +30,7 @@ public class ReplicationFeaturesTest {
     public void setUp() throws IOException {
         File root = folder.newFolder();
         manager = new DataStore(root, 256, null, Long.MAX_VALUE, null);
-        webapp = new Webapp(manager, false, Collections.emptyMap(), null);
+        webapp = new Webapp(manager, false, Collections.emptyMap(), null, Collections.emptyMap());
     }
 
     @After
@@ -83,7 +82,7 @@ public class ReplicationFeaturesTest {
 
     private String GET(String url, NanoHTTPD.Response.Status expectedStatus) throws Exception {
         ReplicationFeaturesTest.DummySession session = new ReplicationFeaturesTest.DummySession(GET, url);
-	NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
+	NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
@@ -93,14 +92,14 @@ public class ReplicationFeaturesTest {
         for (int i = 0; i < parmKeysAndValues.length; i += 2) {
 	    session.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
 	}
-	NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
+	NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
 
     private String DELETE(String url, NanoHTTPD.Response.Status expectedStatus) throws Exception {
         ReplicationFeaturesTest.DummySession session = new ReplicationFeaturesTest.DummySession(DELETE, url);
-        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
+        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
@@ -108,7 +107,7 @@ public class ReplicationFeaturesTest {
     private String POST(String url, String data, NanoHTTPD.Response.Status expectedStatus) throws Exception {
         ReplicationFeaturesTest.DummySession session = new ReplicationFeaturesTest.DummySession(POST, url);
         session.data(data);
-        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full()));
+        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }

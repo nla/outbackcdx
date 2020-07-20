@@ -28,9 +28,13 @@ import java.util.concurrent.Executors;
 public class Main {
     public static void usage() {
         System.err.println("Usage: java " + Main.class.getName() + " [options...]");
-        System.err.println("");
+        System.err.println();
         System.err.println("  -b bindaddr           Bind to a particular IP address");
+        System.err.println("  -c, --context-path url-prefix");
+        System.err.println("                        Set a URL prefix for the application to be mounted under");
         System.err.println("  -d datadir            Directory to store index data under");
+        System.err.println("  --hmac-field name algorithm message-template value-template key expiry-secs");
+        System.err.println("                        Defines a computed HMAC field (useful for storage authentication)");
         System.err.println("  -i                    Inherit the server socket via STDIN (for use with systemd, inetd etc)");
         System.err.println("  -j jwks-url perm-path Use JSON Web Tokens for authorization");
         System.err.println("  -k url realm clientid Use a Keycloak server for authorization");
@@ -53,13 +57,19 @@ public class Main {
         System.err.println("  --update-interval poll-interval    Polling frequency for upstream changes, in seconds. Default: 10");
         System.err.println("  --accept-writes                    Allow writes to this node, even though running as a secondary");
         System.err.println("  --batch-size                       Approximate max size (in bytes) per replication batch");
+        System.err.println();
+        System.err.println("Enable experimental index versions. DANGER: Upgrading a version 3 index to version 4 is not yet supported and " +
+                "updating or deleting existing version 3 records will silently fail.");
+        System.err.println("  --index-version 4     Treats records as distinct if they have a different filename or offset" +
+                "                                   even if they have identical url and date");
         System.exit(1);
     }
 
-    public static void main(String args[]) {
+    public static void main(String[] args) {
         boolean undertow = false;
         String host = null;
         int port = 8080;
+        String contextPath = "";
         int webThreads = Runtime.getRuntime().availableProcessors();
         boolean inheritSocket = false;
         File dataPath = new File("data");
@@ -72,6 +82,7 @@ public class Main {
         long scanCap = Long.MAX_VALUE;
         long batchSize = 10*1024*1024;
         String fuzzyYaml = null;
+        Map<String,ComputedField> computedFields = new HashMap<>();
 
         Map<String,Object> dashboardConfig = new HashMap<>();
         dashboardConfig.put("featureFlags", FeatureFlags.asMap());
@@ -87,11 +98,26 @@ public class Main {
                 case "-b":
                     host = args[++i];
                     break;
+                case "-c":
+                case "--context-path":
+                    contextPath = args[++i].replaceFirst("/+$", "");
+                    if (!contextPath.startsWith("/")) {
+                        throw new IllegalArgumentException("context path (-c) must start with /");
+                    }
+                    break;
                 case "-d":
                     dataPath = new File(args[++i]);
                     break;
+                case "--hmac-field":
+                    computedFields.put(args[++i], new HmacField(args[++i], args[++i], args[++i], args[++i], Integer.parseInt(args[++i])));
+                    break;
                 case "-i":
                     inheritSocket = true;
+                    break;
+                case "--index-version":
+                    System.err.println("WARNING: Experimental index version 4 enabled. Do not use this option (yet) on an " +
+                            "pre-existing version 3 index. Updating or deleting older records will silently fail.");
+                    FeatureFlags.setIndexVersion(Integer.parseInt(args[++i]));
                     break;
                 case "-j":
                     try {
@@ -149,9 +175,9 @@ public class Main {
         try {
             UrlCanonicalizer canonicalizer = new UrlCanonicalizer(fuzzyYaml);
             try (DataStore dataStore = new DataStore(dataPath, maxOpenSstFiles, replicationWindow, scanCap, canonicalizer)) {
-                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer);
+                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields);
                 if (undertow) {
-                    UWeb.UServer server = new UWeb.UServer(host, port, controller, authorizer);
+                    UWeb.UServer server = new UWeb.UServer(host, port, contextPath, controller, authorizer);
                     server.start();
                     System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port);
                     synchronized (Main.class) {
@@ -159,7 +185,7 @@ public class Main {
                     }
                 } else {
                     ServerSocket socket = openSocket(host, port, inheritSocket);
-                    Web.Server server = new Web.Server(socket, controller, authorizer);
+                    Web.Server server = new Web.Server(socket, contextPath, controller, authorizer);
                     ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
                     for (String collectionUrl: collectionUrls) {
                         ChangePollingThread cpt = new ChangePollingThread(collectionUrl, pollingInterval, batchSize, dataStore);
@@ -173,7 +199,7 @@ public class Main {
                             server.stop();
                             dataStore.close();
                         }));
-                        System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port);
+                        System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port + contextPath);
                         synchronized (Main.class) {
                             Main.class.wait();
                         }
