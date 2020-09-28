@@ -176,7 +176,7 @@ Return results ordered closest to furthest from a given timestamp:
 
 See the [API Documentation](https://nla.github.io/outbackcdx/api.html) for more details
 about the available options.
-        
+
 Configuring replay tools
 ------------------------
 
@@ -228,6 +228,22 @@ point. For example to query the 'public' access point.
     http://localhost:8080/myindex/ap/public
 
 See [docs/access-control.md](docs/access-control.md) for details of the access control model.
+
+
+### Getting details about restrictions
+
+To get the matching restriction rule for a particular URL you can use the check endpoint:
+
+    http://localhost:8080/{index}/ap/{access-point}/check?url={url}&timestamp={14-digit-date}
+
+This can be used in custom UI implementation to display a detailed restriction message.
+
+You can also check multiple URLs and timestamps in bulk by POSTing a JSON payload like:
+
+   [
+      {"url": "http://one.example.com", "timestamp": "20020927002131"},
+      {"url": "http://two.example.org", "timestamp": "20091030100328"},
+   ]
 
 Canonicalisation Aliases
 ------------------------
