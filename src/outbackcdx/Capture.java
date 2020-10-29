@@ -12,6 +12,8 @@ import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -61,6 +63,9 @@ public class Capture {
     public long originalLength = -1;
     public long originalCompressedoffset = -1;
     public String originalFile = "-";
+
+    protected static Pattern URLKEY_POSTDATA_REGEX =
+            Pattern.compile("[?&](__wb_post_data|__warc_post_data)=([^&]+).*$", Pattern.CASE_INSENSITIVE);
 
     public Capture(Map.Entry<byte[], byte[]> entry) {
         this(entry.getKey(), entry.getValue());
@@ -354,12 +359,33 @@ public class Capture {
         return out.toString();
     }
 
+    /**
+     * If post data is available in urlkey, appends it to original url
+     * @param urlkey urlkey as passed in cdx line
+     * @param surt outbackcdx canonized surt
+     * @return surt with post-data appended
+     */
+    private static String appendWbPostData(String urlkey, String surt) {
+        Matcher matchKey = URLKEY_POSTDATA_REGEX.matcher(urlkey);
+        Matcher matchOriginal = URLKEY_POSTDATA_REGEX.matcher(surt);
+
+        if (matchKey.find() && !matchOriginal.matches() && matchKey.groupCount() > 1) {
+            StringBuilder sb = new StringBuilder(surt);
+            sb.append( surt.indexOf('?') < 0 ? '?' : '&' );
+            sb.append(matchKey.group(1));
+            sb.append("=");
+            sb.append(matchKey.group(2));
+            return sb.toString();
+        }
+        return surt;
+    }
+
     public static Capture fromCdxLine(String line, UrlCanonicalizer canonicalizer) {
         String[] fields = line.split(" ");
         Capture capture = new Capture();
         capture.timestamp = Long.parseLong(fields[1]);
         capture.original = fields[2];
-        capture.urlkey = canonicalizer.surtCanonicalize(capture.original);
+        capture.urlkey = appendWbPostData(fields[0], canonicalizer.surtCanonicalize(capture.original));
         capture.mimetype = fields[3];
         capture.status = fields[4].equals("-") ? 0 : Integer.parseInt(fields[4]);
         capture.digest = fields[5];
