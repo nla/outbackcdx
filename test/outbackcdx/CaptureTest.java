@@ -34,6 +34,19 @@ public class CaptureTest {
     }
 
     @Test
+    public void testWbPostDataExtraction() {
+        UrlCanonicalizer canonicalizer = new UrlCanonicalizer();
+
+        // simple url with no parameters
+        Capture cap = Capture.fromCdxLine("com,test)/append?__wb_post_data=dGVzdAo= 20200528143535 https://test.com/append application/json 202 2WC5VZGPEJIVA6BQPKMISFH7ISBVWYUQ - - 467 4846509 test.warc.gz", canonicalizer);
+        assertEquals("com,test)/append?__wb_post_data=dGVzdAo=", cap.urlkey);
+
+        // url with parameters
+        cap = Capture.fromCdxLine("com,test)/append?x=1&__wb_post_data=dGVzdAo= 20200528143535 https://test.com/append?x=1 application/json 202 2WC5VZGPEJIVA6BQPKMISFH7ISBVWYUQ - - 467 4846509 test.warc.gz", canonicalizer);
+        assertEquals("com,test)/append?x=1&__wb_post_data=dGVzdAo=", cap.urlkey);
+    }
+
+    @Test
     public void testRange() {
         assertEquals("bytes=1234-13578", dummyRecord().get("range"));
     }
@@ -67,4 +80,5 @@ public class CaptureTest {
         src.robotflags = "AFIGX";
         return src;
     }
+
 }
