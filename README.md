@@ -83,6 +83,14 @@ Wayback uses:
 The canonicalized URL (first field) is ignored, OutbackCDX performs its own
 canonicalization.
 
+By default OutbackCDX will not ingest any records from a POSTed CDX if any of the
+lines are invalid. If you wish to only skip malformed lines and have OutbackCDX 
+ingest all the other, valid lines you can add the parameter `badLines` with the 
+value `skip`. Example:
+
+    $ curl -X POST --data-binary @records.cdx http://localhost:8080/myindex?badLines=skip
+
+
 **Limitation:** Loading an extremely large number of CDX records in one POST request
 can cause an [out of memory error](https://github.com/nla/outbackcdx/issues/13). 
 Until this is fixed you may need to break your request up into several smaller ones. 
