@@ -15,8 +15,7 @@ import java.nio.charset.Charset;
 import java.util.*;
 
 import static java.util.Arrays.asList;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static outbackcdx.Json.GSON;
 import static outbackcdx.NanoHTTPD.Method.*;
 import static outbackcdx.NanoHTTPD.Response.Status.BAD_REQUEST;
@@ -71,16 +70,27 @@ public class WebappTest {
         POST("/test", "@alias http://example.com/ http://www.nla.gov.au/\n- 20100614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20100614070144-00003-crawling016.archive.org\n");
         {
             String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F");
-            assertTrue(response.indexOf("20050614070159") != -1);
-            assertTrue(response.indexOf("20060614070159") != -1);
-            assertTrue(response.indexOf("20100614070159") != -1);
-            assertTrue(response.indexOf("20030614070159") != -1);
+            assertTrue(response.contains("20050614070159"));
+            assertTrue(response.contains("20060614070159"));
+            assertTrue(response.contains("20100614070159"));
+            assertTrue(response.contains("20030614070159"));
         }
-
 
         {
             String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F limit:2 offset:0");
             assertEquals(2, StringUtils.countMatches(response, "<result>"));
+        }
+
+        {
+            String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F", "count", "3", "start_page", "1");
+            assertEquals(3, StringUtils.countMatches(response, "<result>"));
+            assertTrue(response.contains("20050614070159"));
+        }
+
+        {
+            String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F", "count", "3", "start_page", "2");
+            assertEquals(2, StringUtils.countMatches(response, "<result>"));
+            assertFalse(response.contains("20050614070159"));
         }
 
         POST("/test", "- 20060614070159 http://nla.gov.au/bad-wolf text/html bad-wolf XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n", BAD_REQUEST);
@@ -130,6 +140,7 @@ public class WebappTest {
     @Test
     public void testAccessPoint() throws Exception {
         POST("/testap",
+                "- 20050614070159 http://a.ex.org/ text/html 200 - - 42 wrc\n" +
                 "- 20050614070159 http://a.ex.org/ text/html 200 - - 42 wrc\n" +
                 "- 20030614070159 http://a.ex.org/ text/html 200 - - - - 42 wrc\n" +
                 "- 20030614070159 http://b.ex.org/ text/html 200 - - - - 42 wrc\n");
