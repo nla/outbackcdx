@@ -38,8 +38,25 @@ public class XmlQuery {
         queryType = query.getOrDefault("type", "urlquery").toLowerCase();
         queryUrl = canonicalizer.surtCanonicalize(query.get("url"));
 
-        offset = Long.parseLong(query.getOrDefault("offset", "0"));
-        limit = Long.parseLong(query.getOrDefault("limit", "10000"));
+        String countParam = params.get("count");
+        if (countParam != null) {
+            limit = Long.parseLong(countParam);
+        } else {
+            // deprecated
+            limit = Long.parseLong(query.getOrDefault("limit", "10000"));
+        }
+
+        String startPageParam = params.get("start_page");
+        if (startPageParam != null) {
+            long startPage = Long.parseLong(startPageParam);
+            if (startPage < 1) {
+                startPage = 1;
+            }
+            offset = limit * (startPage - 1);
+        } else {
+            // deprecated
+            offset = Long.parseLong(query.getOrDefault("offset", "0"));
+        }
     }
 
     private static Map<String,String> decodeQueryString(String q) {
