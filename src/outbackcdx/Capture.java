@@ -383,7 +383,7 @@ public class Capture {
     public static Capture fromCdxLine(String line, UrlCanonicalizer canonicalizer) {
         String[] fields = line.split(" ");
         Capture capture = new Capture();
-        capture.timestamp = Long.parseLong(fields[1]);
+        capture.timestamp = parseCdxTimestamp(fields[1]);
         capture.original = fields[2];
         capture.urlkey = appendWbPostData(fields[0], canonicalizer.surtCanonicalize(capture.original));
         capture.mimetype = fields[3];
@@ -413,6 +413,26 @@ public class Capture {
         }
 
         return capture;
+    }
+    
+    /**
+     * Convert a 14 digit CDX timestamp into a 64 bit integer (long). If the supplied string is too short, 0 will be
+     * appended to pad it out. If the supplied string is to long, an exception will be thrown.
+     * @param cdxTimestamp The CDX timestamp to convert
+     * @return A 64 bit integer representation of the supplied timestamp
+     * @throws IllegalArgumentException If the supplied timestamp exceeds 14 characters.
+     * @throws NumberFormatException If the supplied timestamp contains non-numeric characters.
+     */
+    private static long parseCdxTimestamp(String cdxTimestamp) {
+        if (cdxTimestamp.length() < 14) {
+            log.log(Level.WARNING, "Padding timestamp shorter then 14 chars: " + cdxTimestamp);
+            cdxTimestamp = cdxTimestamp + PAD_TIMESTAMP.substring(cdxTimestamp.length());
+        }
+        if (cdxTimestamp.length() > 14) {
+            throw new IllegalArgumentException("CDX timestamp longer than 14 chars. Not supported");
+        }
+
+        return Long.parseLong(cdxTimestamp);
     }
 
     public Date date() {
