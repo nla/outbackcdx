@@ -21,16 +21,23 @@ Things it doesn't do (yet):
 Used in production at the National Library of Australia and British Library with
 8-9 billion record indexes.
 
-Usage
------
+Installing
+----------
 
-Build:
+OutbackCDX requires [JDK 8 and 11](https://adoptopenjdk.net/) on x86-64 Linux, Windows or MacOS (other platforms would require a custom build of RocksDB JNI).
+
+Pre-compiled jar packages are available from the [releases page](https://github.com/nla/outbackcdx/releases).
+
+To build from source install [Maven](https://maven.apache.org/) and then run:
 
     mvn package
 
-Run:
+Usage
+-----
 
-    java -jar target/outbackcdx*.jar
+Run with:
+
+    java -jar outbackcdx*.jar
 
 Command line options:
 
