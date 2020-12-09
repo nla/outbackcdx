@@ -15,7 +15,7 @@ Features:
 
 Things it doesn't do (yet):
 
-* Sharding, replication
+* Sharding
 * CDXJ
 
 Used in production at the National Library of Australia and British Library with
