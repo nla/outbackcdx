@@ -116,7 +116,7 @@ public class XmlQuery {
 
     private void urlQuery(XMLStreamWriter out) throws XMLStreamException {
         boolean wroteHeader = false;
-        int results = 0;
+        long numReturned = 0;
         int i = 0;
         for (Capture capture : index.queryAP(queryUrl, accessPoint)) {
             if (i < offset) {
@@ -128,7 +128,6 @@ public class XmlQuery {
             i++;
 
             if (!wroteHeader) {
-                writeHeader(out, "resultstypecapture");
                 out.writeStartElement("results");
                 wroteHeader = true;
             }
@@ -145,11 +144,12 @@ public class XmlQuery {
             writeElement(out, "url", capture.original);
             writeElement(out, "capturedate", capture.timestamp);
             out.writeEndElement(); // </result>
-            results++;
+            numReturned++;
         }
 
         if (wroteHeader) {
             out.writeEndElement(); // </results>
+            writeRequestElement(out, "resultstypecapture", numReturned);
         } else if ("1".equals(System.getenv("CDX_PLUS_WORKAROUND")) && queryUrl.contains("%20")) {
             /*
              * XXX: NLA has a bunch of bad WARC files that contain + instead of %20 in the URLs. This is a dirty
@@ -162,12 +162,13 @@ public class XmlQuery {
             writeNotFoundError(out);
         }
 
-        log.fine("[" + results + " results] " + queryUrl);
+        log.fine("[" + numReturned + " results] " + queryUrl);
     }
 
     private void prefixQuery(XMLStreamWriter out) throws XMLStreamException {
         boolean wroteHeader = false;
-        int i = 0;
+        long i = 0;
+        long numReturned = 0;
         Resources it = new Resources(index.prefixQueryAP(queryUrl, accessPoint).iterator());
         while (it.hasNext()) {
             Resource resource = it.next();
@@ -180,7 +181,6 @@ public class XmlQuery {
             i++;
 
             if (!wroteHeader) {
-                writeHeader(out, "resultstypeurl");
                 out.writeStartElement("results");
                 wroteHeader = true;
             }
@@ -192,16 +192,18 @@ public class XmlQuery {
             writeElement(out, "firstcapturets", resource.firstCapture.timestamp);
             writeElement(out, "lastcapturets", resource.lastCapture.timestamp);
             out.writeEndElement(); // </result>
+            numReturned++;
         }
 
         if (wroteHeader) {
             out.writeEndElement(); // </results>
+            writeRequestElement(out, "resultstypeurl", numReturned);
         } else {
             writeNotFoundError(out);
         }
     }
 
-    private void writeHeader(XMLStreamWriter out, String resultsType) throws XMLStreamException {
+    private void writeRequestElement(XMLStreamWriter out, String resultsType, long numReturned) throws XMLStreamException {
         out.writeStartElement("request");
         writeElement(out, "startdate", "19960101000000");
         writeElement(out, "enddate", Capture.arcTimeFormat.format(LocalDateTime.now(ZoneOffset.UTC)));
@@ -210,6 +212,8 @@ public class XmlQuery {
         writeElement(out, "url", queryUrl);
         writeElement(out, "resultsrequested", limit);
         writeElement(out, "resultstype", resultsType);
+        writeElement(out, "numreturned", numReturned);
+        // TODO: writeElement(out, "numresults", 0);
         out.writeEndElement(); // </request>
     }
 
