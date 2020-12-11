@@ -48,7 +48,7 @@ public class WebappTest {
         UrlCanonicalizer canon = new UrlCanonicalizer(new ByteArrayInputStream(yaml.getBytes("UTF-8")));
 
         DataStore manager = new DataStore(root, -1, null, Long.MAX_VALUE, canon);
-        webapp = new Webapp(manager, false, Collections.emptyMap(), canon, Collections.emptyMap());
+        webapp = new Webapp(manager, false, Collections.emptyMap(), canon, Collections.emptyMap(), 10000);
     }
 
     @After
@@ -73,6 +73,7 @@ public class WebappTest {
             assertTrue(response.contains("20060614070159"));
             Document xml = parseXml(response);
             assertEquals("2", xpath(xml, "/wayback/request/numreturned").getTextContent());
+            assertEquals("2", xpath(xml, "/wayback/request/numresults").getTextContent());
         }
 
         POST("/test", "@alias http://example.com/ http://www.nla.gov.au/\n- 20100614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20100614070144-00003-crawling016.archive.org\n");
@@ -84,6 +85,7 @@ public class WebappTest {
             assertTrue(response.contains("20030614070159"));
             Document xml = parseXml(response);
             assertEquals("5", xpath(xml, "/wayback/request/numreturned").getTextContent());
+            assertEquals("5", xpath(xml, "/wayback/request/numresults").getTextContent());
         }
 
         {
@@ -91,6 +93,7 @@ public class WebappTest {
             assertEquals(2, StringUtils.countMatches(response, "<result>"));
             Document xml = parseXml(response);
             assertEquals("2", xpath(xml, "/wayback/request/numreturned").getTextContent());
+            assertEquals("5", xpath(xml, "/wayback/request/numresults").getTextContent());
         }
 
         {
@@ -99,6 +102,7 @@ public class WebappTest {
             assertTrue(response.contains("20050614070159"));
             Document xml = parseXml(response);
             assertEquals("3", xpath(xml, "/wayback/request/numreturned").getTextContent());
+            assertEquals("5", xpath(xml, "/wayback/request/numresults").getTextContent());
         }
 
         {
@@ -107,6 +111,7 @@ public class WebappTest {
             assertFalse(response.contains("20050614070159"));
             Document xml = parseXml(response);
             assertEquals("2", xpath(xml, "/wayback/request/numreturned").getTextContent());
+            assertEquals("5", xpath(xml, "/wayback/request/numresults").getTextContent());
         }
 
         POST("/test", "- 20060614070159 http://nla.gov.au/bad-wolf text/html bad-wolf XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n", BAD_REQUEST);

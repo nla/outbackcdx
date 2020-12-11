@@ -9,7 +9,6 @@ import outbackcdx.auth.Permit;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 
@@ -30,7 +29,7 @@ public class ReplicationFeaturesTest {
     public void setUp() throws IOException {
         File root = folder.newFolder();
         manager = new DataStore(root, 256, null, Long.MAX_VALUE, null);
-        webapp = new Webapp(manager, false, Collections.emptyMap(), null, Collections.emptyMap());
+        webapp = new Webapp(manager, false, Collections.emptyMap(), null, Collections.emptyMap(), 10000);
     }
 
     @After

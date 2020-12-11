@@ -52,4 +52,6 @@ check $WAYBACK_URL/*/$PAGE 20161016214133
 check $WAYBACK_URL/*/$PAGE 20161016214156
 check $WAYBACK_URL/20161016214133/$PAGE 'Simple Text Documents'
 
-read -n1 -r -p "Press any key to continue..." key
+if [ -n "${WAIT-}" ]; then
+  read -n1 -r -p "Press any key to continue..." key
+fi

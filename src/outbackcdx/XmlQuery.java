@@ -27,9 +27,11 @@ public class XmlQuery {
     final long offset;
     final long limit;
     final String queryType;
+    private final long maxNumResults;
 
-    public XmlQuery(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins, UrlCanonicalizer canonicalizer) {
+    public XmlQuery(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins, UrlCanonicalizer canonicalizer, long maxNumResults) {
         this.index = index;
+        this.maxNumResults = maxNumResults;
 
         Map<String, String> params = request.params();
         Map<String, String> query = decodeQueryString(params.get("q"));
@@ -117,15 +119,20 @@ public class XmlQuery {
     private void urlQuery(XMLStreamWriter out) throws XMLStreamException {
         boolean wroteHeader = false;
         long numReturned = 0;
-        int i = 0;
+        long numResults = 0;
         for (Capture capture : index.queryAP(queryUrl, accessPoint)) {
-            if (i < offset) {
-                i++;
+            if (numResults < offset) { // skip matches before offset
+                numResults++;
                 continue;
-            } else if (i >= offset + limit) {
-                break;
+            } else if (numResults >= offset + limit) {
+                if (numResults < maxNumResults) { // count matches after limit up to maxNumResults
+                    numResults++;
+                    continue;
+                } else {
+                    break;
+                }
             }
-            i++;
+            numResults++;
 
             if (!wroteHeader) {
                 out.writeStartElement("results");
@@ -149,7 +156,7 @@ public class XmlQuery {
 
         if (wroteHeader) {
             out.writeEndElement(); // </results>
-            writeRequestElement(out, "resultstypecapture", numReturned);
+            writeRequestElement(out, "resultstypecapture", numReturned, numResults);
         } else if ("1".equals(System.getenv("CDX_PLUS_WORKAROUND")) && queryUrl.contains("%20")) {
             /*
              * XXX: NLA has a bunch of bad WARC files that contain + instead of %20 in the URLs. This is a dirty
@@ -162,23 +169,28 @@ public class XmlQuery {
             writeNotFoundError(out);
         }
 
-        log.fine("[" + numReturned + " results] " + queryUrl);
+        log.fine("[" + numReturned + "/" + numResults + " results] " + queryUrl);
     }
 
     private void prefixQuery(XMLStreamWriter out) throws XMLStreamException {
         boolean wroteHeader = false;
-        long i = 0;
+        long numResults = 0;
         long numReturned = 0;
         Resources it = new Resources(index.prefixQueryAP(queryUrl, accessPoint).iterator());
         while (it.hasNext()) {
             Resource resource = it.next();
-            if (i < offset) {
-                i++;
+            if (numResults < offset) {
+                numResults++;
                 continue;
-            } else if (i >= offset + limit) {
-                break;
+            } else if (numResults >= offset + limit) {
+                if (numResults < maxNumResults) { // count matches after limit up to maxNumResults
+                    numResults++;
+                    continue;
+                } else {
+                    break;
+                }
             }
-            i++;
+            numResults++;
 
             if (!wroteHeader) {
                 out.writeStartElement("results");
@@ -197,13 +209,13 @@ public class XmlQuery {
 
         if (wroteHeader) {
             out.writeEndElement(); // </results>
-            writeRequestElement(out, "resultstypeurl", numReturned);
+            writeRequestElement(out, "resultstypeurl", numReturned, numResults);
         } else {
             writeNotFoundError(out);
         }
     }
 
-    private void writeRequestElement(XMLStreamWriter out, String resultsType, long numReturned) throws XMLStreamException {
+    private void writeRequestElement(XMLStreamWriter out, String resultsType, long numReturned, long numResults) throws XMLStreamException {
         out.writeStartElement("request");
         writeElement(out, "startdate", "19960101000000");
         writeElement(out, "enddate", Capture.arcTimeFormat.format(LocalDateTime.now(ZoneOffset.UTC)));
@@ -213,7 +225,7 @@ public class XmlQuery {
         writeElement(out, "resultsrequested", limit);
         writeElement(out, "resultstype", resultsType);
         writeElement(out, "numreturned", numReturned);
-        // TODO: writeElement(out, "numresults", 0);
+        writeElement(out, "numresults", numResults);
         out.writeEndElement(); // </request>
     }
 
@@ -222,10 +234,6 @@ public class XmlQuery {
         writeElement(out, "title", "Resource Not In Archive");
         writeElement(out, "message", "The Resource you requested is not in this archive.");
         out.writeEndElement();
-    }
-
-    public static NanoHTTPD.Response queryIndex(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins, UrlCanonicalizer canonicalizer) {
-        return new XmlQuery(request, index, filterPlugins, canonicalizer).streamResults();
     }
 
     /**
