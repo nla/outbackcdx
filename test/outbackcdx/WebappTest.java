@@ -6,10 +6,18 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 import outbackcdx.UrlCanonicalizer.ConfigurationException;
 import outbackcdx.auth.Permit;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.util.*;
@@ -18,9 +26,7 @@ import static java.util.Arrays.asList;
 import static org.junit.Assert.*;
 import static outbackcdx.Json.GSON;
 import static outbackcdx.NanoHTTPD.Method.*;
-import static outbackcdx.NanoHTTPD.Response.Status.BAD_REQUEST;
-import static outbackcdx.NanoHTTPD.Response.Status.CREATED;
-import static outbackcdx.NanoHTTPD.Response.Status.OK;
+import static outbackcdx.NanoHTTPD.Response.Status.*;
 
 public class WebappTest {
     @Rule
@@ -42,7 +48,7 @@ public class WebappTest {
         UrlCanonicalizer canon = new UrlCanonicalizer(new ByteArrayInputStream(yaml.getBytes("UTF-8")));
 
         DataStore manager = new DataStore(root, -1, null, Long.MAX_VALUE, canon);
-        webapp = new Webapp(manager, false, Collections.emptyMap(), canon, Collections.emptyMap());
+        webapp = new Webapp(manager, false, Collections.emptyMap(), canon, Collections.emptyMap(), 10000);
     }
 
     @After
@@ -56,15 +62,18 @@ public class WebappTest {
         POST("/test", "- 20060614070159 http://nla.gov.au/ text/html 200 XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n");
         {
             String response = GET("/test", "url", "nla.gov.au");
-            assertTrue(response.indexOf("au,gov,nla)/ 20050614070159") != -1);
-            assertTrue(response.indexOf("example") == -1);
+            assertTrue(response.contains("au,gov,nla)/ 20050614070159"));
+            assertTrue(!response.contains("example"));
         }
 
 
         {
             String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F");
-            assertTrue(response.indexOf("20050614070159") != -1);
-            assertTrue(response.indexOf("20060614070159") != -1);
+            assertTrue(response.contains("20050614070159"));
+            assertTrue(response.contains("20060614070159"));
+            Document xml = parseXml(response);
+            assertEquals("2", xpath(xml, "/wayback/request/numreturned").getTextContent());
+            assertEquals("2", xpath(xml, "/wayback/request/numresults").getTextContent());
         }
 
         POST("/test", "@alias http://example.com/ http://www.nla.gov.au/\n- 20100614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20100614070144-00003-crawling016.archive.org\n");
@@ -74,27 +83,47 @@ public class WebappTest {
             assertTrue(response.contains("20060614070159"));
             assertTrue(response.contains("20100614070159"));
             assertTrue(response.contains("20030614070159"));
+            Document xml = parseXml(response);
+            assertEquals("5", xpath(xml, "/wayback/request/numreturned").getTextContent());
+            assertEquals("5", xpath(xml, "/wayback/request/numresults").getTextContent());
         }
 
         {
             String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F limit:2 offset:0");
             assertEquals(2, StringUtils.countMatches(response, "<result>"));
+            Document xml = parseXml(response);
+            assertEquals("2", xpath(xml, "/wayback/request/numreturned").getTextContent());
+            assertEquals("5", xpath(xml, "/wayback/request/numresults").getTextContent());
         }
 
         {
             String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F", "count", "3", "start_page", "1");
             assertEquals(3, StringUtils.countMatches(response, "<result>"));
             assertTrue(response.contains("20050614070159"));
+            Document xml = parseXml(response);
+            assertEquals("3", xpath(xml, "/wayback/request/numreturned").getTextContent());
+            assertEquals("5", xpath(xml, "/wayback/request/numresults").getTextContent());
         }
 
         {
             String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F", "count", "3", "start_page", "2");
             assertEquals(2, StringUtils.countMatches(response, "<result>"));
             assertFalse(response.contains("20050614070159"));
+            Document xml = parseXml(response);
+            assertEquals("2", xpath(xml, "/wayback/request/numreturned").getTextContent());
+            assertEquals("5", xpath(xml, "/wayback/request/numresults").getTextContent());
         }
 
         POST("/test", "- 20060614070159 http://nla.gov.au/bad-wolf text/html bad-wolf XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n", BAD_REQUEST);
         POST("/test", "- 20060614070159 http://nla.gov.au/bad-wolf text/html bad-wolf XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n", OK, "badLines", "skip");
+    }
+
+    private static Node xpath(Document doc, String expr) throws XPathExpressionException {
+        return (Node) XPathFactory.newInstance().newXPath().compile(expr).evaluate(doc, XPathConstants.NODE);
+    }
+
+    private static Document parseXml(String xml) throws SAXException, IOException, ParserConfigurationException {
+        return DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(new InputSource(new StringReader(xml)));
     }
 
     @Test

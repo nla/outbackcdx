@@ -39,6 +39,7 @@ class Webapp implements Web.Handler {
     private final ArrayList<FilterPlugin> filterPlugins;
     private final UrlCanonicalizer canonicalizer;
     private final Map<String, ComputedField> computedFields;
+    private final long maxNumResults;
     private final WbCdxApi wbCdxApi;
 
     private static ServiceLoader<FilterPlugin> fpLoader = ServiceLoader.load(FilterPlugin.class);
@@ -57,7 +58,7 @@ class Webapp implements Web.Handler {
         return found ? ok() : notFound();
     }
 
-    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields) {
+    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields, long maxNumResults) {
         this.dataStore = dataStore;
         this.verbose = verbose;
         this.dashboardConfig = dashboardConfig;
@@ -66,6 +67,7 @@ class Webapp implements Web.Handler {
         }
         this.canonicalizer = canonicalizer;
         this.computedFields = computedFields;
+        this.maxNumResults = maxNumResults;
 
         this.filterPlugins = new ArrayList<FilterPlugin>();
         if (FeatureFlags.filterPlugins()) {
@@ -374,7 +376,7 @@ class Webapp implements Web.Handler {
         if (params.keySet().size() == 1 && params.containsKey("collection")) {
             return collectionDetails(index.db);
         } else if (params.containsKey("q")) {
-            return XmlQuery.queryIndex(request, index, this.filterPlugins, canonicalizer);
+            return new XmlQuery(request, index, this.filterPlugins, canonicalizer, maxNumResults).streamResults();
         } else {
             return wbCdxApi.queryIndex(request, index);
         }

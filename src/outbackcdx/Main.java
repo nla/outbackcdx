@@ -40,6 +40,7 @@ public class Main {
         System.err.println("  -k url realm clientid Use a Keycloak server for authorization");
         System.err.println("  -m max-open-files     Limit the number of open .sst files to control memory usage");
         System.err.println("                        (default " + maxOpenSstFilesHeuristic() + " based on system RAM and ulimit -n)");
+        System.err.println("  --max-num-results N   Max number of records to scan to calculate numresults statistic in the XML protocol (default 10000)");
         System.err.println("  -p port               Local port to listen on");
         System.err.println("  -t count              Number of web server threads");
         System.err.println("  -r count              Cap on number of rocksdb records to scan to serve a single request");
@@ -82,6 +83,7 @@ public class Main {
         long scanCap = Long.MAX_VALUE;
         long batchSize = 10*1024*1024;
         String fuzzyYaml = null;
+        long maxNumResults = 10000;
         Map<String,ComputedField> computedFields = new HashMap<>();
 
         Map<String,Object> dashboardConfig = new HashMap<>();
@@ -135,6 +137,9 @@ public class Main {
                 case "-m":
                     maxOpenSstFiles = Integer.parseInt(args[++i]);
                     break;
+                case "--max-num-results":
+                    maxNumResults = Long.parseLong(args[++i]);
+                    break;
                 case "-v":
                     verbose = true;
                     break;
@@ -175,7 +180,7 @@ public class Main {
         try {
             UrlCanonicalizer canonicalizer = new UrlCanonicalizer(fuzzyYaml);
             try (DataStore dataStore = new DataStore(dataPath, maxOpenSstFiles, replicationWindow, scanCap, canonicalizer)) {
-                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields);
+                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields, maxNumResults);
                 if (undertow) {
                     UWeb.UServer server = new UWeb.UServer(host, port, contextPath, controller, authorizer);
                     server.start();

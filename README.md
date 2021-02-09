@@ -53,6 +53,7 @@ Usage: java -jar outbackcdx.jar [options...]
   -k url realm clientid Use a Keycloak server for authorization
   -m max-open-files     Limit the number of open .sst files to control memory usage
                         (default 396 based on system RAM and ulimit -n)
+  --max-num-results N   Max number of records to scan to calculate numresults statistic in the XML protocol (default 10000)
   -p port               Local port to listen on
   -t count              Number of web server threads
   -r count              Cap on number of rocksdb records to scan to serve a single request
@@ -143,15 +144,6 @@ OpenWayback "OpenSearch" XML:
     $ curl 'http://localhost:8080/myindex?q=type:urlquery+url:http%3A%2F%2Fexample.org%2F'
     <?xml version="1.0" encoding="UTF-8"?>
     <wayback>
-       <request>
-           <startdate>19960101000000</startdate>
-           <enddate>20180526162512</enddate>
-           <type>urlquery</type>
-           <firstreturned>0</firstreturned>
-           <url>org,example)/</url>
-           <resultsrequested>10000</resultsrequested>
-           <resultstype>resultstypecapture</resultstype>
-       </request>
        <results>
            <result>
                <compressedoffset>396</compressedoffset>
@@ -167,6 +159,17 @@ OpenWayback "OpenSearch" XML:
                <capturedate>20030402160014</capturedate>
            </result>
        </results>
+       <request>
+           <startdate>19960101000000</startdate>
+           <enddate>20180526162512</enddate>
+           <type>urlquery</type>
+           <firstreturned>0</firstreturned>
+           <url>org,example)/</url>
+           <resultsrequested>10000</resultsrequested>
+           <resultstype>resultstypecapture</resultstype>
+           <numreturned>1</numreturned>
+           <numresults>1</numresults>
+       </request>
     </wayback>
 
 Query URLs that match a given URL prefix:
