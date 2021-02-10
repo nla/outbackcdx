@@ -14,6 +14,18 @@
         <maven.compiler.target>1.8</maven.compiler.target>
     </properties>
 
+    <profiles>
+        <profile>
+            <id>release-8</id>
+            <activation>
+                <jdk>[9,)</jdk>
+            </activation>
+            <properties>
+                <maven.compiler.release>8</maven.compiler.release>
+            </properties>
+        </profile>
+    </profiles>
+
     <build>
         <sourceDirectory>${basedir}/src</sourceDirectory>
         <testSourceDirectory>${basedir}/test</testSourceDirectory>
@@ -166,5 +178,4 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-
 </project>
