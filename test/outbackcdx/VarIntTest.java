@@ -9,7 +9,15 @@ import static org.junit.Assert.assertEquals;
 public class VarIntTest {
     @Test
     public void testVarIntRoundTrip() {
-        long testValue = 632662171617822L;
+        roundTrip(632662171617822L);
+        roundTrip(0);
+        roundTrip(-1);
+        roundTrip(-42);
+        roundTrip(Long.MIN_VALUE);
+        roundTrip(Long.MAX_VALUE);
+    }
+
+    private void roundTrip(long testValue) {
         ByteBuffer bb = ByteBuffer.allocate(32);
         VarInt.encode(bb, testValue);
         assertEquals(VarInt.size(testValue), bb.position());

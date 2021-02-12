@@ -59,7 +59,7 @@ public class VarInt {
 
     public static int size(long x) {
         int size = 1;
-        while (x > 127) {
+        while (Long.compareUnsigned(x, 127) > 0) {
             size++;
             x >>>= 7;
         }
@@ -67,7 +67,7 @@ public class VarInt {
     }
 
     public static void encode(ByteBuffer bb, long x) {
-        while (x > 127) {
+        while (Long.compareUnsigned(x, 127) > 0) {
             bb.put((byte) (x & 127 | 128));
             x >>>= 7;
         }
