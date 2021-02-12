@@ -53,7 +53,7 @@ public class Capture {
     public String mimetype;
     public int status;
     public String digest;
-    public long length;
+    public long length = -1;
     public String file;
     public long compressedoffset;
     public String redirecturl;
@@ -334,7 +334,7 @@ public class Capture {
         out.append(digest).append(" ");
         out.append(redirecturl).append(" ");
         out.append(robotflags).append(" ");
-        out.append(Long.toString(length)).append(" ");
+        out.append((length == -1) ? "-" : length).append(" ");
         out.append(compressedoffset).append(" ");
         out.append(file);
 
@@ -393,7 +393,7 @@ public class Capture {
 
         if (fields.length >= 11) { // 11 fields: CDX N b a m s k r M S V g
             capture.robotflags = fields[7];
-            capture.length = fields[8].equals("-") ? 0 : Long.parseLong(fields[8]);
+            capture.length = fields[8].equals("-") ? -1 : Long.parseLong(fields[8]);
             capture.compressedoffset = Long.parseLong(fields[9]);
             capture.file = fields[10];
 
@@ -478,7 +478,7 @@ public class Capture {
             case "robotflags":
                 return robotflags;
             case "length":
-                return length;
+                return (length == -1) ? "-" : length;
             case "offset":
                 return compressedoffset;
             case "filename":
@@ -490,7 +490,11 @@ public class Capture {
             case "originalFilename":
                 return originalFile;
             case "range":
-                return "bytes=" + compressedoffset + "-" + (compressedoffset + length - 1);
+                if (length == -1) {
+                    return "bytes=" + compressedoffset + "-";
+                } else {
+                    return "bytes=" + compressedoffset + "-" + (compressedoffset + length - 1);
+                }
             default:
                 throw new IllegalArgumentException("no such capture field: " + field);
         }
