@@ -3,7 +3,7 @@ package outbackcdx;
 import java.util.function.Predicate;
 
 public class Query {
-    private static final String DEFAULT_FIELDS = "urlkey,timestamp,original,mimetype,statuscode,digest,redirecturl,robotflags,length,offset,filename";
+    private static final String DEFAULT_FIELDS = "urlkey,timestamp,url,mime,status,digest,redirecturl,robotflags,length,offset,filename";
     private static final String DEFAULT_FIELDS_CDX14 = DEFAULT_FIELDS + ",originalLength,originalOffset,originalFilename";
 
     public static final long MIN_TIMESTAMP = 0l;

@@ -4,14 +4,13 @@ import org.apache.commons.codec.binary.Base32;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,15 +48,15 @@ public class Capture {
 
     public String urlkey;
     public long timestamp;
-    public String original;
-    public String mimetype;
-    public int status;
-    public String digest;
+    public String original = "-";
+    public String mimetype = "-";
+    public int status = -1;
+    public String digest = "-";
     public long length = -1;
-    public String file;
-    public long compressedoffset;
-    public String redirecturl;
-    public String robotflags;
+    public String file = "-";
+    public long compressedoffset = -1;
+    public String redirecturl = "-";
+    public String robotflags = "-";
 
     // Additional properties for CDX14
     public long originalLength = -1;
@@ -382,6 +381,10 @@ public class Capture {
 
     public static Capture fromCdxLine(String line, UrlCanonicalizer canonicalizer) {
         String[] fields = line.split(" ");
+        if (fields.length > 2 && fields[2].startsWith("{")) {
+            return fromCdxjLine(line, canonicalizer);
+        }
+
         Capture capture = new Capture();
         capture.timestamp = parseCdxTimestamp(fields[1]);
         capture.original = fields[2];
@@ -414,7 +417,20 @@ public class Capture {
 
         return capture;
     }
-    
+
+    @SuppressWarnings("unchecked")
+    private static Capture fromCdxjLine(String line, UrlCanonicalizer canonicalizer) {
+        String[] fixedFields = line.split(" ", 3);
+        Capture capture = new Capture();
+        capture.urlkey = fixedFields[0];
+        capture.timestamp = parseCdxTimestamp(fixedFields[1]);
+        Map<String,Object> json = Json.GSON.fromJson(fixedFields[2], Map.class);
+        for (Map.Entry<String, Object> entry: json.entrySet()) {
+            capture.put(entry.getKey(), entry.getValue());
+        }
+        return capture;
+    }
+
     /**
      * Convert a 14 digit CDX timestamp into a 64 bit integer (long). If the supplied string is too short, 0 will be
      * appended to pad it out. If the supplied string is to long, an exception will be thrown.
@@ -450,6 +466,87 @@ public class Capture {
         return Date.from(LocalDateTime.parse(timestampstr, arcTimeFormat).toInstant(ZoneOffset.UTC));
     }
 
+    private static long coerceLong(Object value) {
+        if (value == null) {
+            return -1;
+        } else if (value instanceof String) {
+            return Long.parseLong((String)value);
+        } else if (value instanceof Long) {
+            return (Long) value;
+        } else if (value instanceof Integer) {
+            return (long) (Integer)value;
+        } else {
+            throw new IllegalArgumentException(value.getClass().getName());
+        }
+    }
+
+    private static String coerceString(Object value) {
+        if (value == null) {
+            return "-";
+        } else if (value instanceof String) {
+            return (String)value;
+        } else {
+            throw new IllegalArgumentException(value.getClass().getName());
+        }
+    }
+
+    private void put(String field, Object value) {
+        try {
+            switch (field) {
+                case "urlkey":
+                    urlkey = coerceString(value);
+                    break;
+                case "timestamp":
+                    timestamp = coerceLong(value);
+                    break;
+                case "url":
+                case "original":
+                    original = coerceString(value);
+                    break;
+                case "mime":
+                case "mimetype":
+                    mimetype = coerceString(value);
+                    break;
+                case "statuscode":
+                case "status":
+                    status = (int) coerceLong(value);
+                    break;
+                case "digest":
+                    digest = coerceString(value);
+                    break;
+                case "redirecturl":
+                case "redirect":
+                    redirecturl = coerceString(value);
+                    break;
+                case "robotflags":
+                    robotflags = coerceString(value);
+                    break;
+                case "length":
+                    length = coerceLong(value);
+                    break;
+                case "offset":
+                    compressedoffset = coerceLong(value);
+                    break;
+                case "filename":
+                    file = coerceString(value);
+                    break;
+                case "originalLength":
+                    originalLength = coerceLong(value);
+                    break;
+                case "originalOffset":
+                    originalCompressedoffset = coerceLong(value);
+                    break;
+                case "originalFilename":
+                    originalFile = coerceString(value);
+                    break;
+                default:
+                    throw new IllegalArgumentException("no such capture field: " + field);
+            }
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("expected a number in field " + field, e);
+        }
+    }
+
     /**
      * Gets the value of a field by name. We support several names as pywb and wayback-cdx-server use different names.
      *
@@ -478,15 +575,15 @@ public class Capture {
             case "robotflags":
                 return robotflags;
             case "length":
-                return (length == -1) ? "-" : length;
+                return (length == -1) ? null : length;
             case "offset":
                 return compressedoffset;
             case "filename":
                 return file;
             case "originalLength":
-                return (originalLength != -1) ? originalLength : "-";
+                return (originalLength != -1) ? originalLength : null;
             case "originalOffset":
-                return (originalCompressedoffset != -1) ? originalCompressedoffset : "-";
+                return (originalCompressedoffset != -1) ? originalCompressedoffset : null;
             case "originalFilename":
                 return originalFile;
             case "range":
