@@ -136,7 +136,8 @@ public class HmacField implements ComputedField {
                     value = "\r\n";
                     break;
                 default:
-                    value = capture.get(variable).toString();
+                    Object obj = capture.get(variable);
+                    value = obj == null ? "-" : obj.toString();
                     break;
             }
             matcher.appendReplacement(buffer, value);
