@@ -1,5 +1,7 @@
 package outbackcdx;
 
+import org.apache.commons.collections4.iterators.PeekingIterator;
+
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
@@ -27,6 +29,7 @@ public class XmlQuery {
     final long offset;
     final long limit;
     final String queryType;
+    final Long queryDate;
     private final long maxNumResults;
 
     public XmlQuery(Web.Request request, Index index, Iterable<FilterPlugin> filterPlugins, UrlCanonicalizer canonicalizer, long maxNumResults) {
@@ -39,6 +42,7 @@ public class XmlQuery {
         accessPoint = params.get("accesspoint");
         queryType = query.getOrDefault("type", "urlquery").toLowerCase();
         queryUrl = canonicalizer.surtCanonicalize(query.get("url"));
+        queryDate = query.containsKey("date") ? Long.parseLong(query.get("date")) : null;
 
         String countParam = params.get("count");
         if (countParam != null) {
@@ -120,7 +124,10 @@ public class XmlQuery {
         boolean wroteHeader = false;
         long numReturned = 0;
         long numResults = 0;
-        for (Capture capture : index.queryAP(queryUrl, accessPoint)) {
+        boolean scanningForClosestDate = queryDate != null;
+        PeekingIterator<Capture> iterator = new PeekingIterator<>(index.queryAP(queryUrl, accessPoint).iterator());
+        while (iterator.hasNext()) {
+            Capture capture = iterator.next();
             if (numResults < offset) { // skip matches before offset
                 numResults++;
                 continue;
@@ -152,6 +159,20 @@ public class XmlQuery {
             writeElement(out, "robotflags", capture.robotflags);
             writeElement(out, "url", capture.original);
             writeElement(out, "capturedate", capture.timestamp);
+
+            // if the query includes a date annotate the closest capture to that date
+            // since we scan the captures in date order we just have to wait until the next capture is further away
+            // from the query date than the current one, annotate it and then stop
+            if (scanningForClosestDate) {
+                Capture next = iterator.peek();
+                long thisDistance = Math.abs(queryDate - capture.timestamp);
+                long nextDistance = next == null ? Long.MAX_VALUE : Math.abs(queryDate - next.timestamp);
+                if (thisDistance < nextDistance) {
+                    writeElement(out, "closest", "true");
+                    scanningForClosestDate = false;
+                }
+            }
+
             out.writeEndElement(); // </result>
             numReturned++;
         }

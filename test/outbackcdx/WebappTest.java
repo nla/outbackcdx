@@ -78,7 +78,7 @@ public class WebappTest {
 
         POST("/test", "@alias http://example.com/ http://www.nla.gov.au/\n- 20100614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20100614070144-00003-crawling016.archive.org\n");
         {
-            String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F");
+            String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F date:20060614070000");
             assertTrue(response.contains("20050614070159"));
             assertTrue(response.contains("20060614070159"));
             assertTrue(response.contains("20100614070159"));
@@ -86,6 +86,7 @@ public class WebappTest {
             Document xml = parseXml(response);
             assertEquals("5", xpath(xml, "/wayback/request/numreturned").getTextContent());
             assertEquals("5", xpath(xml, "/wayback/request/numresults").getTextContent());
+            assertEquals("20060614070159", xpath(xml, "//result[closest]/capturedate").getTextContent());
         }
 
         {
