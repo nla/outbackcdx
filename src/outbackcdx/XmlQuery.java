@@ -165,9 +165,7 @@ public class XmlQuery {
             // from the query date than the current one, annotate it and then stop
             if (scanningForClosestDate) {
                 Capture next = iterator.peek();
-                long thisDistance = Math.abs(queryDate - capture.timestamp);
-                long nextDistance = next == null ? Long.MAX_VALUE : Math.abs(queryDate - next.timestamp);
-                if (thisDistance < nextDistance) {
+                if (next == null || Math.abs(queryDate - capture.timestamp) < Math.abs(queryDate - next.timestamp)) {
                     writeElement(out, "closest", "true");
                     scanningForClosestDate = false;
                 }
