@@ -44,6 +44,7 @@ public class Main {
         System.err.println("  -p port               Local port to listen on");
         System.err.println("  -t count              Number of web server threads");
         System.err.println("  -r count              Cap on number of rocksdb records to scan to serve a single request");
+        System.err.println("  -s                    Strips schemes from the digest of any incoming CDX lines, if applicable");
         System.err.println("  -x                    Output CDX14 by default (instead of CDX11)");
         System.err.println("  -v                    Verbose logging");
         System.err.println("  -y file               Custom fuzzy match canonicalization YAML configuration file");
@@ -76,6 +77,7 @@ public class Main {
         File dataPath = new File("data");
         int maxOpenSstFiles = maxOpenSstFilesHeuristic();
         boolean verbose = false;
+        boolean stripDigestScheme = false;
         Authorizer authorizer = new NullAuthorizer();
         int pollingInterval = 10;
         List<String> collectionUrls = new ArrayList<>();
@@ -140,6 +142,9 @@ public class Main {
                 case "--max-num-results":
                     maxNumResults = Long.parseLong(args[++i]);
                     break;
+                case "-s":
+                    stripDigestScheme = true;
+                    break;
                 case "-v":
                     verbose = true;
                     break;
@@ -180,7 +185,7 @@ public class Main {
         try {
             UrlCanonicalizer canonicalizer = new UrlCanonicalizer(fuzzyYaml);
             try (DataStore dataStore = new DataStore(dataPath, maxOpenSstFiles, replicationWindow, scanCap, canonicalizer)) {
-                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields, maxNumResults);
+                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields, maxNumResults, stripDigestScheme);
                 if (undertow) {
                     UWeb.UServer server = new UWeb.UServer(host, port, contextPath, controller, authorizer);
                     server.start();
