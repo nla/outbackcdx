@@ -33,7 +33,6 @@ import org.rocksdb.TransactionLogIterator.BatchResult;
 
 class Webapp implements Web.Handler {
     private final boolean verbose;
-    private final boolean stripDigestScheme;
     private final DataStore dataStore;
     private final Web.Router router;
     private final Map<String,Object> dashboardConfig;
@@ -59,10 +58,9 @@ class Webapp implements Web.Handler {
         return found ? ok() : notFound();
     }
 
-    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields, long maxNumResults, boolean stripDigestScheme) {
+    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields, long maxNumResults) {
         this.dataStore = dataStore;
         this.verbose = verbose;
-        this.stripDigestScheme = stripDigestScheme;
         this.dashboardConfig = dashboardConfig;
         if (canonicalizer == null) {
             canonicalizer = new UrlCanonicalizer();
@@ -249,12 +247,6 @@ class Webapp implements Web.Handler {
                     } else {
                         try  {
                             Capture capture = Capture.fromCdxLine(line, canonicalizer);
-
-                            // remove the protocol, if applicable
-                            if(this.stripDigestScheme && capture.digest.contains(":")) {
-                                capture.digest = capture.digest.split(":")[1];
-                            }
-
                             batch.putCapture(capture);
                             added++;
                         } catch (Exception e) {

@@ -394,6 +394,11 @@ public class Capture {
         capture.digest = fields[5];
         capture.redirecturl = fields[6];
 
+        // remove the digest scheme, if applicable
+        if(capture.digest.contains(":")) {
+            capture.digest = capture.digest.split(":")[1];
+        }
+
         if (fields.length >= 11) { // 11 fields: CDX N b a m s k r M S V g
             capture.robotflags = fields[7];
             capture.length = fields[8].equals("-") ? -1 : Long.parseLong(fields[8]);
