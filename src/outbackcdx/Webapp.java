@@ -246,8 +246,7 @@ class Webapp implements Web.Handler {
                         added++;
                     } else {
                         try  {
-                            Capture capture = Capture.fromCdxLine(line, canonicalizer);
-                            batch.putCapture(capture);
+                            batch.putCapture(Capture.fromCdxLine(line, canonicalizer));
                             added++;
                         } catch (Exception e) {
                             if (skipBadLines) {
