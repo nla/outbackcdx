@@ -35,6 +35,16 @@ public class CaptureTest {
     }
 
     @Test
+    public void testCdxDigestScheme() {
+        Capture src = Capture.fromCdxLine("- 19870102030405 http://example.org/ text/html 200 sha1:M5ORM4XQ5QCEZEDRNZRGSWXPCOGUVASI - 100 test.warc.gz", new UrlCanonicalizer());
+        Capture dst = new Capture(src.encodeKey(), src.encodeValue());
+        assertEquals(-1, src.length);
+        assertEquals(100, src.compressedoffset);
+        assertFieldsEqual(src, dst);
+        assertEquals("org,example)/ 19870102030405 http://example.org/ text/html 200 M5ORM4XQ5QCEZEDRNZRGSWXPCOGUVASI - - - 100 test.warc.gz - - -", dst.toString());
+    }
+
+    @Test
     public void testCdxj() {
         Capture src = Capture.fromCdxLine("com,example)/robots.txt 20210203115119 {\"url\": \"https://example.org/robots.txt\", \"mime\": \"unk\", \"status\": \"400\", \"digest\": \"3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ\", \"length\": \"451\", \"offset\": \"90493\", \"filename\": \"example.warc.gz\"}", new UrlCanonicalizer());
         Capture dst = new Capture(src.encodeKey(), src.encodeValue());

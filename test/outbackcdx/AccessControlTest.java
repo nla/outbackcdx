@@ -24,7 +24,7 @@ public class AccessControlTest {
     @BeforeClass
     public static void setUp() throws RocksDBException {
         RocksDB.loadLibrary();
-        env = new RocksMemEnv();
+        env = new RocksMemEnv(Env.getDefault());
         try (Options options = new Options()
                      .setCreateIfMissing(true)
                      .setEnv(env)) {

@@ -314,7 +314,7 @@ class AccessControl {
             return false;
         }
         rulesBySurt.remove(rule);
-        db.remove(ruleCf, encodeKey(ruleId));
+        db.delete(ruleCf, encodeKey(ruleId));
         return true;
     }
 
