@@ -264,7 +264,8 @@ are applied.
 
 Aliases can be mixed with regular CDX lines either in the same file or separate files and in any order. Any existing records that the alias rule affects the canonicalised URL for will be updated when the alias is added to the index.
 
-Deletion of aliases is not yet implemented.
+Aliases can be deleted but writing new records while simultaneously deleting aliases that affect them may result in
+an inconsistent index.
 
 Tuning Memory Usage
 -------------------

@@ -460,6 +460,31 @@ public class Index {
             updateExistingRecordsWithNewAlias(dbBatch, aliasSurt, targetSurt);
         }
 
+        /**
+         * Removes an alias from the index.  Updates existing captures affected by the removed alias.
+         */
+        public void deleteAlias(String aliasSurt) throws IOException {
+            String targetSurt = resolveAlias(aliasSurt);
+            if (targetSurt.equals(aliasSurt)) return; // no such alias
+
+            try {
+                dbBatch.delete(aliasCF, aliasSurt.getBytes(US_ASCII));
+
+                // rekey records that were affected by the alias
+                // FIXME: can race with newly inserted records
+                for (Capture capture : rawQuery(targetSurt, null, false)) {
+                    String surt = canonicalizer.surtCanonicalize(capture.original);
+                    if (surt.equals(aliasSurt) && !surt.equals(capture.urlkey)) {
+                        dbBatch.delete(capture.encodeKey());
+                        capture.urlkey = surt;
+                        dbBatch.put(capture.encodeKey(), capture.encodeValue());
+                    }
+                }
+            } catch (RocksDBException e) {
+                throw new IOException(e);
+            }
+        }
+
         public void commit() throws IOException {
             try {
                 commitBatch(dbBatch);

@@ -195,10 +195,10 @@ class Webapp implements Web.Handler {
 
                 try {
                     if (line.startsWith("@alias ")) {
-                        throw new UnsupportedOperationException("Deleting of aliases is not yet implemented");
-                    }
-
-                    if (recanonicalize) {
+                        String[] fields = line.split(" ");
+                        String aliasSurt = canonicalizer.surtCanonicalize(fields[1]);
+                        batch.deleteAlias(aliasSurt);
+                    } else if (recanonicalize) {
                         batch.deleteCapture(Capture.fromCdxLine(line, canonicalizer));
                     } else {
                         String[] fields = line.split(" ", 3);
