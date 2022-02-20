@@ -1,4 +1,4 @@
-FROM maven:3-adoptopenjdk-11 as build-env
+FROM maven:3-eclipse-temurin-17 as build-env
 
 RUN apt-get update \
  && apt-get install -y libsnappy-dev \
@@ -29,7 +29,7 @@ RUN export JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF8 && \
     mvn -B -s /usr/share/maven/ref/settings-docker.xml -DskipTests package && \
     mvn package
 
-FROM adoptopenjdk:11-jdk-hotspot
+FROM eclipse-temurin:17
 
 RUN apt-get update && apt-get install -y libsnappy-dev dumb-init \
  && rm -rf /var/lib/apt/lists/*
