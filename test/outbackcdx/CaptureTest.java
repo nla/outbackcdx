@@ -46,10 +46,11 @@ public class CaptureTest {
 
     @Test
     public void testCdxj() {
-        Capture src = Capture.fromCdxLine("com,example)/robots.txt 20210203115119 {\"url\": \"https://example.org/robots.txt\", \"mime\": \"unk\", \"status\": \"400\", \"digest\": \"3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ\", \"length\": \"451\", \"offset\": \"90493\", \"filename\": \"example.warc.gz\"}", new UrlCanonicalizer());
+        Capture src = Capture.fromCdxLine("com,example)/robots.txt 20210203115119 {\"url\": \"https://example.org/robots.txt\", \"mime\": \"unk\", \"status\": \"400\", \"digest\": \"3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ\", \"length\": \"451\", \"offset\": \"90493\", \"filename\": \"example.warc.gz\", \"method\": \"POST\"}", new UrlCanonicalizer());
         Capture dst = new Capture(src.encodeKey(), src.encodeValue());
         assertEquals(451, src.length);
         assertEquals(90493, src.compressedoffset);
+        assertEquals("POST", src.method);
         assertFieldsEqual(src, dst);
         assertEquals("com,example)/robots.txt 20210203115119 https://example.org/robots.txt unk 400 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 451 90493 example.warc.gz - - -", dst.toString());
     }

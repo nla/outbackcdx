@@ -63,6 +63,9 @@ public class Capture {
     public long originalCompressedoffset = -1;
     public String originalFile = "-";
 
+    // pywb adds this to the CDXJ for POST requests
+    public String method = "GET";
+
     protected static Pattern URLKEY_POSTDATA_REGEX =
             Pattern.compile("[?&](__wb_post_data|__warc_post_data)=([^&]+).*$", Pattern.CASE_INSENSITIVE);
 
@@ -544,6 +547,9 @@ public class Capture {
                 case "originalFilename":
                     originalFile = coerceString(value);
                     break;
+                case "method":
+                    method = coerceString(value);
+                    break;
                 default:
                     throw new IllegalArgumentException("no such capture field: " + field);
             }
@@ -597,6 +603,8 @@ public class Capture {
                 } else {
                     return "bytes=" + compressedoffset + "-" + (compressedoffset + length - 1);
                 }
+            case "method":
+                return method;
             default:
                 throw new IllegalArgumentException("no such capture field: " + field);
         }
