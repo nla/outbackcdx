@@ -4,11 +4,7 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.*;
 import java.util.function.Predicate;
 
 import org.rocksdb.ColumnFamilyHandle;
@@ -250,6 +246,14 @@ public class Index {
     }
 
     public String resolveAlias(String surt) {
+        Set<String> seen = new HashSet<>();
+        for (int i = 0; i < 32 && seen.add(surt); i++) {
+            surt = resolveAliasOnce(surt);
+        }
+        return surt;
+    }
+
+    public String resolveAliasOnce(String surt) {
         try {
             byte[] resolved = db.get(aliasCF, surt.getBytes(StandardCharsets.US_ASCII));
             if (resolved != null) {
