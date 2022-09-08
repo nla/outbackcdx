@@ -191,7 +191,9 @@ class Webapp implements Web.Handler {
         return new Response(OK, "text/plain", out -> {
             PrintWriter writer = new PrintWriter(out);
             Map<String,CubeTally> tallyMap = new HashMap<>();
-            try (ReadOptions readOptions = new ReadOptions().setTailing(true).setFillCache(false);
+            try (ReadOptions readOptions = new ReadOptions().setTailing(true)
+                    .setFillCache(false)
+                    .setReadaheadSize(2*1024*1024);
                  RocksIterator iterator = index.db.newIterator(readOptions)) {
                 for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
                     Capture capture = new Capture(iterator.key(), iterator.value());
