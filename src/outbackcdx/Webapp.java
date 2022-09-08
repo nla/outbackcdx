@@ -195,9 +195,11 @@ class Webapp implements Web.Handler {
                  RocksIterator iterator = index.db.newIterator(readOptions)) {
                 for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
                     Capture capture = new Capture(iterator.key(), iterator.value());
-                    int i = capture.urlkey.indexOf(')');
-                    String host = i >= 0 ? capture.urlkey.substring(0, i) : capture.urlkey;
-
+                    int paren = capture.urlkey.indexOf(')');
+                    int slash = capture.urlkey.indexOf('/');
+                    if (paren < 0) paren = capture.urlkey.length();
+                    if (slash < 0) slash = capture.urlkey.length();
+                    String host = capture.urlkey.substring(0, Math.min(paren, slash));
 
                     String key = host + " " + capture.mimetype + " " + capture.status + " " +
                             String.valueOf(capture.timestamp).substring(0, 4);
@@ -209,7 +211,7 @@ class Webapp implements Web.Handler {
                     }
                 }
                 writeCubeTallies(tallyMap, writer);
-                    writer.flush();
+                writer.flush();
             }
         });
     }
