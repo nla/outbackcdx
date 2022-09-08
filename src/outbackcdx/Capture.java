@@ -185,7 +185,7 @@ public class Capture {
         status = (int) VarInt.decode(bb);
         mimetype = VarInt.decodeAscii(bb);
         length = VarInt.decode(bb);
-        digest = base32.encodeAsString(VarInt.decodeBytes(bb));
+        digest = base32Encode(VarInt.decodeBytes(bb));
         file = VarInt.decodeAscii(bb);
         compressedoffset = VarInt.decode(bb);
         redirecturl = VarInt.decodeAscii(bb);
@@ -209,7 +209,7 @@ public class Capture {
         status = (int) VarInt.decode(bb);
         mimetype = VarInt.decodeAscii(bb);
         length = VarInt.decode(bb);
-        digest = base32.encodeAsString(VarInt.decodeBytes(bb));
+        digest = base32Encode(VarInt.decodeBytes(bb));
         redirecturl = VarInt.decodeAscii(bb);
         robotflags = VarInt.decodeAscii(bb);
         originalLength = VarInt.decode(bb);
@@ -600,5 +600,28 @@ public class Capture {
             default:
                 throw new IllegalArgumentException("no such capture field: " + field);
         }
+    }
+
+    private static final String BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+    static String base32Encode(byte[] data) {
+        StringBuilder out = new StringBuilder(data.length / 5 * 8);
+        for (int i = 0; i < data.length; i += 5) {
+            long buf = 0;
+
+            // read 5 bytes
+            for (int j = 0; j < 5; j++) {
+                buf <<= 8;
+                if (i + j < data.length) {
+                    buf += data[i + j] & 0xff;
+                }
+            }
+
+            // write 8 base32 characters
+            for (int j = 0; j < 8; j++) {
+                out.append(BASE32_ALPHABET.charAt((int)((buf >> ((7-j) * 5)) & 31)));
+            }
+        }
+        return out.toString();
     }
 }
