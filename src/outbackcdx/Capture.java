@@ -610,10 +610,18 @@ public class Capture {
             long buf = 0;
 
             // read 5 bytes
-            for (int j = 0; j < 5; j++) {
-                buf <<= 8;
-                if (i + j < data.length) {
-                    buf += data[i + j] & 0xff;
+            if (i + 5 < data.length) {
+                buf = (data[i] & 0xFFL) << (8 * 4) |
+                        (data[i + 1] & 0xFFL) << (8 * 3) |
+                        (data[i + 2] & 0xFFL) << (8 * 2) |
+                        (data[i + 3] & 0xFFL) << 8 |
+                        (data[i + 4] & 0xFFL);
+            } else {
+                for (int j = 0; j < 5; j++) {
+                    buf <<= 8;
+                    if (i + j < data.length) {
+                        buf += data[i + j] & 0xff;
+                    }
                 }
             }
 
