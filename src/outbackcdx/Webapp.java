@@ -17,6 +17,9 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -186,24 +189,37 @@ class Webapp implements Web.Handler {
         });
     }
 
+    private static final Pattern VALID_MEDIA_TYPE =
+            Pattern.compile("[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*");
+
     Response cube(Web.Request request) throws ResponseException, IOException {
         Index index = getIndex(request);
         return new Response(OK, "text/plain", out -> {
             PrintWriter writer = new PrintWriter(out);
             Map<String,CubeTally> tallyMap = new HashMap<>();
+            Matcher mediaTypeMatcher = VALID_MEDIA_TYPE.matcher("");
             try (ReadOptions readOptions = new ReadOptions().setTailing(true)
                     .setFillCache(false)
                     .setReadaheadSize(2*1024*1024);
                  RocksIterator iterator = index.db.newIterator(readOptions)) {
                 for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
                     Capture capture = new Capture(iterator.key(), iterator.value());
+
+                    // extract host from urlkey
                     int paren = capture.urlkey.indexOf(')');
                     int slash = capture.urlkey.indexOf('/');
                     if (paren < 0) paren = capture.urlkey.length();
                     if (slash < 0) slash = capture.urlkey.length();
                     String host = capture.urlkey.substring(0, Math.min(paren, slash));
 
-                    String key = host + " " + capture.mimetype + " " + capture.status + " " +
+                    // validate mimetype to reduce long tail
+                    String mimetype = capture.mimetype;
+                    mediaTypeMatcher.reset(mimetype);
+                    if (!mediaTypeMatcher.matches()) {
+                        mimetype = "-";
+                    }
+
+                    String key = host + " " + mimetype + " " + capture.status + " " +
                             String.valueOf(capture.timestamp).substring(0, 4);
                     tallyMap.computeIfAbsent(key, k -> new CubeTally()).add(capture.length);
 
