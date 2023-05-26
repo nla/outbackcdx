@@ -107,8 +107,8 @@ public class AccessControlTest {
     public void testPattern() {
         assertEquals("au,gov,", AccessControl.toSsurtPrefix("*.gov.au"));
         assertEquals("au,gov,", AccessControl.toSsurtPrefix("*.GOV.AU"));
-        assertEquals("com,example,//http:/foo/", AccessControl.toSsurtPrefix("http://EXAMPLE.com/foo/*"));
-        assertEquals("com,example,//http:/foo/ ", AccessControl.toSsurtPrefix("http://example.com/foo/"));
+        assertEquals("com,example,//http:/foo", AccessControl.toSsurtPrefix("http://EXAMPLE.com/foo/*"));
+        assertEquals("com,example,//http:/foo ", AccessControl.toSsurtPrefix("http://example.com/foo/"));
     }
 
     @Test
