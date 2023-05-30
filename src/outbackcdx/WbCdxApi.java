@@ -1,5 +1,6 @@
 package outbackcdx;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.google.gson.stream.JsonWriter;
 import outbackcdx.NanoHTTPD.Response;
 
@@ -7,10 +8,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
@@ -219,24 +217,32 @@ public class WbCdxApi {
             writer.write(' ');
             writer.write(String.valueOf(capture.timestamp));
             writer.write(' ');
-            JsonWriter jsonWriter = new JsonWriter(writer);
-            List<String> filteredFields = Arrays.stream(query.fields).filter(f -> !f.equals("urlkey") && !f.equals("timestamp")).collect(toList());
-            jsonWriter.beginObject();
-            for (String field : filteredFields) {
-                Object value = computeField(capture, field);
-                if (value == null || "-".equals(value)) {
-                    // omit it
-                } else if (value instanceof Long) {
-                    jsonWriter.name(field).value(value.toString()); // pywb uses strings for everything
-                } else if (value instanceof Integer) {
-                    jsonWriter.name(field).value(value.toString()); // pywb uses strings for everything
-                } else if (value instanceof String) {
-                    jsonWriter.name(field).value((String) value);
-                } else {
-                    throw new UnsupportedOperationException("Don't know how to format: " + field + " (" + value.getClass() + ")");
+            try (JsonGenerator generator = Json.JSON_MAPPER.createGenerator(writer)) {
+                List<String> filteredFields = Arrays.stream(query.fields).filter(f -> !f.equals("urlkey") && !f.equals("timestamp")).collect(toList());
+                generator.writeStartObject();
+                for (String field : filteredFields) {
+                    Object value = computeField(capture, field);
+                    if (value == null || "-".equals(value)) {
+                        // omit it
+                    } else if (value instanceof Long) {
+                        generator.writeStringField(field, value.toString()); // pywb uses strings for everything
+                    } else if (value instanceof Integer) {
+                        generator.writeStringField(field, value.toString()); // pywb uses strings for everything
+                    } else if (value instanceof String) {
+                        generator.writeStringField(field, (String) value);
+                    } else {
+                        generator.writeFieldName(field);
+                        Json.JSON_MAPPER.writeValue(generator, value);
+                    }
                 }
+                if (query.allFields && capture.extra != null) {
+                    for (Map.Entry<String, Object> entry : capture.extra.entrySet()) {
+                        generator.writeFieldName(entry.getKey());
+                        Json.JSON_MAPPER.writeValue(generator, entry.getValue());
+                    }
+                }
+                generator.writeEndObject();
             }
-            jsonWriter.endObject();
             writer.write('\n');
         }
     }

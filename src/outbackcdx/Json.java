@@ -1,5 +1,8 @@
 package outbackcdx;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.TypeAdapter;
@@ -16,6 +19,11 @@ public class Json {
             .setDateFormat("yyyy-MM-dd'T'HH:mm:ssZ")
             .registerTypeAdapter(Period.class, new PeriodTypeAdapter())
             .create();
+    public static final CBORFactory CBOR_FACTORY = new CBORFactory();
+    public static final ObjectMapper CBOR_MAPPER = new ObjectMapper(CBOR_FACTORY);
+    public static final JsonFactory JSON_FACTORY = new JsonFactory();
+    public static final ObjectMapper JSON_MAPPER = new ObjectMapper(JSON_FACTORY);
+
     private static class PeriodTypeAdapter extends TypeAdapter<Period> {
         @Override
         public void write(JsonWriter out, Period value) throws IOException {

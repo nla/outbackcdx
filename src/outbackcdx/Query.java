@@ -16,6 +16,7 @@ public class Query {
     String urlkey;
     String closest;
     String[] fields;
+    boolean allFields;
     boolean outputJson;
     long limit;
     Predicate<Capture> predicate;
@@ -61,6 +62,7 @@ public class Query {
             collapseToLastSpec = params.get("collapseToLast");
         }
 
+        allFields = !params.containsKey("fl");
         String fl = params.getOrDefault("fl", FeatureFlags.cdx14() ? DEFAULT_FIELDS_CDX14 : DEFAULT_FIELDS);
         fields = fl.split(",");
 

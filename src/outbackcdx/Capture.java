@@ -1,13 +1,23 @@
 package outbackcdx;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.dataformat.cbor.CBORGenerator;
+import com.fasterxml.jackson.dataformat.cbor.CBORParser;
 import org.apache.commons.codec.binary.Base32;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -39,7 +49,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * </pre>
  * <p>
  * The record's value consists of a static list fields packed using {@link outbackcdx.VarInt}.  The first field in the
- * value is a schema version number to allow fields to be added or removed in later versions.
+ * value is a schema version number to allow fields to be added or removed in later versions. Version 5 values use CBOR
+ * encoding to allow storing arbitrary CDXJ fields.
  */
 public class Capture {
     private static final Logger log = Logger.getLogger(Capture.class.getName());
@@ -62,6 +73,7 @@ public class Capture {
     public long originalLength = -1;
     public long originalCompressedoffset = -1;
     public String originalFile = "-";
+    Map<String,Object> extra;
 
     protected static Pattern URLKEY_POSTDATA_REGEX =
             Pattern.compile("[?&](__wb_post_data|__warc_post_data)=([^&]+).*$", Pattern.CASE_INSENSITIVE);
@@ -139,9 +151,10 @@ public class Capture {
             case 3:
                 return encodeKeyV0(urlkey, timestamp);
             case 4:
+            case 5:
                 return encodeKeyV4(urlkey, timestamp, file, compressedoffset);
             default:
-                throw new IllegalArgumentException("unsupported version: " + 4);
+                throw new IllegalArgumentException("unsupported version: " + version);
         }
     }
 
@@ -163,8 +176,11 @@ public class Capture {
             case 4:
                 decodeValueV4(bb);
                 break;
+            case 5:
+                decodeValueV5(bb);
+                break;
             default:
-                throw new IllegalArgumentException("CDX encoding is too new (v" + version + ") only versions up to v4 are supported");
+                throw new IllegalArgumentException("CDX encoding is too new (v" + version + ") only versions up to v5 are supported");
         }
     }
 
@@ -217,18 +233,25 @@ public class Capture {
         originalCompressedoffset = VarInt.decode(bb);
     }
 
-    public int sizeValue() {
-        return sizeValue(FeatureFlags.indexVersion());
-    }
-
-    public int sizeValue(int version) {
-        switch (version) {
-            case 3:
-                return sizeValueV3();
-            case 4:
-                return sizeValueV4();
-            default:
-                throw new IllegalArgumentException("Unsupported version " + version);
+    public void decodeValueV5(ByteBuffer bb) {
+        ByteArrayInputStream stream = new ByteArrayInputStream(bb.array(), bb.position(), bb.limit());
+        try (CBORParser parser = Json.CBOR_FACTORY.createParser(stream)) {
+            original = parser.nextTextValue();
+            status = parser.nextIntValue(-1);
+            mimetype = parser.nextTextValue();
+            length = parser.nextLongValue(-1);
+            parser.nextToken();
+            digest = base32Encode(parser.getBinaryValue());
+            redirecturl = parser.nextTextValue();
+            robotflags = parser.nextTextValue();
+            originalLength = parser.nextLongValue(-1);
+            originalFile = parser.nextTextValue();
+            originalCompressedoffset = parser.nextLongValue(-1);
+            if (parser.nextToken() == JsonToken.START_OBJECT) {
+                extra = Json.CBOR_MAPPER.readValue(parser, new TypeReference<Map<String, Object>>() {});
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -263,24 +286,29 @@ public class Capture {
     }
 
 
-    public void encodeValue(ByteBuffer bb) {
-        encodeValue(bb, FeatureFlags.indexVersion());
-    }
-
-    private void encodeValue(ByteBuffer bb, int version) {
+    public byte[] encodeValue(int version) {
         switch (version) {
             case 3:
-                encodeValueV3(bb);
-                break;
+                ensureNoExtraFields();
+                return encodeValueV3();
             case 4:
-                encodeValueV4(bb);
-                break;
+                ensureNoExtraFields();
+                return encodeValueV4();
+            case 5:
+                return encodeValueV5();
             default:
                 throw new IllegalArgumentException("Unsupported version " + version);
         }
     }
 
-    private void encodeValueV3(ByteBuffer bb) {
+    private void ensureNoExtraFields() {
+        if (extra != null && !extra.isEmpty()) {
+            throw new IllegalStateException("Can't encode capture with extra (CDXJ) fields in index version < 5");
+        }
+    }
+
+    private byte[] encodeValueV3() {
+        ByteBuffer bb = ByteBuffer.allocate(sizeValueV3());
         VarInt.encode(bb, 3);
         VarInt.encodeAscii(bb, original);
         VarInt.encode(bb, status);
@@ -294,9 +322,11 @@ public class Capture {
         VarInt.encode(bb, originalLength);
         VarInt.encodeAscii(bb, originalFile);
         VarInt.encode(bb, originalCompressedoffset);
+        return bb.array();
     }
 
-    private void encodeValueV4(ByteBuffer bb) {
+    private byte[] encodeValueV4() {
+        ByteBuffer bb = ByteBuffer.allocate(sizeValueV4());
         VarInt.encode(bb, 4);
         VarInt.encodeAscii(bb, original);
         VarInt.encode(bb, status);
@@ -308,12 +338,30 @@ public class Capture {
         VarInt.encode(bb, originalLength);
         VarInt.encodeAscii(bb, originalFile);
         VarInt.encode(bb, originalCompressedoffset);
+        return bb.array();
     }
 
-    public byte[] encodeValue(int version) {
-        ByteBuffer bb = ByteBuffer.allocate(sizeValue(version));
-        encodeValue(bb, version);
-        return bb.array();
+    private byte[] encodeValueV5() {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        stream.write(5); // version 5
+        try (CBORGenerator generator = Json.CBOR_FACTORY.createGenerator(stream)) {
+            generator.writeString(original);
+            generator.writeNumber(status);
+            generator.writeString(mimetype);
+            generator.writeNumber(length);
+            generator.writeBinary(base32.decode(digest));
+            generator.writeString(redirecturl);
+            generator.writeString(robotflags);
+            generator.writeNumber(originalLength);
+            generator.writeString(originalFile);
+            generator.writeNumber(originalCompressedoffset);
+            if (extra != null) {
+                Json.CBOR_MAPPER.writeValue(generator, extra);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return stream.toByteArray();
     }
 
     public byte[] encodeValue() {
@@ -423,16 +471,24 @@ public class Capture {
         return capture;
     }
 
-    @SuppressWarnings("unchecked")
     private static Capture fromCdxjLine(String line, UrlCanonicalizer canonicalizer) {
         String[] fixedFields = line.split(" ", 3);
         Capture capture = new Capture();
-        capture.urlkey = fixedFields[0];
         capture.timestamp = parseCdxTimestamp(fixedFields[1]);
-        Map<String,Object> json = Json.GSON.fromJson(fixedFields[2], Map.class);
+        Map<String, Object> json;
+        try {
+            json = Json.JSON_MAPPER.readValue(fixedFields[2], new TypeReference<Map<String, Object>>() {
+            });
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Invalid JSON in CDXJ line: " + line, e);
+        }
         for (Map.Entry<String, Object> entry: json.entrySet()) {
             capture.put(entry.getKey(), entry.getValue());
         }
+        if (capture.original == null) {
+            throw new IllegalArgumentException("Missing 'url' field in CDXJ line: " + line);
+        }
+        capture.urlkey = appendWbPostData(fixedFields[0], canonicalizer.surtCanonicalize(capture.original));
         return capture;
     }
 
@@ -495,7 +551,7 @@ public class Capture {
         }
     }
 
-    private void put(String field, Object value) {
+    public void put(String field, Object value) {
         try {
             switch (field) {
                 case "urlkey":
@@ -545,7 +601,10 @@ public class Capture {
                     originalFile = coerceString(value);
                     break;
                 default:
-                    throw new IllegalArgumentException("no such capture field: " + field);
+                    if (extra == null) {
+                        extra = new HashMap<>();
+                    }
+                    extra.put(field, value);
             }
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("expected a number in field " + field, e);
@@ -598,6 +657,9 @@ public class Capture {
                     return "bytes=" + compressedoffset + "-" + (compressedoffset + length - 1);
                 }
             default:
+                if (extra != null) {
+                    return extra.get(field);
+                }
                 throw new IllegalArgumentException("no such capture field: " + field);
         }
     }

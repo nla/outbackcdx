@@ -12,11 +12,11 @@ Features:
 * Compressed indexes (varint packing + snappy), typically 1/4 - 1/5 the size of CDX files.
 * Primary-secondary replication
 * Access control (experimental, see below)
+* CDXJ (experimental, requires index version 5)
 
 Things it doesn't do (yet):
 
 * Sharding
-* CDXJ
 
 Used in production at the National Library of Australia and British Library with
 8-9 billion record indexes.

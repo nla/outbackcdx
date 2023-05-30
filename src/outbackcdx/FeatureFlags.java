@@ -16,6 +16,8 @@ public class FeatureFlags {
     private static boolean acceptWrites;
     private static boolean cdx14;
     private static int indexVersion = 3;
+    private static final int indexVersionMin = 3;
+    private static final int indexVersionMax = 5;
 
     static {
         experimentalAccessControl = "1".equals(System.getenv("EXPERIMENTAL_ACCESS_CONTROL"));
@@ -81,8 +83,9 @@ public class FeatureFlags {
     }
 
     public static void setIndexVersion(int indexVersion) {
-        if (indexVersion != 3 && indexVersion != 4) {
-            throw new IllegalArgumentException("Only index versions 3 and 4 are supported, not " + indexVersion);
+        if (indexVersion < indexVersionMin || indexVersion > indexVersionMax) {
+            throw new IllegalArgumentException("Only index versions " + indexVersionMin + "-" + indexVersionMax +
+                    " are supported, not " + indexVersion);
         }
         FeatureFlags.indexVersion = indexVersion;
     }
