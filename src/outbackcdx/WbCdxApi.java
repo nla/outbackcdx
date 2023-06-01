@@ -218,6 +218,7 @@ public class WbCdxApi {
             writer.write(String.valueOf(capture.timestamp));
             writer.write(' ');
             try (JsonGenerator generator = Json.JSON_MAPPER.createGenerator(writer)) {
+                generator.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
                 List<String> filteredFields = Arrays.stream(query.fields).filter(f -> !f.equals("urlkey") && !f.equals("timestamp")).collect(toList());
                 generator.writeStartObject();
                 for (String field : filteredFields) {
