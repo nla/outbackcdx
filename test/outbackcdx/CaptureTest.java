@@ -3,6 +3,7 @@ package outbackcdx;
 import org.junit.Test;
 
 import java.util.Arrays;
+
 import static org.junit.Assert.assertEquals;
 
 public class CaptureTest {
@@ -51,12 +52,16 @@ public class CaptureTest {
 
     @Test
     public void testCdxj() {
-        Capture src = Capture.fromCdxLine("- 20210203115119 {\"url\": \"https://example.org/robots.txt\", \"mime\": \"unk\", \"status\": \"400\", \"digest\": \"3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ\", \"length\": \"451\", \"offset\": \"90493\", \"filename\": \"example.warc.gz\", \"non-standard-field\": [\"yes\", 2, 3]}", new UrlCanonicalizer());
+        Capture src = Capture.fromCdxLine("- 20210203115119 {\"url\": \"https://example.org/robots.txt\", " +
+                "\"mime\": \"unk\", \"status\": \"400\", \"digest\": \"3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ\", " +
+                "\"length\": \"451\", \"offset\": \"90493\", \"filename\": \"example.warc.gz\", " +
+                "\"non-standard-field\": [\"yes\", 2, 3], \"method\": \"POST\", \"requestBody\": \"x=1&y=2\"}",
+                new UrlCanonicalizer());
         Capture dst = new Capture(src.encodeKey(5), src.encodeValue(5));
         assertEquals(451, src.length);
         assertEquals(90493, src.compressedoffset);
         assertFieldsEqual(src, dst);
-        assertEquals("org,example)/robots.txt 20210203115119 https://example.org/robots.txt unk 400 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 451 90493 example.warc.gz - - -", dst.toString());
+        assertEquals("org,example)/robots.txt?__wb_method=post&x=1&y=2 20210203115119 https://example.org/robots.txt unk 400 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 451 90493 example.warc.gz - - -", dst.toString());
         assertEquals(Arrays.asList("yes", 2, 3), dst.get("non-standard-field"));
     }
 
@@ -74,12 +79,14 @@ public class CaptureTest {
         UrlCanonicalizer canonicalizer = new UrlCanonicalizer();
 
         // simple url with no parameters
-        Capture cap = Capture.fromCdxLine("com,test)/append?__wb_post_data=dGVzdAo= 20200528143535 https://test.com/append application/json 202 2WC5VZGPEJIVA6BQPKMISFH7ISBVWYUQ - - 467 4846509 test.warc.gz", canonicalizer);
-        assertEquals("com,test)/append?__wb_post_data=dGVzdAo=", cap.urlkey);
+        Capture cap = Capture.fromCdxLine("com,test)/append?__wb_method=post&__wb_post_data=dGVzdAo= 20200528143535 https://test.com/append application/json 202 2WC5VZGPEJIVA6BQPKMISFH7ISBVWYUQ - - 467 4846509 test.warc.gz", canonicalizer);
+        assertEquals("com,test)/append?__wb_method=post&__wb_post_data=dgvzdao=", cap.urlkey);
+        assertEquals("POST", cap.get("method"));
+        assertEquals("__wb_post_data=dGVzdAo=", cap.get("requestBody"));
 
         // url with parameters
-        cap = Capture.fromCdxLine("com,test)/append?x=1&__wb_post_data=dGVzdAo= 20200528143535 https://test.com/append?x=1 application/json 202 2WC5VZGPEJIVA6BQPKMISFH7ISBVWYUQ - - 467 4846509 test.warc.gz", canonicalizer);
-        assertEquals("com,test)/append?x=1&__wb_post_data=dGVzdAo=", cap.urlkey);
+        cap = Capture.fromCdxLine("com,test)/append?x=1&__wb_method=post&__wb_post_data=dGVzdAo= 20200528143535 https://test.com/append?x=1 application/json 202 2WC5VZGPEJIVA6BQPKMISFH7ISBVWYUQ - - 467 4846509 test.warc.gz", canonicalizer);
+        assertEquals("com,test)/append?__wb_method=post&__wb_post_data=dgvzdao=&x=1", cap.urlkey);
     }
 
     @Test

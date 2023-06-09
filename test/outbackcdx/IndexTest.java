@@ -62,14 +62,14 @@ public class IndexTest {
     @Test
     public void testPostData() throws IOException {
         try (Index.Batch batch = index.beginUpdate()) {
-            batch.putCapture(Capture.fromCdxLine("org,post)/?__wb_post_data=dGVzdAo= 20200528143307 http://post.org/ text/html 200 - - 0 w1", index.canonicalizer));
-            batch.putCapture(Capture.fromCdxLine("org,post)/?__wb_post_data=dGVzdDIK 20200528143307 http://post.org/ text/html 200 - - 0 w1", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("org,post)/?__wb_method=post&__wb_post_data=dGVzdAo= 20200528143307 http://post.org/ text/html 200 - - 0 w1", index.canonicalizer));
+            batch.putCapture(Capture.fromCdxLine("org,post)/?__wb_method=post&__wb_post_data=dGVzdDIK 20200528143307 http://post.org/ text/html 200 - - 0 w1", index.canonicalizer));
             batch.commit();
         }
 
         List<Capture> results = new ArrayList<>();
-        index.closestQuery("org,post)/?__wb_post_data=dGVzdAo=", 20200528143307L, null).forEach(results::add);
-        assertEquals("org,post)/?__wb_post_data=dGVzdAo=", results.get(0).urlkey);
+        index.closestQuery("org,post)/?__wb_method=post&__wb_post_data=dgvzdao=", 20200528143307L, null).forEach(results::add);
+        assertEquals("org,post)/?__wb_method=post&__wb_post_data=dgvzdao=", results.get(0).urlkey);
     }
 
     @Test

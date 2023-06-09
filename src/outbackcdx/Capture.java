@@ -16,13 +16,9 @@ import java.nio.ByteOrder;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -74,9 +70,6 @@ public class Capture {
     public long originalCompressedoffset = -1;
     public String originalFile = "-";
     Map<String,Object> extra;
-
-    protected static Pattern URLKEY_POSTDATA_REGEX =
-            Pattern.compile("[?&](__wb_post_data|__warc_post_data)=([^&]+).*$", Pattern.CASE_INSENSITIVE);
 
     public Capture(Map.Entry<byte[], byte[]> entry) {
         this(entry.getKey(), entry.getValue());
@@ -301,8 +294,10 @@ public class Capture {
         }
     }
 
+    private static final Set<String> INFERRABLE_EXTRA_FIELDS = new HashSet<>(Arrays.asList("method", "requestBody"));
+
     private void ensureNoExtraFields() {
-        if (extra != null && !extra.isEmpty()) {
+        if (extra != null && !extra.isEmpty() && !INFERRABLE_EXTRA_FIELDS.containsAll(extra.keySet())) {
             throw new IllegalStateException("Can't encode capture with extra (CDXJ) fields in index version < 5");
         }
     }
@@ -406,27 +401,6 @@ public class Capture {
         return out.toString();
     }
 
-    /**
-     * If post data is available in urlkey, appends it to original url
-     * @param urlkey urlkey as passed in cdx line
-     * @param surt outbackcdx canonized surt
-     * @return surt with post-data appended
-     */
-    private static String appendWbPostData(String urlkey, String surt) {
-        Matcher matchKey = URLKEY_POSTDATA_REGEX.matcher(urlkey);
-        Matcher matchOriginal = URLKEY_POSTDATA_REGEX.matcher(surt);
-
-        if (matchKey.find() && !matchOriginal.matches() && matchKey.groupCount() > 1) {
-            StringBuilder sb = new StringBuilder(surt);
-            sb.append( surt.indexOf('?') < 0 ? '?' : '&' );
-            sb.append(matchKey.group(1));
-            sb.append("=");
-            sb.append(matchKey.group(2));
-            return sb.toString();
-        }
-        return surt;
-    }
-
     public static Capture fromCdxLine(String line, UrlCanonicalizer canonicalizer) {
         String[] fields = line.split(" ");
         if (fields.length > 2 && fields[2].startsWith("{")) {
@@ -436,7 +410,8 @@ public class Capture {
         Capture capture = new Capture();
         capture.timestamp = parseCdxTimestamp(fields[1]);
         capture.original = fields[2];
-        capture.urlkey = appendWbPostData(fields[0], canonicalizer.surtCanonicalize(capture.original));
+        capture.inferMethodAndRequestBodyFromOldUrlKey(fields[0], canonicalizer);
+        capture.urlkey = capture.generateUrlKey(canonicalizer);
         capture.mimetype = fields[3];
         capture.status = fields[4].equals("-") ? 0 : Integer.parseInt(fields[4]);
         capture.digest = fields[5];
@@ -488,8 +463,117 @@ public class Capture {
         if (capture.original == null) {
             throw new IllegalArgumentException("Missing 'url' field in CDXJ line: " + line);
         }
-        capture.urlkey = appendWbPostData(fixedFields[0], canonicalizer.surtCanonicalize(capture.original));
+        capture.inferMethodAndRequestBodyFromOldUrlKey(fixedFields[0], canonicalizer);
+        capture.urlkey = capture.generateUrlKey(canonicalizer);
         return capture;
+    }
+
+    private String getExtraString(String field) {
+        if (extra != null) {
+            Object value = extra.get(field);
+            if (value instanceof String) {
+                return (String) value;
+            }
+        }
+        return null;
+    }
+
+    private String[] extractQueryParams(String url) {
+        int queryIndex = url.indexOf('?');
+        if (queryIndex == -1) {
+            return new String[0];
+        }
+        String query = url.substring(queryIndex + 1);
+        return query.split("&");
+    }
+
+    /**
+     * Returns the strings that are in a but not in b. a and b most both be sorted.
+     */
+    private List<String> diffParams(String[] a, String[] b) {
+        List<String> result = new ArrayList<>();
+        int i = 0;
+        int j = 0;
+        while (i < a.length && j < b.length) {
+            int cmp = a[i].compareTo(b[j]);
+            if (cmp < 0) {
+                result.add(a[i]);
+                i++;
+            } else if (cmp > 0) {
+                j++;
+            } else {
+                i++;
+                j++;
+            }
+        }
+        while (i < a.length) {
+            result.add(a[i]);
+            i++;
+        }
+        return result;
+
+    }
+
+    /**
+     * Attempts to infer the method and requestBody extra fields by comparing an old urlkey against the original url.
+     * <p>
+     * When run with the --post-append option, webrecorder/cdxj-indexer will include the request method and encoded
+     * version of the request body as query parameters in the url key. In CDXJ output mode it will usually also
+     * add extra "method" and "requestBody" fields for these values. However, in CDX11 output mode there no extra
+     * fields. Older versions of cdxj-indexer in CDXJ mode also didn't populate the extra fields.
+     * <p>
+     * We can determine the fields from request body because they won't appear in the original url query string.
+     * <p>
+     * This method does nothing if the extra fields are already populated.
+     */
+    private void inferMethodAndRequestBodyFromOldUrlKey(String oldUrlKey, UrlCanonicalizer canonicalizer) {
+        if (oldUrlKey == null) return;
+        if (!oldUrlKey.contains("__wb_method=")) return;
+        if (extra != null) {
+            if (extra.containsKey("method")) return;
+            if (extra.containsKey("requestBody")) return;
+        }
+
+        // if the old urlkey contains __wb_method but we don't have method and requestBody,
+        // then we try to extract them from the urlkey by looking for query parameters that appear
+        // in the old urlkey but aren't present in the original url field.
+        String[] oldParams = extractQueryParams(oldUrlKey);
+        String newUrlKey = canonicalizer.surtCanonicalize(original);
+        String[] newParams = extractQueryParams(newUrlKey);
+        List<String> extraParams = diffParams(oldParams, newParams);
+        StringBuilder builder = new StringBuilder();
+        for (String param: extraParams) {
+            if (param.startsWith("__wb_method=")) {
+                put("method", param.substring("__wb_method=".length()).toUpperCase(Locale.ROOT));
+            } else {
+                // probably a request body parameter
+                if (builder.length() > 0) {
+                    builder.append("&");
+                }
+                builder.append(param);
+            }
+        }
+        if (builder.length() > 0) {
+            put("requestBody", builder.toString());
+        }
+    }
+
+    private String generateUrlKey(UrlCanonicalizer canonicalizer) {
+        String method = getExtraString("method");
+        String requestBody = getExtraString("requestBody");
+        String url;
+        if ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method)) {
+            StringBuilder builder = new StringBuilder(original);
+            builder.append(original.contains("?") ? "&" : "?");
+            builder.append("__wb_method=").append(method);
+            if (requestBody != null && !requestBody.isEmpty()) {
+                builder.append("&").append(requestBody);
+            }
+            url = builder.toString();
+        } else {
+            url = original;
+        }
+        return canonicalizer.surtCanonicalize(url);
     }
 
     /**
