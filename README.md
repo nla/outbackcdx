@@ -12,11 +12,11 @@ Features:
 * Compressed indexes (varint packing + snappy), typically 1/4 - 1/5 the size of CDX files.
 * Primary-secondary replication
 * Access control (experimental, see below)
+* CDXJ (experimental, requires index version 5)
 
 Things it doesn't do (yet):
 
 * Sharding
-* CDXJ
 
 Used in production at the National Library of Australia and British Library with
 8-9 billion record indexes.
@@ -37,7 +37,7 @@ Usage
 
 Run with:
 
-    java -jar outbackcdx*.jar
+    java -Xmx512m -jar outbackcdx*.jar
 
 Command line options:
 
@@ -282,7 +282,10 @@ many other processes. You can override the limit OutbackCDX's `-m` option.
 If you find OutbackCDX using too much memory or you need more performance try adjusting the limit. The optimal setting
 will depend on your index size and hardware. If you have a lot of memory `-m -1` (no limit) will allow RocksDB to open
 all SST files on startup and should give the best query performance. However with slow disks it can also make startup
-very slow. You may also need to increase the kernel's max open file description limit (`ulimit -n`). 
+very slow. You may also need to increase the kernel's max open file description limit (`ulimit -n`).
+
+Also make sure you're limiting the Java heap size with a JVM option like `-Xmx512m`. By default Java will allow the
+heap to grow to half the size of physical RAM which is usually excessive.
 
 Authorization
 -------------

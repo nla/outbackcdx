@@ -4,8 +4,7 @@ package outbackcdx;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
+import org.rocksdb.*;
 
 import outbackcdx.NanoHTTPD.IStreamer;
 import outbackcdx.NanoHTTPD.Response;
@@ -18,6 +17,9 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -28,7 +30,6 @@ import static outbackcdx.NanoHTTPD.Method.*;
 import static outbackcdx.NanoHTTPD.Response.Status.*;
 import static outbackcdx.Web.*;
 
-import org.rocksdb.TransactionLogIterator;
 import org.rocksdb.TransactionLogIterator.BatchResult;
 
 class Webapp implements Web.Handler {
@@ -102,6 +103,7 @@ class Webapp implements Web.Handler {
         router.on(POST, "/<collection>", request -> post(request), Permission.INDEX_EDIT);
         router.on(POST, "/<collection>/delete", request -> delete(request), Permission.INDEX_EDIT);
         router.on(GET, "/<collection>/stats", req2 -> stats(req2));
+        router.on(GET, "/<collection>/cube", request -> cube(request));
         router.on(GET, "/<collection>/captures", request -> captures(request));
         router.on(GET, "/<collection>/aliases", request -> aliases(request));
         router.on(GET, "/<collection>/changes", request -> changeFeed(request));
@@ -162,6 +164,74 @@ class Webapp implements Web.Handler {
                 .limit(limit)
                 .collect(Collectors.<Capture>toList());
         return jsonResponse(results);
+    }
+
+    private static class CubeTally {
+        long count;
+        long size;
+
+        public void add(long length) {
+            count += 1;
+            if (length > 0) {
+                size += length;
+            }
+        }
+    }
+
+    void writeCubeTallies(Map<String, CubeTally> tallyMap, PrintWriter writer) throws IOException {
+        tallyMap.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
+            writer.print(entry.getKey());
+            writer.print(' ');
+            writer.print(entry.getValue().count);
+            writer.print(' ');
+            writer.print(entry.getValue().size);
+            writer.print('\n');
+        });
+    }
+
+    private static final Pattern VALID_MEDIA_TYPE =
+            Pattern.compile("[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*");
+
+    Response cube(Web.Request request) throws ResponseException, IOException {
+        Index index = getIndex(request);
+        return new Response(OK, "text/plain", out -> {
+            PrintWriter writer = new PrintWriter(out);
+            Map<String,CubeTally> tallyMap = new HashMap<>();
+            Matcher mediaTypeMatcher = VALID_MEDIA_TYPE.matcher("");
+            try (ReadOptions readOptions = new ReadOptions().setTailing(true)
+                    .setFillCache(false)
+                    .setReadaheadSize(2*1024*1024);
+                 RocksIterator iterator = index.db.newIterator(readOptions)) {
+                for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
+                    Capture capture = new Capture(iterator.key(), iterator.value());
+
+                    // extract host from urlkey
+                    int paren = capture.urlkey.indexOf(')');
+                    int slash = capture.urlkey.indexOf('/');
+                    if (paren < 0) paren = capture.urlkey.length();
+                    if (slash < 0) slash = capture.urlkey.length();
+                    String host = capture.urlkey.substring(0, Math.min(paren, slash));
+
+                    // validate mimetype to reduce long tail
+                    String mimetype = capture.mimetype;
+                    mediaTypeMatcher.reset(mimetype);
+                    if (!mediaTypeMatcher.matches()) {
+                        mimetype = "-";
+                    }
+
+                    String key = host + " " + mimetype + " " + capture.status + " " +
+                            String.valueOf(capture.timestamp).substring(0, 4);
+                    tallyMap.computeIfAbsent(key, k -> new CubeTally()).add(capture.length);
+
+                    if (tallyMap.size() > 10000) {
+                        writeCubeTallies(tallyMap, writer);
+                        tallyMap.clear();
+                    }
+                }
+                writeCubeTallies(tallyMap, writer);
+                writer.flush();
+            }
+        });
     }
 
     Response aliases(Web.Request request) throws IOException, Web.ResponseException {

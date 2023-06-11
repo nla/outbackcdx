@@ -2,6 +2,8 @@ package outbackcdx;
 
 import org.junit.Test;
 
+import java.util.Arrays;
+
 import static org.junit.Assert.assertEquals;
 
 public class CaptureTest {
@@ -9,19 +11,23 @@ public class CaptureTest {
     public void testRecordsCanBeEncodedAndDecoded() {
         Capture src = dummyRecord();
 
-        byte[] key = src.encodeKey();
-        byte[] value = src.encodeValue();
+        for (int version : new int[]{3, 4, 5}) {
+            byte[] key = src.encodeKey(version);
+            byte[] value = src.encodeValue(version);
 
-        assertEquals(3, value[0]);
-        assertEquals(8, value[1]);
-        assertEquals('o', value[2]);
-        assertEquals('r', value[3]);
+            if (version == 3) {
+                assertEquals(3, value[0]);
+                assertEquals(8, value[1]);
+                assertEquals('o', value[2]);
+                assertEquals('r', value[3]);
+            }
 
-        Capture dst = new Capture(key, value);
-        assertFieldsEqual(src, dst);
+            Capture dst = new Capture(key, value);
+            assertFieldsEqual(src, dst);
 
-        assertEquals(src.date(), dst.date());
-        assertEquals(src.date().getTime(), 1388579640000L);
+            assertEquals(src.date(), dst.date());
+            assertEquals(src.date().getTime(), 1388579640000L);
+        }
     }
 
     @Test
@@ -46,12 +52,17 @@ public class CaptureTest {
 
     @Test
     public void testCdxj() {
-        Capture src = Capture.fromCdxLine("com,example)/robots.txt 20210203115119 {\"url\": \"https://example.org/robots.txt\", \"mime\": \"unk\", \"status\": \"400\", \"digest\": \"3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ\", \"length\": \"451\", \"offset\": \"90493\", \"filename\": \"example.warc.gz\"}", new UrlCanonicalizer());
-        Capture dst = new Capture(src.encodeKey(), src.encodeValue());
+        Capture src = Capture.fromCdxLine("- 20210203115119 {\"url\": \"https://example.org/robots.txt\", " +
+                "\"mime\": \"unk\", \"status\": \"400\", \"digest\": \"3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ\", " +
+                "\"length\": \"451\", \"offset\": \"90493\", \"filename\": \"example.warc.gz\", " +
+                "\"non-standard-field\": [\"yes\", 2, 3], \"method\": \"POST\", \"requestBody\": \"x=1&y=2\"}",
+                new UrlCanonicalizer());
+        Capture dst = new Capture(src.encodeKey(5), src.encodeValue(5));
         assertEquals(451, src.length);
         assertEquals(90493, src.compressedoffset);
         assertFieldsEqual(src, dst);
-        assertEquals("com,example)/robots.txt 20210203115119 https://example.org/robots.txt unk 400 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 451 90493 example.warc.gz - - -", dst.toString());
+        assertEquals("org,example)/robots.txt?__wb_method=post&x=1&y=2 20210203115119 https://example.org/robots.txt unk 400 3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ - - 451 90493 example.warc.gz - - -", dst.toString());
+        assertEquals(Arrays.asList("yes", 2, 3), dst.get("non-standard-field"));
     }
 
     @Test
@@ -68,12 +79,14 @@ public class CaptureTest {
         UrlCanonicalizer canonicalizer = new UrlCanonicalizer();
 
         // simple url with no parameters
-        Capture cap = Capture.fromCdxLine("com,test)/append?__wb_post_data=dGVzdAo= 20200528143535 https://test.com/append application/json 202 2WC5VZGPEJIVA6BQPKMISFH7ISBVWYUQ - - 467 4846509 test.warc.gz", canonicalizer);
-        assertEquals("com,test)/append?__wb_post_data=dGVzdAo=", cap.urlkey);
+        Capture cap = Capture.fromCdxLine("com,test)/append?__wb_method=post&__wb_post_data=dGVzdAo= 20200528143535 https://test.com/append application/json 202 2WC5VZGPEJIVA6BQPKMISFH7ISBVWYUQ - - 467 4846509 test.warc.gz", canonicalizer);
+        assertEquals("com,test)/append?__wb_method=post&__wb_post_data=dgvzdao=", cap.urlkey);
+        assertEquals("POST", cap.get("method"));
+        assertEquals("__wb_post_data=dGVzdAo=", cap.get("requestBody"));
 
         // url with parameters
-        cap = Capture.fromCdxLine("com,test)/append?x=1&__wb_post_data=dGVzdAo= 20200528143535 https://test.com/append?x=1 application/json 202 2WC5VZGPEJIVA6BQPKMISFH7ISBVWYUQ - - 467 4846509 test.warc.gz", canonicalizer);
-        assertEquals("com,test)/append?x=1&__wb_post_data=dGVzdAo=", cap.urlkey);
+        cap = Capture.fromCdxLine("com,test)/append?x=1&__wb_method=post&__wb_post_data=dGVzdAo= 20200528143535 https://test.com/append?x=1 application/json 202 2WC5VZGPEJIVA6BQPKMISFH7ISBVWYUQ - - 467 4846509 test.warc.gz", canonicalizer);
+        assertEquals("com,test)/append?__wb_method=post&__wb_post_data=dgvzdao=&x=1", cap.urlkey);
     }
 
     @Test
@@ -110,5 +123,4 @@ public class CaptureTest {
         src.robotflags = "AFIGX";
         return src;
     }
-
 }

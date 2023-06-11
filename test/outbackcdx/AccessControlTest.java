@@ -6,6 +6,7 @@ import org.junit.Test;
 import org.rocksdb.*;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.Date;
 
@@ -106,8 +107,8 @@ public class AccessControlTest {
     public void testPattern() {
         assertEquals("au,gov,", AccessControl.toSsurtPrefix("*.gov.au"));
         assertEquals("au,gov,", AccessControl.toSsurtPrefix("*.GOV.AU"));
-        assertEquals("com,example,//http:/foo/", AccessControl.toSsurtPrefix("http://EXAMPLE.com/foo/*"));
-        assertEquals("com,example,//http:/foo/ ", AccessControl.toSsurtPrefix("http://example.com/foo/"));
+        assertEquals("com,example,//http:/foo", AccessControl.toSsurtPrefix("http://EXAMPLE.com/foo/*"));
+        assertEquals("com,example,//http:/foo ", AccessControl.toSsurtPrefix("http://example.com/foo/"));
     }
 
     @Test
@@ -116,5 +117,14 @@ public class AccessControlTest {
         assertEquals("org,example,//http:/index.html?hello", AccessControl.canonSsurt("http://PANDORA.nla.gov.au/pan/12345/20160101-1234/www.example.org/INDEX.html?hello#world"));
     }
 
+    @Test
+    public void testJson() {
+        // GSON can't handle Period on Java 17 so check that our custom type adapter works
+        AccessRule rule = new AccessRule();
+        rule.period = Period.ofDays(1);
+        String json = Json.GSON.toJson(rule);
+        AccessRule rule2 = Json.GSON.fromJson(json, AccessRule.class);
+        assertEquals(rule.period, rule2.period);
+    }
 }
 
