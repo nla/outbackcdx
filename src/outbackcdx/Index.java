@@ -8,13 +8,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.function.Predicate;
 
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
-import org.rocksdb.RocksIterator;
-import org.rocksdb.TransactionLogIterator;
-import org.rocksdb.WriteBatch;
-import org.rocksdb.WriteOptions;
+import org.rocksdb.*;
 
 /**
  * Wraps RocksDB with a higher-level query interface.
@@ -193,9 +187,10 @@ public class Index {
 
         System.out.println("Upgrading index '" + name + "' (~" + estimatedTotal + " records) to index version " + targetVersion);
 
-        try (WriteOptions writeOptions = new WriteOptions();
+        try (ReadOptions readOptions = new ReadOptions().setTailing(true);
+                WriteOptions writeOptions = new WriteOptions();
                 WriteBatch writeBatch = new WriteBatch();
-                RocksIterator it = db.newIterator(defaultCF)) {
+                RocksIterator it = db.newIterator(defaultCF, readOptions)) {
             for (it.seekToFirst(); it.isValid(); it.next()) {
                 byte[] oldKey = it.key();
                 byte[] oldValue = it.value();
