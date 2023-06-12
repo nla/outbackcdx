@@ -174,7 +174,7 @@ public class Index {
         // So the basic idea is to iterate over all records and write them back
         // to the database with the new key format. This is done in batches of
         // to avoid running out of memory.
-        int batchSize = 1000;
+        int batchSize = 10000;
         int recordsInBatch = 0;
         long recordsSeen = 0;
         long recordsChanged = 0;
@@ -187,7 +187,7 @@ public class Index {
 
         System.out.println("Upgrading index '" + name + "' (~" + estimatedTotal + " records) to index version " + targetVersion);
 
-        try (ReadOptions readOptions = new ReadOptions().setTailing(true);
+        try (ReadOptions readOptions = new ReadOptions().setTailing(true).setReadaheadSize(2 * 1024 * 1024);
                 WriteOptions writeOptions = new WriteOptions();
                 WriteBatch writeBatch = new WriteBatch();
                 RocksIterator it = db.newIterator(defaultCF, readOptions)) {
