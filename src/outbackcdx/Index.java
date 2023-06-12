@@ -206,8 +206,8 @@ public class Index {
                 lastSeenUrlKey = capture.urlkey;
                 if (!Arrays.equals(oldKey, newKey) || !Arrays.equals(oldValue, newValue)) {
                     // Found a record that needs to be upgraded.
-                    writeBatch.delete(oldKey);
-                    writeBatch.put(newKey, newValue);
+                    writeBatch.delete(defaultCF, oldKey);
+                    writeBatch.put(defaultCF, newKey, newValue);
                     recordsChanged++;
                     recordsInBatch++;
                     if (recordsInBatch >= batchSize) {
