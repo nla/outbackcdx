@@ -165,9 +165,12 @@ class Webapp implements Web.Handler {
         Index index = getIndex(request);
         String key = request.param("key", "");
         long limit = Long.parseLong(request.param("limit", "1000"));
-        List<Capture> results = StreamSupport.stream(index.capturesAfter(key).spliterator(), false)
-                .limit(limit)
-                .collect(Collectors.<Capture>toList());
+        List<Capture> results = new ArrayList<>();
+        try (CloseableIterator<Capture> it = index.capturesAfter(key)) {
+            while (it.hasNext() && results.size() < limit) {
+                results.add(it.next());
+            }
+        }
         return jsonResponse(results);
     }
 

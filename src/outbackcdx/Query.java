@@ -165,7 +165,7 @@ public class Query {
         return canonicalizer.surtCanonicalize(urlToCanonicalize);
     }
 
-    Iterable<Capture> execute(Index index) {
+    CloseableIterator<Capture> execute(Index index) {
         compatibilityHacks();
         expandWildcards();
         validate();
@@ -174,7 +174,7 @@ public class Query {
             urlkey = buildUrlKey(index.canonicalizer);
         }
 
-        Iterable<Capture> captures = index.execute(this);
+        CloseableIterator<Capture> captures = index.execute(this);
         if (collapseToLastSpec != null) {
             captures = Filter.collapseToLast(captures, collapseToLastSpec);
         }

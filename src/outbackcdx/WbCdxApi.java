@@ -35,7 +35,6 @@ public class WbCdxApi {
 
     public Response queryIndex(Web.Request request, Index index) {
         Query query = new Query(request.params(), filterPlugins);
-        Iterable<Capture> captures = query.execute(index);
 
         FormatFactory format;
         String contentType;
@@ -58,12 +57,14 @@ public class WbCdxApi {
                 break;
         }
 
+        CloseableIterator<Capture> captures = query.execute(index);
         Response response = new Response(OK, contentType, outputStream -> {
             Writer out = new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8));
             OutputFormat outf = format.construct(query, computedFields, out);
             long row = 0;
-            try {
-                for (Capture capture : captures) {
+            try (CloseableIterator<Capture> it = captures) {
+                while (it.hasNext()) {
+                    Capture capture = it.next();
                     if (row >= query.limit) {
                         break;
                     }
@@ -74,6 +75,8 @@ public class WbCdxApi {
                 System.err.println(new Date() + ": exception " + e + " thrown processing captures");
                 e.printStackTrace();
                 out.write("warning: output may be incomplete, error occurred processing captures\n");
+            } finally {
+                captures.close();
             }
 
             outf.close();

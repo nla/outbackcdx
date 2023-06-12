@@ -69,6 +69,33 @@ public class FilterTest {
         assertFalse(t13Collapser.test(two));
     }
 
+    public static class DummyCloseableIterator implements CloseableIterator<Capture> {
+        private final Iterator<Capture> inner;
+
+        public DummyCloseableIterator(Iterator<Capture> inner) {
+            this.inner = inner;
+        }
+
+        @Override
+        public void close() {
+
+        }
+
+        @Override
+        public boolean hasNext() {
+            return inner.hasNext();
+        }
+
+        @Override
+        public Capture next() {
+            return inner.next();
+        }
+    }
+
+    public static Iterator<Capture> collapseToLastList(List<Capture> list, String spec) {
+        return Filter.collapseToLast(new DummyCloseableIterator(list.iterator()), spec);
+    }
+
     @Test
     public void testCollapseToLast() {
         Capture one = new Capture();
@@ -79,25 +106,25 @@ public class FilterTest {
         two.timestamp = 20190101000005l;
         List<Capture> list = Arrays.asList(one, two);
 
-        Iterator<Capture> iter = Filter.collapseToLast(list, "original").iterator();
+        Iterator<Capture> iter = collapseToLastList(list, "original");
         assertEquals(iter.next(), two);
         assertFalse(iter.hasNext());
 
-        iter = Filter.collapseToLast(list, "timestamp").iterator();
+        iter = collapseToLastList(list, "timestamp");
         assertEquals(iter.next(), one);
         assertEquals(iter.next(), two);
         assertFalse(iter.hasNext());
 
-        iter = Filter.collapseToLast(list, "timestamp:13").iterator();
+        iter = collapseToLastList(list, "timestamp:13");
         assertEquals(iter.next(), two);
         assertFalse(iter.hasNext());
 
         // sanity check wrapping empty iterator
-        iter = Filter.collapseToLast(Collections.<Capture>emptyList(), "original").iterator();
+        iter = collapseToLastList(Collections.<Capture>emptyList(), "original");
         assertFalse(iter.hasNext());
 
         // check that additional calls don't mess up iterator state
-        iter = Filter.collapseToLast(list, "timestamp").iterator();
+        iter = collapseToLastList(list, "timestamp");
         assertTrue(iter.hasNext());
         assertTrue(iter.hasNext());
         assertEquals(iter.next(), one);
@@ -114,7 +141,7 @@ public class FilterTest {
         assertNotNull(e);
 
         // check that additional calls don't mess up iterator state
-        iter = Filter.collapseToLast(list, "timestamp:13").iterator();
+        iter = collapseToLastList(list, "timestamp:13");
         assertTrue(iter.hasNext());
         assertTrue(iter.hasNext());
         assertEquals(iter.next(), two);

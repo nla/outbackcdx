@@ -1,6 +1,5 @@
 package outbackcdx;
 
-import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -62,28 +61,23 @@ interface Filter extends Predicate<Capture> {
         }
     }
 
-    public static Iterable<Capture> collapseToLast(Iterable<Capture> captures, String spec) {
-        return new Iterable<Capture>() {
-            @Override
-            public Iterator<Capture> iterator() {
-                return new CollapseToLast(captures.iterator(), spec);
-            }
-        };
+    public static CloseableIterator<Capture> collapseToLast(CloseableIterator<Capture> captures, String spec) {
+        return new CollapseToLast(captures, spec);
     }
 
     /**
      * Not a {@link Filter} because it needs to look ahead to the next line to know
      * whether to include or exclude the current line.
      */
-    public static class CollapseToLast implements Iterator<Capture> {
+    public static class CollapseToLast implements CloseableIterator<Capture> {
 
-        protected Iterator<Capture> inner;
+        protected CloseableIterator<Capture> inner;
         protected String field;
         protected Integer substringLength;
         protected Capture next;
         protected Capture innerNext;
 
-        public CollapseToLast(Iterator<Capture> inner, String spec) {
+        public CollapseToLast(CloseableIterator<Capture> inner, String spec) {
             this.inner = inner;
 
             String[] splits = spec.split(":", 2);
@@ -135,6 +129,10 @@ interface Filter extends Predicate<Capture> {
             }
         }
 
+        @Override
+        public void close() {
+            inner.close();
+        }
     }
 
     abstract class BaseFilter implements Filter {

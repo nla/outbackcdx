@@ -41,6 +41,13 @@ public class IndexTest {
         env.close();
     }
 
+    private static List<Capture> list(CloseableIterator<Capture> iterator) {
+        List<Capture> captures = new ArrayList<>();
+        iterator.forEachRemaining(captures::add);
+        iterator.close();
+        return captures;
+    }
+
     @Test
     public void testClosest() throws IOException {
         try (Index.Batch batch = index.beginUpdate()) {
@@ -51,8 +58,7 @@ public class IndexTest {
             batch.commit();
         }
 
-        List<Capture> results = new ArrayList<>();
-        index.closestQuery("org,closest)/", 20060129000000L, null).forEach(results::add);
+        List<Capture> results = list(index.closestQuery("org,closest)/", 20060129000000L, null));
         assertEquals(20060201000000L, results.get(0).timestamp);
         assertEquals(20060101000000L, results.get(1).timestamp);
         assertEquals(20070101000000L, results.get(2).timestamp);
@@ -67,8 +73,7 @@ public class IndexTest {
             batch.commit();
         }
 
-        List<Capture> results = new ArrayList<>();
-        index.closestQuery("org,post)/?__wb_method=post&__wb_post_data=dgvzdao=", 20200528143307L, null).forEach(results::add);
+        List<Capture> results = list(index.closestQuery("org,post)/?__wb_method=post&__wb_post_data=dgvzdao=", 20200528143307L, null));
         assertEquals("org,post)/?__wb_method=post&__wb_post_data=dgvzdao=", results.get(0).urlkey);
     }
 
@@ -82,8 +87,7 @@ public class IndexTest {
         }
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.query("org,a)/", null).forEach(results::add);
+            List<Capture> results = list(index.query("org,a)/", null));
             assertEquals(3, results.size());
             assertEquals(20050101000000L, results.get(0).timestamp);
             assertEquals(20060101000000L, results.get(1).timestamp);
@@ -96,8 +100,7 @@ public class IndexTest {
         }
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.query("org,a)/", null).forEach(results::add);
+            List<Capture> results = list(index.query("org,a)/", null));
             assertEquals(2, results.size());
             assertEquals(20050101000000L, results.get(0).timestamp);
             assertEquals(20070101000000L, results.get(1).timestamp);
@@ -116,24 +119,21 @@ public class IndexTest {
         }
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.reverseQuery("org,a)/", null).forEach(results::add);
+            List<Capture> results = list(index.reverseQuery("org,a)/", null));
             assertEquals(20070101000000L, results.get(0).timestamp);
             assertEquals(20060101000000L, results.get(1).timestamp);
             assertEquals(20050101000000L, results.get(2).timestamp);
         }
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.reverseQuery("org,b)/", null).forEach(results::add);
+            List<Capture> results = list(index.reverseQuery("org,b)/", null));
             assertEquals(1, results.size());
             assertEquals(19960101000000L, results.get(0).timestamp);
         }
 
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.query("org,a)/", null).forEach(results::add);
+            List<Capture> results = list(index.query("org,a)/", null));
             assertEquals(20050101000000L, results.get(0).timestamp);
             assertEquals(20060101000000L, results.get(1).timestamp);
             assertEquals(20070101000000L, results.get(2).timestamp);
@@ -154,15 +154,13 @@ public class IndexTest {
         }
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.query("org,fromto)/", 20060000000000l, 20080000000000l, null).forEach(results::add);
+            List<Capture> results = list(index.query("org,fromto)/", 20060000000000l, 20080000000000l, null));
             assertEquals(20060101000000L, results.get(0).timestamp);
             assertEquals(20070101000000L, results.get(1).timestamp);
         }
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.reverseQuery("org,fromto)/", 20060000000000l, 20080000000000l, null).forEach(results::add);
+            List<Capture> results = list(index.reverseQuery("org,fromto)/", 20060000000000l, 20080000000000l, null));
             assertEquals(20070101000000L, results.get(0).timestamp);
             assertEquals(20060101000000L, results.get(1).timestamp);
         }
@@ -181,8 +179,7 @@ public class IndexTest {
                 batch.commit();
             }
 
-            List<Capture> results = new ArrayList<>();
-            index.query("org,v4)/", null).forEach(results::add);
+            List<Capture> results = list(index.query("org,v4)/", null));
             assertEquals(3, results.size());
         } finally {
             FeatureFlags.setIndexVersion(oldVersion);
@@ -205,8 +202,7 @@ public class IndexTest {
             }
 
             {
-                List<Capture> results = new ArrayList<>();
-                index.query("org,example)/", null).forEach(results::add);
+                List<Capture> results = list(index.query("org,example)/", null));
                 assertEquals(3, results.size());
             }
 
@@ -215,8 +211,7 @@ public class IndexTest {
             index.upgrade();
 
             {
-                List<Capture> results = new ArrayList<>();
-                index.query("org,example)/", null).forEach(results::add);
+                List<Capture> results = list(index.query("org,example)/", null));
                 assertEquals(3, results.size());
             }
 
