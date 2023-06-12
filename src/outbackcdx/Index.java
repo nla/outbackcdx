@@ -214,10 +214,15 @@ public class Index {
                 if (recordsSeen % 16384 == 0) {
                     long now = System.currentTimeMillis();
                     if (now - lastProgressTime > 5000) {
+                        // the estimated record count tends to change over time
+                        // it seems particularly inaccurate after restart so we refresh it
+                        estimatedTotal = estimatedRecordCount();
+                        if (estimatedTotal == 0) estimatedTotal = 1; // guard against division by zero
                         long recordsPerSecond = (recordsSeen - lastProgressRecords) * 1000 / (now - lastProgressTime);
                         Duration eta = Duration.ofSeconds((now - startTime) * (estimatedTotal - recordsSeen) / recordsSeen / 1000);
-                        int percentage = (int) (recordsSeen * 100 / estimatedTotal);
-                        System.out.println("Upgrade progress (" + name + "): ~" + percentage + "% " +
+                        double percentage = recordsSeen * 100.0 / estimatedTotal;
+                        System.out.println("Upgrade progress (" + name + "): ~" +
+                                String.format("%.2f", percentage) + "% " +
                                 recordsSeen + "/~" + estimatedTotal
                                 + " (" + recordsChanged + " changed) " + recordsPerSecond + "/s"
                                 +  " ETA: " + eta);
@@ -355,7 +360,7 @@ public class Index {
 
     public long estimatedRecordCount() {
         try {
-            return db.getLongProperty("rocksdb.estimate-num-keys");
+            return db.getLongProperty(defaultCF, "rocksdb.estimate-num-keys");
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }
