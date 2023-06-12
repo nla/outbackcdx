@@ -209,16 +209,19 @@ public class Index {
                         db.write(writeOptions, writeBatch);
                         writeBatch.clear();
                         recordsInBatch = 0;
-
-                        long now = System.currentTimeMillis();
-                        if (now - lastProgressTime > 5000) {
-                            long recordsPerSecond = (recordsSeen - lastProgressRecords) * 1000 / (now - lastProgressTime);
-                            Duration eta = Duration.ofMillis((now - startTime) * (estimatedTotal - recordsSeen) / recordsSeen);
-                            System.out.println("Upgrade progress (" + name + "): " + recordsSeen + "/" + estimatedTotal
-                                    + " (" + recordsChanged + " changed) " + recordsPerSecond + "/s"
-                                    +  " ETA: " + eta);
-                            lastProgressTime = now;
-                        }
+                    }
+                }
+                if (recordsSeen % 16384 == 0) {
+                    long now = System.currentTimeMillis();
+                    if (now - lastProgressTime > 5000) {
+                        long recordsPerSecond = (recordsSeen - lastProgressRecords) * 1000 / (now - lastProgressTime);
+                        Duration eta = Duration.ofSeconds((now - startTime) * (estimatedTotal - recordsSeen) / recordsSeen / 1000);
+                        int percentage = (int) (recordsSeen * 100 / estimatedTotal);
+                        System.out.println("Upgrade progress (" + name + "): ~" + percentage + "% " +
+                                recordsSeen + "/~" + estimatedTotal
+                                + " (" + recordsChanged + " changed) " + recordsPerSecond + "/s"
+                                +  " ETA: " + eta);
+                        lastProgressTime = now;
                     }
                 }
             }
