@@ -4,6 +4,7 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.*;
 import java.util.function.Predicate;
 
@@ -26,6 +27,7 @@ public class Index {
     final AccessControl accessControl;
     final long scanCap;
     final UrlCanonicalizer canonicalizer;
+    private Thread upgradeThread;
 
     public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl) {
         this(name, db, defaultCF, aliasCF, accessControl, Long.MAX_VALUE, new UrlCanonicalizer());
@@ -164,6 +166,80 @@ public class Index {
     static String hostFromSurt(String surtPrefix) {
         int i = surtPrefix.indexOf(")/");
         return i < 0 ? surtPrefix : surtPrefix.substring(0, i);
+    }
+
+    public synchronized boolean upgradeInBackground() {
+        if (upgradeThread != null && upgradeThread.isAlive()) return false;
+        upgradeThread = new Thread(this::upgrade, "Index upgrade (" + name + ")");
+        upgradeThread.setDaemon(true);
+        upgradeThread.start();
+        return true;
+    }
+
+    void upgrade() {
+        // So the basic idea is to iterate over all records and write them back
+        // to the database with the new key format. This is done in batches of
+        // to avoid running out of memory.
+        int batchSize = 1000;
+        int recordsInBatch = 0;
+        long recordsSeen = 0;
+        long recordsChanged = 0;
+        long estimatedTotal = estimatedRecordCount();
+        long startTime = System.currentTimeMillis();
+        long lastProgressTime = startTime;
+        long lastProgressRecords = 0;
+        String lastSeenUrlKey = null;
+        int targetVersion = FeatureFlags.indexVersion();
+
+        System.out.println("Upgrading index '" + name + "' (~" + estimatedTotal + " records) to index version " + targetVersion);
+
+        try (WriteOptions writeOptions = new WriteOptions();
+                WriteBatch writeBatch = new WriteBatch();
+                RocksIterator it = db.newIterator(defaultCF)) {
+            for (it.seekToFirst(); it.isValid(); it.next()) {
+                byte[] oldKey = it.key();
+                byte[] oldValue = it.value();
+                Capture capture = new Capture(oldKey, oldValue);
+                byte[] newKey = capture.encodeKey();
+                byte[] newValue = capture.encodeValue();
+                recordsSeen++;
+                lastSeenUrlKey = capture.urlkey;
+                if (!Arrays.equals(oldKey, newKey) || !Arrays.equals(oldValue, newValue)) {
+                    // Found a record that needs to be upgraded.
+                    writeBatch.delete(oldKey);
+                    writeBatch.put(newKey, newValue);
+                    recordsChanged++;
+                    recordsInBatch++;
+                    if (recordsInBatch >= batchSize) {
+                        db.write(writeOptions, writeBatch);
+                        writeBatch.clear();
+                        recordsInBatch = 0;
+
+                        long now = System.currentTimeMillis();
+                        if (now - lastProgressTime > 5000) {
+                            long recordsPerSecond = (recordsSeen - lastProgressRecords) * 1000 / (now - lastProgressTime);
+                            Duration eta = Duration.ofMillis((now - startTime) * (estimatedTotal - recordsSeen) / recordsSeen);
+                            System.out.println("Upgrade progress (" + name + "): " + recordsSeen + "/" + estimatedTotal
+                                    + " (" + recordsChanged + " changed) " + recordsPerSecond + "/s"
+                                    +  " ETA: " + eta);
+                            lastProgressTime = now;
+                        }
+                    }
+                }
+            }
+
+            if (recordsInBatch > 0) {
+                db.write(writeOptions, writeBatch);
+                writeBatch.clear();
+            }
+            Duration duration = Duration.ofMillis(System.currentTimeMillis() - startTime);
+            System.out.println("Upgrade complete (" + name + "): " + recordsSeen + " records"
+                    + " (" + recordsChanged + " changed) in " + duration);
+        } catch (RocksDBException e) {
+            System.err.println("Upgrade failed (" + name + ") at urlkey: " + lastSeenUrlKey);
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
     }
 
     /**

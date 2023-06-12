@@ -188,4 +188,42 @@ public class IndexTest {
             FeatureFlags.setIndexVersion(oldVersion);
         }
     }
+
+    @Test
+    public void testUpgradeInPlace() throws IOException, RocksDBException {
+        int initialVersion = FeatureFlags.indexVersion();
+        try {
+
+
+            // First create some records in the old format
+            FeatureFlags.setIndexVersion(3);
+            try (Index.Batch batch = index.beginUpdate()) {
+                batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://example.org/ text/html 200 - - 0 w1", index.canonicalizer));
+                batch.putCapture(Capture.fromCdxLine("- 20050102000000 http://example.org/ text/html 200 - - 10 w1", index.canonicalizer));
+                batch.putCapture(Capture.fromCdxLine("- 20050103000000 http://example.org/ text/html 200 - - 10 w1", index.canonicalizer));
+                batch.commit();
+            }
+
+            {
+                List<Capture> results = new ArrayList<>();
+                index.query("org,example)/", null).forEach(results::add);
+                assertEquals(3, results.size());
+            }
+
+            // Now upgrade the index
+            FeatureFlags.setIndexVersion(5);
+            index.upgrade();
+
+            {
+                List<Capture> results = new ArrayList<>();
+                index.query("org,example)/", null).forEach(results::add);
+                assertEquals(3, results.size());
+            }
+
+        } finally {
+            FeatureFlags.setIndexVersion(initialVersion);
+        }
+
+        // Now upgrade the index
+    }
 }

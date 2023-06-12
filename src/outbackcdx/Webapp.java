@@ -105,6 +105,7 @@ class Webapp implements Web.Handler {
         router.on(GET, "/<collection>/changes", request -> changeFeed(request));
         router.on(GET, "/<collection>/sequence", request -> sequence(request));
         router.on(POST, "/<collection>/truncate_replication", request -> flushWal(request));
+        router.on(POST, "/<collection>/upgrade", request -> upgrade(request), Permission.INDEX_EDIT);
 
         if (FeatureFlags.experimentalAccessControl()) {
             router.on(GET, "/<collection>/ap/<accesspoint>", request -> query(request));
@@ -126,6 +127,14 @@ class Webapp implements Web.Handler {
         index.flushWal();
         Map<String,Boolean> map = new HashMap<>();
         map.put("success", true);
+        return jsonResponse(map);
+    }
+
+    Response upgrade(Web.Request request) throws Web.ResponseException, IOException {
+        Index index = getIndex(request);
+        boolean success = index.upgradeInBackground();
+        Map<String,Boolean> map = new HashMap<>();
+        map.put("success", success);
         return jsonResponse(map);
     }
 
