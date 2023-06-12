@@ -60,12 +60,20 @@ public class WebappTest {
     public void test() throws Exception {
         POST("/test", "- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n");
         POST("/test", "- 20060614070159 http://nla.gov.au/ text/html 200 XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n");
+        POST("/test", "- 20210203115119 {\"url\": \"http://nla.gov.au/\", " +
+                "\"mime\": \"text/plain\", \"status\": \"200\", \"digest\": \"PPPCCEPOOWFMGGO5635HFZXGFRLRGWIX\", " +
+                "\"length\": \"832\", \"offset\": \"1234\", \"filename\": \"example.warc.gz\", \"method\": \"POST\", \"requestBody\": \"x=1&y=2\"}");
         {
             String response = GET("/test", "url", "nla.gov.au");
             assertTrue(response.contains("au,gov,nla)/ 20050614070159"));
-            assertTrue(!response.contains("example"));
+            assertFalse(response.contains("example"));
         }
 
+        {
+            String response = GET("/test", "url", "nla.gov.au", "method", "POST", "requestBody", "x=1&y=2");
+            assertTrue(response.contains("20210203115119"));
+            assertFalse(response.contains("20050614070159"));
+        }
 
         {
             String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F");

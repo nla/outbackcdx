@@ -1,5 +1,9 @@
 package outbackcdx;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.function.Predicate;
 
 public class Query {
@@ -13,6 +17,8 @@ public class Query {
     MatchType matchType;
     Sort sort;
     String url;
+    String method;
+    String requestBody;
     String urlkey;
     String closest;
     String[] fields;
@@ -27,6 +33,8 @@ public class Query {
     public Query(MultiMap<String, String> params, Iterable<FilterPlugin> filterPlugins) {
         accessPoint = params.get("accesspoint");
         url = params.get("url");
+        method = params.get("method");
+        requestBody = params.get("requestBody");
         urlkey = params.get("urlkey");
         matchType = MatchType.valueOf(params.getOrDefault("matchType", "default").toUpperCase());
         sort = Sort.valueOf(params.getOrDefault("sort", "default").toUpperCase());
@@ -141,13 +149,33 @@ public class Query {
         }
     }
 
+    String buildUrlKey(UrlCanonicalizer canonicalizer) {
+        String urlToCanonicalize;
+        if (method != null && !method.equalsIgnoreCase("GET")) {
+            try {
+                StringBuilder builder = new StringBuilder(url);
+                builder.append(url.contains("?") ? "&" : "?");
+                builder.append("__wb_method=").append(URLEncoder.encode(method.toUpperCase(Locale.ROOT), StandardCharsets.UTF_8.name()));
+                if (requestBody != null) {
+                    builder.append("&").append(requestBody);
+                }
+                urlToCanonicalize = builder.toString();
+            } catch (UnsupportedEncodingException e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            urlToCanonicalize = url;
+        }
+        return canonicalizer.surtCanonicalize(urlToCanonicalize);
+    }
+
     Iterable<Capture> execute(Index index) {
         compatibilityHacks();
         expandWildcards();
         validate();
 
         if (urlkey == null) {
-            urlkey = index.canonicalizer.surtCanonicalize(url);
+            urlkey = buildUrlKey(index.canonicalizer);
         }
 
         Iterable<Capture> captures = index.execute(this);

@@ -48,6 +48,16 @@ public class WbCdxApiTest {
     }
 
     @Test
+    public void queryPostUrlKeyEncoding() {
+        MultiMap<String,String> params = new MultiMap<>();
+        params.put("url", "http://example.org/?a=1");
+        params.put("method", "POST");
+        params.put("requestBody", "hello=world");
+        Query query = new Query(params, null);
+        assertEquals("org,example)/?__wb_method=post&a=1&hello=world", query.buildUrlKey(new UrlCanonicalizer()));
+    }
+
+    @Test
     public void testCdxjOutputFormat() throws IOException {
         Query query = new Query(new MultiMap<>(), Collections.emptyList());
         StringWriter sw = new StringWriter();
