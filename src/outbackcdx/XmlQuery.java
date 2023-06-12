@@ -1,7 +1,5 @@
 package outbackcdx;
 
-import org.apache.commons.collections4.iterators.PeekingIterator;
-
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
@@ -125,10 +123,18 @@ public class XmlQuery {
         long numResults = 0;
         boolean scanningForClosestDate = queryDate != null;
 
-        try (CloseableIterator<Capture> captures = index.queryAP(queryUrl, accessPoint)) {
-            PeekingIterator<Capture> iterator = new PeekingIterator<>(captures);
-            while (iterator.hasNext()) {
-                Capture capture = iterator.next();
+        try (CloseableIterator<Capture> iterator = index.queryAP(queryUrl, accessPoint)) {
+            Capture next = null;
+            while (true) {
+                Capture capture;
+                if (next != null) {
+                    capture = next;
+                    next = null;
+                } else if (iterator.hasNext()) {
+                    capture = iterator.next();
+                } else {
+                    break;
+                }
                 if (numResults < offset) { // skip matches before offset
                     numResults++;
                     continue;
@@ -165,7 +171,7 @@ public class XmlQuery {
                 // since we scan the captures in date order we just have to wait until the next capture is further away
                 // from the query date than the current one, annotate it and then stop
                 if (scanningForClosestDate) {
-                    Capture next = iterator.peek();
+                    next = iterator.hasNext() ? iterator.next() : null;
                     if (next == null || Math.abs(queryDate - capture.timestamp) < Math.abs(queryDate - next.timestamp)) {
                         writeElement(out, "closest", "true");
                         scanningForClosestDate = false;
