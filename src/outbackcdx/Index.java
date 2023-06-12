@@ -187,7 +187,7 @@ public class Index {
 
         System.out.println("Upgrading index '" + name + "' (~" + estimatedTotal + " records) to index version " + targetVersion);
 
-        try (ReadOptions readOptions = new ReadOptions().setTailing(true).setReadaheadSize(2 * 1024 * 1024);
+        try (ReadOptions readOptions = new ReadOptions().setTailing(true);
                 WriteOptions writeOptions = new WriteOptions();
                 WriteBatch writeBatch = new WriteBatch();
                 RocksIterator it = db.newIterator(defaultCF, readOptions)) {
