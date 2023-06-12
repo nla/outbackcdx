@@ -288,7 +288,7 @@ public class Index {
     }
 
     private interface RecordConstructor<T> {
-        public T construct(byte[] key, byte[] value);
+        T construct(byte[] key, byte[] value);
     }
 
     /**

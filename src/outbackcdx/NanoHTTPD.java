@@ -83,6 +83,7 @@ import java.util.concurrent.ThreadPoolExecutor;
  * License for the specific language governing permissions and limitations
 * under the License.
  */
+@SuppressWarnings("ALL")
 public abstract class NanoHTTPD {
     /**
      * Maximum time to wait on Socket.getInputStream().read() (in milliseconds)

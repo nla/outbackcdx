@@ -20,8 +20,10 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 import java.io.*;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import static java.nio.charset.StandardCharsets.*;
 import static java.util.Arrays.asList;
 import static org.junit.Assert.*;
 import static outbackcdx.Json.GSON;
@@ -43,9 +45,8 @@ public class WebappTest {
                 "- url_prefix: 'com,facebook)/pages_reaction_units/more'\n" +
                 "  fuzzy_lookup:\n" +
                 "  - page_id\n" +
-                "  - cursor\n" +
-                "";
-        UrlCanonicalizer canon = new UrlCanonicalizer(new ByteArrayInputStream(yaml.getBytes("UTF-8")));
+                "  - cursor\n";
+        UrlCanonicalizer canon = new UrlCanonicalizer(new ByteArrayInputStream(yaml.getBytes(UTF_8)));
 
         DataStore manager = new DataStore(root, -1, null, Long.MAX_VALUE, canon);
         webapp = new Webapp(manager, false, Collections.emptyMap(), canon, Collections.emptyMap(), 10000);
@@ -171,7 +172,7 @@ public class WebappTest {
         {
             String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F");
             assertTrue(response.contains("20050614070159"));
-            assertTrue(!response.contains("20060614070159"));
+            assertFalse(response.contains("20060614070159"));
         }
     }
 
@@ -354,7 +355,7 @@ public class WebappTest {
     private static class DummySession implements NanoHTTPD.IHTTPSession {
         private final NanoHTTPD.Method method;
         InputStream stream = new ByteArrayInputStream(new byte[0]);
-        MultiMap<String, String> parms = new MultiMap<String, String>();
+        MultiMap<String, String> parms = new MultiMap<>();
         String url;
 
         public DummySession(NanoHTTPD.Method method, String url) {
@@ -363,7 +364,7 @@ public class WebappTest {
         }
 
         public DummySession data(String data) {
-            stream = new ByteArrayInputStream(data.getBytes(Charset.forName("UTF-8")));
+            stream = new ByteArrayInputStream(data.getBytes(UTF_8));
             return this;
         }
 
@@ -373,7 +374,7 @@ public class WebappTest {
         }
 
         @Override
-        public void execute() throws IOException {
+        public void execute() {
             // nothing
         }
 

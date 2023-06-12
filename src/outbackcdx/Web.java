@@ -52,7 +52,7 @@ class Web {
                 return e.response;
             } catch (Exception e) {
                 e.printStackTrace();
-                return new Response(INTERNAL_ERROR, "text/plain", e.toString() + "\n");
+                return new Response(INTERNAL_ERROR, "text/plain", e + "\n");
             }
         }
     }
@@ -318,7 +318,7 @@ class Web {
         }
     }
 
-    public static interface Request {
+    public interface Request {
         String method();
 
         /**

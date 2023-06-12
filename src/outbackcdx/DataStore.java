@@ -17,7 +17,7 @@ public class DataStore implements Closeable {
     public static final String COLLECTION_PATTERN = "[A-Za-z0-9_-]+";
 
     private final File dataDir;
-    private final Map<String, Index> indexes = new ConcurrentHashMap<String, Index>();
+    private final Map<String, Index> indexes = new ConcurrentHashMap<>();
     private final Long replicationWindow;
     private final long scanCap;
     private final int maxOpenSstFiles;
@@ -180,7 +180,7 @@ public class DataStore implements Closeable {
         }
 
         List<ColumnFamilyHandle> handles = new ArrayList<>(existing.size());
-        try (RocksDB db = RocksDB.open(dbOptions, path, existing, handles);) {
+        try (RocksDB db = RocksDB.open(dbOptions, path, existing, handles)) {
             for (ColumnFamilyDescriptor descriptor : toCreate) {
                 try (ColumnFamilyHandle cf = db.createColumnFamily(descriptor)) {
                 }
@@ -200,7 +200,7 @@ public class DataStore implements Closeable {
     }
 
     public List<String> listCollections() {
-        List<String> collections = new ArrayList<String>();
+        List<String> collections = new ArrayList<>();
         for (File f : dataDir.listFiles()) {
             if (f.isDirectory() && isValidCollectionName(f.getName())) {
                 collections.add(f.getName());

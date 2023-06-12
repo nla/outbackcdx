@@ -278,10 +278,7 @@ class AccessControl {
 
         if (matching != null) {
             AccessPolicy policy = policies.get(matching.policyId);
-            boolean allowed = true;
-            if (policy != null && !policy.accessPoints.contains(accessPoint)) {
-                allowed = false;
-            }
+            boolean allowed = policy == null || policy.accessPoints.contains(accessPoint);
             return new AccessDecision(allowed, matching, policy);
         }
         return new AccessDecision(true, null, null);

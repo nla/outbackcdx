@@ -43,7 +43,7 @@ public class AccessRule {
     public boolean matchesDates(Date captureTime, Date accessTime) {
         return (captured == null || captured.contains(captureTime)) &&
                 (accessed == null || accessed.contains(accessTime)) &&
-                (period == null || period.equals(period.ZERO) || isWithinPeriod(captureTime, accessTime));
+                (period == null || period.equals(Period.ZERO) || isWithinPeriod(captureTime, accessTime));
     }
 
     private boolean isWithinPeriod(Date captureTime, Date accessTime) {

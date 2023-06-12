@@ -3,9 +3,8 @@ package outbackcdx;
 
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
-
 import org.rocksdb.*;
-
+import org.rocksdb.TransactionLogIterator.BatchResult;
 import outbackcdx.NanoHTTPD.IStreamer;
 import outbackcdx.NanoHTTPD.Response;
 import outbackcdx.NanoHTTPD.Response.Status;
@@ -17,7 +16,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -29,8 +27,6 @@ import static outbackcdx.Json.GSON;
 import static outbackcdx.NanoHTTPD.Method.*;
 import static outbackcdx.NanoHTTPD.Response.Status.*;
 import static outbackcdx.Web.*;
-
-import org.rocksdb.TransactionLogIterator.BatchResult;
 
 class Webapp implements Web.Handler {
     private final boolean verbose;
@@ -368,7 +364,7 @@ class Webapp implements Web.Handler {
                 BufferedOutputStream output = new BufferedOutputStream(outputStream);
                 output.write("[\n".getBytes(UTF_8));
 
-                long size = 0l;
+                long size = 0L;
                 long initialSeqNo = -1;
                 while (true) {
                     BatchResult batch = logReader.getBatch();
@@ -417,7 +413,7 @@ class Webapp implements Web.Handler {
         final Index index = getIndex(request);
 
         if (verbose) {
-            out.println(String.format("%s Received request %s. Retrieving deltas for collection <%s> since sequenceNumber %s", new Date(), request, collection, since));
+            out.printf("%s Received request %s. Retrieving deltas for collection <%s> since sequenceNumber %s%n", new Date(), request, collection, since);
         }
 
         try {
@@ -436,7 +432,7 @@ class Webapp implements Web.Handler {
                 e.printStackTrace();
             }
             throw new Web.ResponseException(
-                    new Response(Status.INTERNAL_ERROR, "text/plain", e.toString() + "\n"));
+                    new Response(Status.INTERNAL_ERROR, "text/plain", e + "\n"));
         }
     }
 
@@ -560,7 +556,7 @@ class Webapp implements Web.Handler {
 
     private Response getAccessRule(Web.Request req) throws IOException, Web.ResponseException, RocksDBException {
         Index index = getIndex(req);
-        Long ruleId = Long.parseLong(req.param("ruleId"));
+        long ruleId = Long.parseLong(req.param("ruleId"));
         AccessRule rule = index.accessControl.rule(ruleId);
         if (rule == null) {
             return notFound();

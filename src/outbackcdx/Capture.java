@@ -369,10 +369,10 @@ public class Capture {
     public String toString() {
         StringBuilder out = new StringBuilder();
         out.append(urlkey).append(" ");
-        out.append(Long.toString(timestamp)).append(" ");
+        out.append(timestamp).append(" ");
         out.append(original).append(" ");
         out.append(mimetype).append(" ");
-        out.append(Integer.toString(status)).append(" ");
+        out.append(status).append(" ");
         out.append(digest).append(" ");
         out.append(redirecturl).append(" ");
         out.append(robotflags).append(" ");
@@ -384,13 +384,13 @@ public class Capture {
             out.append(" ");
 
             if (originalLength > 0) {
-                out.append(Long.toString(originalLength)).append(" ");
+                out.append(originalLength).append(" ");
             } else {
                 out.append("-").append(" ");
             }
 
             if (originalCompressedoffset > 0) {
-                out.append(Long.toString(originalCompressedoffset)).append(" ");
+                out.append(originalCompressedoffset).append(" ");
             } else {
                 out.append("-").append(" ");
             }

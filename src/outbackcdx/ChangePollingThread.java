@@ -1,27 +1,25 @@
 package outbackcdx;
 
 
-import static outbackcdx.Json.GSON;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.util.Base64;
-import java.util.Date;
-
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.client.HttpClients;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteBatch;
 
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Date;
+
+import static outbackcdx.Json.GSON;
 
 public class ChangePollingThread extends Thread {
     final byte[] SEQ_NUM_KEY = "#ReplicationSequence".getBytes();
@@ -53,6 +51,7 @@ public class ChangePollingThread extends Thread {
                 try {
                     ChangePollingThread.this.join(60000);
                 } catch (InterruptedException e) {
+                    // ok
                 }
             }
         });
@@ -89,7 +88,7 @@ public class ChangePollingThread extends Thread {
                     e.printStackTrace();
                 }
 
-                long sleepTime = (pollingInterval * 1000) - (System.currentTimeMillis() - startTime);
+                long sleepTime = (pollingInterval * 1000L) - (System.currentTimeMillis() - startTime);
                 if (sleepTime > 0 && !shuttingDown) {
                     try {
                         Thread.sleep(sleepTime);
@@ -174,10 +173,8 @@ public class ChangePollingThread extends Thread {
         Base64.Decoder decoder = Base64.getDecoder();
         byte[] decodedWriteBatch = decoder.decode(writeBatch);
         try (WriteBatch batch = new WriteBatch(decodedWriteBatch)){
-            batch.put(SEQ_NUM_KEY, String.valueOf(sequenceNumber).getBytes("ASCII"));
+            batch.put(SEQ_NUM_KEY, String.valueOf(sequenceNumber).getBytes(StandardCharsets.US_ASCII));
             index.commitBatch(batch);
-        } catch (UnsupportedEncodingException e){
-            throw new RuntimeException(e); // ASCII is everywhere; this shouldn't happen.
         }
     }
 }

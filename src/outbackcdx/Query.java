@@ -10,8 +10,8 @@ public class Query {
     private static final String DEFAULT_FIELDS = "urlkey,timestamp,url,mime,status,digest,redirecturl,robotflags,length,offset,filename";
     private static final String DEFAULT_FIELDS_CDX14 = DEFAULT_FIELDS + ",originalLength,originalOffset,originalFilename";
 
-    public static final long MIN_TIMESTAMP = 0l;
-    public static final long MAX_TIMESTAMP = 99999999999999l;
+    public static final long MIN_TIMESTAMP = 0L;
+    public static final long MAX_TIMESTAMP = 99999999999999L;
 
     String accessPoint;
     MatchType matchType;
@@ -83,7 +83,7 @@ public class Query {
     /**
      * Pads timestamp with {@code padDigit} if shorter than 14 digits, or truncates
      * to 14 digits if longer than 14 digits, and converts to long.
-     *
+     * <p>
      * For example:
      * <ul>
      * <li>"2019" -> 20190000000000l
@@ -98,12 +98,7 @@ public class Query {
             buf.append(padDigit);
         }
         buf.setLength(14);
-        long result = Long.parseLong(buf.toString());
-        return result;
-    }
-
-    public String getAccessPoint() {
-        return accessPoint;
+        return Long.parseLong(buf.toString());
     }
 
     public void addPredicate(Predicate<Capture> predicate) {
@@ -139,7 +134,8 @@ public class Query {
             if (matchType != MatchType.EXACT) {
                 throw new IllegalArgumentException("sort=reverse is currently only implemented for exact matches");
             }
-        } else if (from != MIN_TIMESTAMP || to != MAX_TIMESTAMP) {
+        }
+        if (from != MIN_TIMESTAMP || to != MAX_TIMESTAMP) {
             if (matchType != MatchType.EXACT) {
                 throw new IllegalArgumentException("from={timestamp} and to={timestamp} are currently only implemented for exact matches");
             }
@@ -195,7 +191,7 @@ public class Query {
     }
 
     enum MatchType {
-        DEFAULT, EXACT, PREFIX, HOST, DOMAIN, RANGE;
+        DEFAULT, EXACT, PREFIX, HOST, DOMAIN, RANGE
     }
 
     enum Sort {
