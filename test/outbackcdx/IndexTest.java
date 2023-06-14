@@ -7,6 +7,7 @@ import org.rocksdb.*;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,13 +21,13 @@ public class IndexTest {
     private static RocksMemEnv env;
 
     @BeforeClass
-    public static void setUp() throws RocksDBException {
+    public static void setUp() throws RocksDBException, IOException {
         RocksDB.loadLibrary();
         env = new RocksMemEnv(Env.getDefault());
         try (Options options = new Options()
                 .setCreateIfMissing(true)
                 .setEnv(env)) {
-            db = RocksDB.open(options, "test");
+            db = RocksDB.open(options, Paths.get("test").toAbsolutePath().toString());
             defaultCf = db.getDefaultColumnFamily();
             aliasCf = db.createColumnFamily(new ColumnFamilyDescriptor("alias".getBytes(StandardCharsets.UTF_8)));
             index = new Index("test", db, defaultCf, aliasCf, null);

@@ -6,6 +6,7 @@ import org.junit.Test;
 import org.rocksdb.*;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.time.Period;
 import java.util.ArrayList;
 import java.util.Date;
@@ -29,7 +30,7 @@ public class AccessControlTest {
         try (Options options = new Options()
                      .setCreateIfMissing(true)
                      .setEnv(env)) {
-            db = RocksDB.open(options, "test");
+            db = RocksDB.open(options, Paths.get("test").toAbsolutePath().toString());
             ruleCf = db.getDefaultColumnFamily();
             policyCf = db.createColumnFamily(new ColumnFamilyDescriptor("policies".getBytes(StandardCharsets.UTF_8)));
             accessControl = new AccessControl(db, ruleCf, policyCf);
