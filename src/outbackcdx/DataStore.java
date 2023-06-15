@@ -84,6 +84,7 @@ public class DataStore implements Closeable {
             dbOptions.setCreateIfMissing(createAllowed);
             dbOptions.setMaxBackgroundJobs(Math.min(8, Runtime.getRuntime().availableProcessors()));
             dbOptions.setAvoidFlushDuringRecovery(true);
+            dbOptions.setCompactionReadaheadSize(2 * 1024 * 1024);
 
             // if not null, replication data will be available this far back in
             // time (in seconds)
