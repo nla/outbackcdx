@@ -22,6 +22,7 @@ public class Index {
     final long scanCap;
     final UrlCanonicalizer canonicalizer;
     private Thread upgradeThread;
+    private Thread compactThread;
 
     public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl) {
         this(name, db, defaultCF, aliasCF, accessControl, Long.MAX_VALUE, new UrlCanonicalizer());
@@ -160,6 +161,26 @@ public class Index {
     static String hostFromSurt(String surtPrefix) {
         int i = surtPrefix.indexOf(")/");
         return i < 0 ? surtPrefix : surtPrefix.substring(0, i);
+    }
+
+    public synchronized boolean compactInBackground() {
+        if (compactThread != null && compactThread.isAlive()) return false;
+        compactThread = new Thread(this::compact, "Index compaction (" + name + ")");
+        compactThread.setDaemon(true);
+        compactThread.start();
+        return true;
+    }
+
+    void compact() {
+        System.out.println("Compacting index '" + name + "'");
+        long startTime = System.currentTimeMillis();
+        try {
+            db.compactRange(defaultCF);
+        } catch (RocksDBException e) {
+            e.printStackTrace();
+        }
+        System.out.println("Compaction complete (" + name + ") in " +
+                Duration.ofMillis(System.currentTimeMillis() - startTime));
     }
 
     public synchronized boolean upgradeInBackground() {
