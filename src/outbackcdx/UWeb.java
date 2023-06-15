@@ -9,12 +9,13 @@ import outbackcdx.auth.Permission;
 import outbackcdx.auth.Permit;
 
 import java.io.*;
+import java.net.InetSocketAddress;
 import java.util.Deque;
 import java.util.Map;
 
 public class UWeb {
 
-    static class UServer {
+    static class UServer implements Closeable {
         private final Undertow undertow;
         private final Authorizer authorizer;
         private final Web.Handler handler;
@@ -73,6 +74,14 @@ public class UWeb {
 
         public void start() {
             undertow.start();
+        }
+
+        public void close() {
+            undertow.stop();
+        }
+
+        public int port() {
+            return ((InetSocketAddress)undertow.getListenerInfo().get(0).getAddress()).getPort();
         }
     }
 

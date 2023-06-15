@@ -66,4 +66,26 @@ public class WbCdxApiTest {
         new WbCdxApi.CdxjFormat(query, Collections.emptyMap(), sw).writeCapture(capture);
         assertEquals("org,example)/ 19870102030405 {\"url\":\"http://example.org/\",\"mime\":\"text/html\",\"status\":\"200\",\"digest\":\"M5ORM4XQ5QCEZEDRNZRGSWXPCOGUVASI\",\"offset\":\"100\",\"filename\":\"test.warc.gz\",\"non-standard-field\":[\"yes\",2,3]}\n", sw.toString());
     }
+
+    @Test
+    public void testJsonDictOutputFormat() throws IOException {
+        Query query = new Query(new MultiMap<>(), Collections.emptyList());
+        StringWriter sw = new StringWriter();
+        Capture capture = Capture.fromCdxLine("- 19870102030405 http://example.org/ text/html 200 M5ORM4XQ5QCEZEDRNZRGSWXPCOGUVASI - 100 test.warc.gz", new UrlCanonicalizer());
+        try (WbCdxApi.JsonDictFormat format = new WbCdxApi.JsonDictFormat(query, Collections.emptyMap(), sw)) {
+            format.writeCapture(capture);
+        }
+        assertEquals("[{\"urlkey\":\"org,example)/\",\"timestamp\":19870102030405,\"url\":\"http://example.org/\",\"mime\":\"text/html\",\"status\":200,\"digest\":\"M5ORM4XQ5QCEZEDRNZRGSWXPCOGUVASI\",\"offset\":100,\"filename\":\"test.warc.gz\"}]", sw.toString());
+    }
+
+    @Test
+    public void testJsonOutputFormat() throws IOException {
+        Query query = new Query(new MultiMap<>(), Collections.emptyList());
+        StringWriter sw = new StringWriter();
+        Capture capture = Capture.fromCdxLine("- 19870102030405 http://example.org/ text/html 200 M5ORM4XQ5QCEZEDRNZRGSWXPCOGUVASI - 100 test.warc.gz", new UrlCanonicalizer());
+        try (WbCdxApi.JsonFormat format = new WbCdxApi.JsonFormat(query, Collections.emptyMap(), sw)) {
+            format.writeCapture(capture);
+        }
+        assertEquals("[[\"org,example)/\",19870102030405,\"http://example.org/\",\"text/html\",200,\"M5ORM4XQ5QCEZEDRNZRGSWXPCOGUVASI\",\"-\",\"-\",null,100,\"test.warc.gz\"]]", sw.toString());
+    }
 }

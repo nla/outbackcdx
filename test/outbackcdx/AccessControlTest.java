@@ -1,5 +1,6 @@
 package outbackcdx;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -119,12 +120,11 @@ public class AccessControlTest {
     }
 
     @Test
-    public void testJson() {
-        // GSON can't handle Period on Java 17 so check that our custom type adapter works
+    public void testJson() throws JsonProcessingException {
         AccessRule rule = new AccessRule();
         rule.period = Period.ofDays(1);
-        String json = Json.GSON.toJson(rule);
-        AccessRule rule2 = Json.GSON.fromJson(json, AccessRule.class);
+        String json = Json.JSON_MAPPER.writeValueAsString(rule);
+        AccessRule rule2 = Json.JSON_MAPPER.readValue(json, AccessRule.class);
         assertEquals(rule.period, rule2.period);
     }
 }

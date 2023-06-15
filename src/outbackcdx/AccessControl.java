@@ -1,5 +1,6 @@
 package outbackcdx;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import com.googlecode.concurrenttrees.radixinverted.ConcurrentInvertedRadixTree;
 import com.googlecode.concurrenttrees.radixinverted.InvertedRadixTree;
@@ -10,6 +11,7 @@ import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -21,7 +23,7 @@ import java.util.regex.Pattern;
 
 import static java.nio.ByteOrder.BIG_ENDIAN;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static outbackcdx.Json.GSON;
+import static outbackcdx.Json.JSON_MAPPER;
 
 /**
  * Manages a set of access control rules and policies. Rules are persisted
@@ -69,8 +71,13 @@ class AccessControl {
         try (RocksIterator it = db.newIterator(policyCf)) {
             it.seekToFirst();
             while (it.isValid()) {
-                AccessPolicy policy = GSON.fromJson(new String(it.value(), UTF_8), AccessPolicy.class);
-                map.put(policy.id, policy);
+                try {
+                    AccessPolicy policy = JSON_MAPPER.readValue(new String(it.value(), UTF_8), AccessPolicy.class);
+                    map.put(policy.id, policy);
+                } catch (JsonProcessingException e) {
+                    System.err.println("WARNING: Exception parsing access policy " + decodeKey(it.key()));
+                    e.printStackTrace();
+                }
                 it.next();
             }
         }
@@ -82,8 +89,13 @@ class AccessControl {
         try (RocksIterator it = db.newIterator(ruleCf)) {
             it.seekToFirst();
             while (it.isValid()) {
-                AccessRule rule = GSON.fromJson(new String(it.value(), UTF_8), AccessRule.class);
-                map.put(rule.id, rule);
+                try {
+                    AccessRule rule = JSON_MAPPER.readValue(new String(it.value(), UTF_8), AccessRule.class);
+                    map.put(rule.id, rule);
+                } catch (JsonProcessingException e) {
+                    System.err.println("WARNING: Exception parsing access rule " + decodeKey(it.key()));
+                    e.printStackTrace();
+                }
                 it.next();
             }
         }
@@ -129,8 +141,12 @@ class AccessControl {
                 rule.creator = previous.creator;
             }
 
-            byte[] value = GSON.toJson(rule).getBytes(UTF_8);
-            db.put(ruleCf, encodeKey(rule.id), value);
+            try {
+                byte[] value = JSON_MAPPER.writeValueAsBytes(rule);
+                db.put(ruleCf, encodeKey(rule.id), value);
+            } catch (JsonProcessingException e) {
+                throw new UncheckedIOException("Exception serializing access rule " + rule.id, e);
+            }
 
             rules.put(rule.id, rule);
             rulesBySurt.put(rule);
@@ -147,8 +163,12 @@ class AccessControl {
         if (policy.id == null) {
             generatedId = policy.id = nextPolicyId.getAndIncrement();
         }
-        byte[] value = GSON.toJson(policy).getBytes(UTF_8);
-        db.put(policyCf, encodeKey(policy.id), value);
+        try {
+            byte[] value = JSON_MAPPER.writeValueAsBytes(policy);
+            db.put(policyCf, encodeKey(policy.id), value);
+        } catch (JsonProcessingException e) {
+            throw new UncheckedIOException("Exception serializing access policy " + policy.id, e);
+        }
         policies.put(policy.id, policy);
         return generatedId;
     }

@@ -1,18 +1,14 @@
 package outbackcdx;
 
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.google.gson.stream.JsonWriter;
 import outbackcdx.NanoHTTPD.Response;
 
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
+import java.io.*;
 import java.util.*;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
-import static outbackcdx.Json.GSON;
+import static outbackcdx.Json.JSON_MAPPER;
 import static outbackcdx.NanoHTTPD.Response.Status.OK;
 
 /**
@@ -91,7 +87,7 @@ public class WbCdxApi {
         OutputFormat construct(Query query, Map<String, ComputedField> computedFields, Writer out) throws IOException;
     }
 
-    static abstract class OutputFormat {
+    static abstract class OutputFormat implements Closeable {
         protected final Query query;
         protected final Writer writer;
         protected final Map<String, ComputedField> computedFields;
@@ -111,42 +107,42 @@ public class WbCdxApi {
         }
 
         public abstract void writeCapture(Capture capture) throws IOException;
-        void close() throws IOException {}
+        public void close() throws IOException {}
     }
 
     static class JsonDictFormat extends OutputFormat {
-        private final JsonWriter jsonWriter;
+        private final JsonGenerator jsonGenerator;
 
         JsonDictFormat(Query query, Map<String, ComputedField> computedFields, Writer writer) throws IOException {
             super(query, computedFields, writer);
-            this.jsonWriter = GSON.newJsonWriter(writer);
-            jsonWriter.beginArray();
+            this.jsonGenerator = JSON_MAPPER.createGenerator(writer);
+            jsonGenerator.writeStartArray();
         }
 
         @Override
         public void writeCapture(Capture capture) throws IOException {
-            jsonWriter.beginObject();
+            jsonGenerator.writeStartObject();
             for (String field : Arrays.asList(query.fields)) {
                 Object value = computeField(capture, field);
                 if (value == null || "-".equals(value)) {
                     // omit it
                 } else if (value instanceof Long) {
-                    jsonWriter.name(field).value((long) value);
+                    jsonGenerator.writeNumberField(field, (long)value);
                 } else if (value instanceof Integer) {
-                    jsonWriter.name(field).value((int) value);
+                    jsonGenerator.writeNumberField(field, (int)value);
                 } else if (value instanceof String) {
-                    jsonWriter.name(field).value((String) value);
+                    jsonGenerator.writeStringField(field, (String)value);
                 } else {
                     throw new UnsupportedOperationException("Don't know how to format: " + field + " (" + value.getClass() + ")");
                 }
             }
-            jsonWriter.endObject();
+            jsonGenerator.writeEndObject();
         }
 
         @Override
         public void close() throws IOException {
-            jsonWriter.endArray();
-            jsonWriter.close();
+            jsonGenerator.writeEndArray();
+            jsonGenerator.close();
         }
     }
 
@@ -155,38 +151,38 @@ public class WbCdxApi {
      * pywb and wayback-cdx-server.
      */
     static class JsonFormat extends OutputFormat {
-        private final JsonWriter jsonWriter;
+        private final JsonGenerator jsonGenerator;
 
         JsonFormat(Query query, Map<String, ComputedField> computedFields, Writer writer) throws IOException {
             super(query, computedFields, writer);
-            this.jsonWriter = GSON.newJsonWriter(writer);
-            jsonWriter.beginArray();
+            this.jsonGenerator = JSON_MAPPER.createGenerator(writer);
+            jsonGenerator.writeStartArray();
         }
 
         @Override
         public void writeCapture(Capture capture) throws IOException {
-            jsonWriter.beginArray();
+            jsonGenerator.writeStartArray();
             for (String field : query.fields) {
                 Object value = computeField(capture, field);
                 if (value == null) {
-                    jsonWriter.nullValue();
-                } if (value instanceof Long) {
-                    jsonWriter.value((long) value);
+                    jsonGenerator.writeNull();
+                } else if (value instanceof Long) {
+                    jsonGenerator.writeNumber((long) value);
                 } else if (value instanceof Integer) {
-                    jsonWriter.value((int) value);
+                    jsonGenerator.writeNumber((int) value);
                 } else if (value instanceof String) {
-                    jsonWriter.value((String) value);
+                    jsonGenerator.writeString((String) value);
                 } else {
                     throw new UnsupportedOperationException("Don't know how to format: " + field + " (" + value.getClass() + ")");
                 }
             }
-            jsonWriter.endArray();
+            jsonGenerator.writeEndArray();
         }
 
         @Override
         public void close() throws IOException {
-            jsonWriter.endArray();
-            jsonWriter.close();
+            jsonGenerator.writeEndArray();
+            jsonGenerator.close();
         }
     }
 

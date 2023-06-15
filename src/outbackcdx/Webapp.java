@@ -1,8 +1,10 @@
 package outbackcdx;
 
 
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.rocksdb.*;
 import org.rocksdb.TransactionLogIterator.BatchResult;
 import outbackcdx.NanoHTTPD.IStreamer;
@@ -23,7 +25,7 @@ import java.util.stream.StreamSupport;
 
 import static java.lang.System.out;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static outbackcdx.Json.GSON;
+import static outbackcdx.Json.JSON_MAPPER;
 import static outbackcdx.NanoHTTPD.Method.*;
 import static outbackcdx.NanoHTTPD.Response.Status.*;
 import static outbackcdx.Web.*;
@@ -41,7 +43,7 @@ class Webapp implements Web.Handler {
 
     private static ServiceLoader<FilterPlugin> fpLoader = ServiceLoader.load(FilterPlugin.class);
 
-    private Response configJson(Web.Request req) {
+    private Response configJson(Web.Request req) throws JsonProcessingException {
         return jsonResponse(dashboardConfig);
     }
 
@@ -138,7 +140,7 @@ class Webapp implements Web.Handler {
         return jsonResponse(map);
     }
 
-    Response listCollections(Web.Request request) {
+    Response listCollections(Web.Request request) throws JsonProcessingException {
         return jsonResponse(dataStore.listCollections());
     }
 
@@ -156,7 +158,7 @@ class Webapp implements Web.Handler {
         }
 
         Response response = new Response(Response.Status.OK, "application/json",
-                GSON.toJson(map));
+                JSON_MAPPER.writeValueAsString(map));
         response.addHeader("Access-Control-Allow-Origin", "*");
         return response;
     }
@@ -481,8 +483,8 @@ class Webapp implements Web.Handler {
         return new Response(OK, "text/html", page);
     }
 
-    private <T> T fromJson(Web.Request request, Class<T> clazz) {
-        return GSON.fromJson(new InputStreamReader(request.inputStream(), UTF_8), clazz);
+    private <T> T fromJson(Web.Request request, Class<T> clazz) throws IOException {
+        return JSON_MAPPER.readValue(request.inputStream(), clazz);
     }
 
     private Response getAccessPolicy(Web.Request req) throws IOException, Web.ResponseException {
@@ -513,19 +515,10 @@ class Webapp implements Web.Handler {
                 return new Response(BAD_REQUEST, "text/plain", formatStackTrace(e));
             }
         } else { // JSON format
-            JsonReader reader = GSON.newJsonReader(new InputStreamReader(request.inputStream(), UTF_8));
-            if (reader.peek() == JsonToken.BEGIN_ARRAY) {
-                reader.beginArray();
-                rules = new ArrayList<>();
-                while (reader.hasNext()) {
-                    AccessRule rule = GSON.fromJson(reader, AccessRule.class);
-                    rules.add(rule);
-                }
-                reader.endArray();
-            } else { // single rule
-                rules = Arrays.asList((AccessRule)GSON.fromJson(reader, AccessRule.class));
-                single = true;
-            }
+            ObjectMapper mapper = JSON_MAPPER.copy().enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
+            JsonNode tree = mapper.readTree(request.inputStream());
+            single = !tree.isArray();
+            rules = mapper.treeToValue(tree, mapper.getTypeFactory().constructCollectionType(List.class, AccessRule.class));
         }
 
         // validate rules
@@ -560,10 +553,10 @@ class Webapp implements Web.Handler {
         return new Response(OK, null, "");
     }
 
-    private Response created(long id) {
+    private Response created(long id) throws JsonProcessingException {
         Map<String,String> map = new HashMap<>();
         map.put("id", Long.toString(id));
-        return new Response(CREATED, "application/json", GSON.toJson(map));
+        return new Response(CREATED, "application/json", JSON_MAPPER.writeValueAsString(map));
     }
 
     private Response getAccessRule(Web.Request req) throws IOException, Web.ResponseException, RocksDBException {
@@ -576,7 +569,7 @@ class Webapp implements Web.Handler {
         return jsonResponse(rule);
     }
 
-    private Response getNewAccessRule(Web.Request request) {
+    private Response getNewAccessRule(Web.Request request) throws JsonProcessingException {
         AccessRule rule = new AccessRule();
         return jsonResponse(rule);
     }

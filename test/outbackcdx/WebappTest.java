@@ -19,14 +19,12 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 import java.io.*;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-import static java.nio.charset.StandardCharsets.*;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static org.junit.Assert.*;
-import static outbackcdx.Json.GSON;
+import static outbackcdx.Json.JSON_MAPPER;
 import static outbackcdx.NanoHTTPD.Method.*;
 import static outbackcdx.NanoHTTPD.Response.Status.*;
 
@@ -186,26 +184,29 @@ public class WebappTest {
 
         long publicPolicyId = createPolicy("Normal", "public", "staff");
         long staffPolicyId = createPolicy("Restricted", "staff");
-
-        assertEquals(5, GSON.fromJson(GET("/testap/access/policies"), AccessPolicy[].class).length);
+        
+        assertEquals(5, JSON_MAPPER.readValue(GET("/testap/access/policies"), AccessPolicy[].class).length);
 
         createRule(publicPolicyId, "*");
         long ruleIdC = createRule(staffPolicyId, "*.c.ex.org");
         long ruleIdA = createRule(staffPolicyId, "*.a.ex.org");
+        long[] multiRuleIds = createRules(staffPolicyId, "*.a.multi.ex.org", "*.b.multi.ex.org");
 
 
         // default sort should be rule id
         {
-            AccessRule[] actualRules = GSON.fromJson(GET("/testap/access/rules"), AccessRule[].class);
-            assertEquals(3, actualRules.length);
+            AccessRule[] actualRules = JSON_MAPPER.readValue(GET("/testap/access/rules"), AccessRule[].class);
+            assertEquals(5, actualRules.length);
             assertEquals(ruleIdC, (long) actualRules[1].id);
             assertEquals(ruleIdA, (long) actualRules[2].id);
+            assertEquals(multiRuleIds[0], (long) actualRules[3].id);
+            assertEquals(multiRuleIds[1], (long) actualRules[4].id);
         }
 
         // check sorting by SURT
         {
-            AccessRule[] actualRules = GSON.fromJson(GET("/testap/access/rules", "sort", "surt"), AccessRule[].class);
-            assertEquals(3, actualRules.length);
+            AccessRule[] actualRules = JSON_MAPPER.readValue(GET("/testap/access/rules", "sort", "surt"), AccessRule[].class);
+            assertEquals(5, actualRules.length);
             assertEquals(ruleIdA, (long) actualRules[1].id);
             assertEquals(ruleIdC, (long) actualRules[2].id);
         }
@@ -223,9 +224,10 @@ public class WebappTest {
         // try modifying a policy
         //
 
-        AccessPolicy policy = GSON.fromJson(GET("/testap/access/policies/" + staffPolicyId), AccessPolicy.class);
+        AccessPolicy policy = JSON_MAPPER.readValue(GET("/testap/access/policies/" + staffPolicyId), AccessPolicy.class);
         policy.accessPoints.remove("staff");
-        POST("/testap/access/policies", GSON.toJson(policy));
+        
+        POST("/testap/access/policies", JSON_MAPPER.writeValueAsString(policy));
 
         assertEquals(asList("http://b.ex.org/"),
                 cdxUrls(GET("/testap/ap/staff", "url", "*.ex.org")));
@@ -234,11 +236,11 @@ public class WebappTest {
         // try modifying a rule
         //
 
-        AccessRule rule = GSON.fromJson(GET("/testap/access/rules/" + ruleIdA), AccessRule.class);
+        AccessRule rule = JSON_MAPPER.readValue(GET("/testap/access/rules/" + ruleIdA), AccessRule.class);
         rule.urlPatterns.clear();
         rule.urlPatterns.add("*.b.ex.org");
 
-        POST("/testap/access/rules", GSON.toJson(rule));
+        POST("/testap/access/rules", JSON_MAPPER.writeValueAsString(rule));
 
         assertEquals(asList("http://a.ex.org/", "http://a.ex.org/"),
                 cdxUrls(GET("/testap/ap/public", "url", "*.ex.org")));
@@ -260,16 +262,16 @@ public class WebappTest {
         AccessRule badRule = new AccessRule();
         badRule.policyId = staffPolicyId;
         badRule.urlPatterns.add("*.example.org/with/a/path");
-        POST("/testap/access/rules", GSON.toJson(badRule), BAD_REQUEST);
+        POST("/testap/access/rules", JSON_MAPPER.writeValueAsString(badRule), BAD_REQUEST);
 
         AccessRule badRule2 = new AccessRule();
         badRule2.policyId = staffPolicyId;
         badRule2.urlPatterns.add("");
-        POST("/testap/access/rules", GSON.toJson(badRule2), BAD_REQUEST);
+        POST("/testap/access/rules", JSON_MAPPER.writeValueAsString(badRule2), BAD_REQUEST);
 
         AccessRule badRule3 = new AccessRule();
         badRule3.policyId = staffPolicyId;
-        POST("/testap/access/rules", GSON.toJson(badRule3), BAD_REQUEST);
+        POST("/testap/access/rules", JSON_MAPPER.writeValueAsString(badRule3), BAD_REQUEST);
 
     }
 
@@ -285,8 +287,20 @@ public class WebappTest {
         AccessRule rule = new AccessRule();
         rule.policyId = policyId;
         rule.urlPatterns.addAll(asList(surts));
-        String response = POST("/testap/access/rules", GSON.toJson(rule), CREATED);
-        return GSON.fromJson(response, Id.class).id;
+        String response = POST("/testap/access/rules", JSON_MAPPER.writeValueAsString(rule), CREATED);
+        return JSON_MAPPER.readValue(response, Id.class).id;
+    }
+
+    private long[] createRules(long policyId, String... surts) throws Exception {
+        List<AccessRule> rules = new ArrayList<>();
+        for (String surt: surts) {
+            AccessRule rule = new AccessRule();
+            rule.policyId = policyId;
+            rule.urlPatterns.add(surt);
+            rules.add(rule);
+        }
+        String response = POST("/testap/access/rules", JSON_MAPPER.writeValueAsString(rules), OK);
+        return JSON_MAPPER.readValue(response, long[].class);
     }
 
     private long createPolicy(String name, String... accessPoints) throws Exception {
@@ -294,8 +308,8 @@ public class WebappTest {
         publicPolicy.name = name;
         publicPolicy.accessPoints.addAll(asList(accessPoints));
 
-        String response = POST("/testap/access/policies", GSON.toJson(publicPolicy), CREATED);
-        return GSON.fromJson(response, Id.class).id;
+        String response = POST("/testap/access/policies", JSON_MAPPER.writeValueAsString(publicPolicy), CREATED);
+        return JSON_MAPPER.readValue(response, Id.class).id;
     }
 
     public static class Id {

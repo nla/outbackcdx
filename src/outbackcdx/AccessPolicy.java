@@ -1,9 +1,12 @@
 package outbackcdx;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.NON_PRIVATE)
 public class AccessPolicy {
     Long id;
     String name;
