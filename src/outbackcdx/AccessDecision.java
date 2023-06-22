@@ -16,6 +16,7 @@ public class AccessDecision {
     }
 
     public String getPublicMessage() {
+        if (rule == null) return null;
         return rule.publicMessage;
     }
 }
