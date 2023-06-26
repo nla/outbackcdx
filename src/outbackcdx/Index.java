@@ -127,6 +127,9 @@ public class Index {
         if (query.accessPoint != null && accessControl != null) {
             filter = filter.and(accessControl.filter(query.accessPoint, new Date()));
         }
+        if (query.omitSelfRedirects) {
+            filter = filter.and(record -> !record.isSelfRedirect(canonicalizer));
+        }
 
         switch (query.matchType) {
             case EXACT:

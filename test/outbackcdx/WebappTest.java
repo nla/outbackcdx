@@ -47,7 +47,7 @@ public class WebappTest {
         UrlCanonicalizer canon = new UrlCanonicalizer(new ByteArrayInputStream(yaml.getBytes(UTF_8)));
 
         DataStore manager = new DataStore(root, -1, null, Long.MAX_VALUE, canon);
-        webapp = new Webapp(manager, false, Collections.emptyMap(), canon, Collections.emptyMap(), 10000);
+        webapp = new Webapp(manager, false, Collections.emptyMap(), canon, Collections.emptyMap(), 10000, new QueryConfig());
     }
 
     @After
@@ -151,6 +151,36 @@ public class WebappTest {
         {
             String response = GET("/test", "url", "https://www.facebook.com/pages_reaction_units/more/whatever/foo?random&junk=blahblah&page_id=115681848447769&somethingwhatever&cursor=%7B%22timeline_cursor%22%3A%22timeline_unit%3A1%3A00000000001397435609%3A04611686018427387904%3A09223372036854775661%3A04611686018427387904%22%2C%22timeline_section_cursor%22%3A%7B%7D%2C%22has_next_page%22%3Atrue%7D&surface=jifdopsajfiodspajfidsopajfidsoapfdjisaop&unit_count=3482743829&dpr=1&__user=4936279463271496327&__a=1&__dyn=fjdIOPFEUOPEJIOCPWEJIFOPJIOFEPJIFOWPEJIFOPUFHFHFH-iWF3ozGFi9LFGA4XG7VKEKGwThEnUF7yWCHAxiESmqaxuqE88HyWDyuipi28gyEnGieKmjBXDmEgF3ebByqAAxaFSifDxCaVQibVojB-qjyVfh6u-jifopejwqiofpjewiqfojpewiqofpjewiqofpewjqifeopwqjfiewoqpfewq-Rx2Qh1Gcy8C6rld13xivQFfxqHu4olDh4dy8gyVUkCyFFFK5p8BaUhKHWG4ui9K8nVQGmV7Gh6BJq8G8WDDio8lfBGq9gZ4jyXV98-8t2eZKqaHyoO5pEpJaroK8Fp8HZ3aXAnjz4&__af=h0&__req=20&__be=-1&__pc=PHASED%3ADEFAULT&__rev=333333333333333&__spin_r=4444444444444444&__spin_b=frunkles&__spin_t=6363636363663363636\n");
             assertEquals(response, "");
+        }
+    }
+
+    @Test
+    public void testSelfRedirectFiltering() throws Exception {
+        POST("/test",
+                "- 20170819040336 http://redirtest.com/ text/html 301 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX https://www.redirtest.com/ - 123 0 foo.warc.gz\n" +
+                "- 20170819040337 https://redirtest.com/ text/html 301 BKMCCEPOOWFMGGO5635HFZXGFRLRGWIX https://www.redirtest.com/ - 123 300 foo.warc.gz\n" +
+                "- 20170819040338 http://www.redirtest.com/ text/html 301 CKMCCEPOOWFMGGO5635HFZXGFRLRGWIX https://www.redirtest.com/ - 123 600 foo.warc.gz\n" +
+                "- 20170819040339 https://www.redirtest.com/ text/html 200 DKMCCEPOOWFMGGO5635HFZXGFRLRGWIX https://www.redirtest.com/ - 1024 900 foo.warc.gz\n" +
+                "- 20200101010101 https://www.redirtest.com/ text/html 307 EKMCCEPOOWFMGGO5635HFZXGFRLRGWIX https://www.newsite.com/ - 1024 1200 foo.warc.gz\n");
+
+        // omitSelfRedirects=true should omit self redirects
+        {
+            String response = GET("/test", "url", "http://redirtest.com/", "omitSelfRedirects", "true");
+            assertFalse("http-bare -> https-www should be omitted", response.contains("20170819040336"));
+            assertFalse("https-bare -> https-www should be omitted", response.contains("20170819040337"));
+            assertFalse("http-www -> https-www should be omitted", response.contains("20170819040338"));
+            assertTrue("keep 200 response", response.contains("20170819040339"));
+            assertTrue("keep external redirect", response.contains("20200101010101"));
+        }
+
+        // omitSelfRedirects=false should keep all records
+        {
+            String response = GET("/test", "url", "http://redirtest.com/", "omitSelfRedirects", "false");
+            assertTrue(response.contains("20170819040336"));
+            assertTrue(response.contains("20170819040337"));
+            assertTrue(response.contains("20170819040338"));
+            assertTrue(response.contains("20170819040339"));
+            assertTrue(response.contains("20200101010101"));
         }
     }
 

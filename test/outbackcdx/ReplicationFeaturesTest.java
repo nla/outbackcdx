@@ -3,7 +3,6 @@ package outbackcdx;
 import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 
-import org.rocksdb.RocksDBException;
 import outbackcdx.NanoHTTPD.Response.Status;
 import outbackcdx.auth.NullAuthorizer;
 import outbackcdx.auth.Permit;
@@ -32,7 +31,7 @@ public class ReplicationFeaturesTest {
     public void setUp() throws IOException {
         File root = folder.newFolder();
         manager = new DataStore(root, 256, null, Long.MAX_VALUE, null);
-        webapp = new Webapp(manager, false, Collections.emptyMap(), null, Collections.emptyMap(), 10000);
+        webapp = new Webapp(manager, false, Collections.emptyMap(), null, Collections.emptyMap(), 10000, new QueryConfig());
     }
 
     @After

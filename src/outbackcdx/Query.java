@@ -22,6 +22,7 @@ public class Query {
     String urlkey;
     String closest;
     String[] fields;
+    boolean omitSelfRedirects;
     boolean allFields;
     boolean outputJson;
     long limit;
@@ -31,6 +32,10 @@ public class Query {
     String collapseToLastSpec;
 
     public Query(MultiMap<String, String> params, Iterable<FilterPlugin> filterPlugins) {
+        this(params, filterPlugins, new QueryConfig());
+    }
+
+    public Query(MultiMap<String, String> params, Iterable<FilterPlugin> filterPlugins, QueryConfig queryConfig) {
         accessPoint = params.get("accesspoint");
         url = params.get("url");
         method = params.get("method");
@@ -45,6 +50,7 @@ public class Query {
         if (params.containsKey("to")) {
             to = timestamp14Long(params.get("to"), '9');
         }
+        omitSelfRedirects = Boolean.parseBoolean(params.getOrDefault("omitSelfRedirects", String.valueOf(queryConfig.omitSelfRedirects)));
 
         predicate = capture -> true;
         if (params.getAll("filter") != null) {

@@ -57,7 +57,7 @@ class Webapp implements Web.Handler {
         return found ? ok() : notFound();
     }
 
-    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields, long maxNumResults) {
+    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields, long maxNumResults, QueryConfig queryConfig) {
         this.dataStore = dataStore;
         this.verbose = verbose;
         this.dashboardConfig = dashboardConfig;
@@ -77,7 +77,7 @@ class Webapp implements Web.Handler {
             }
         }
 
-        wbCdxApi = new WbCdxApi(filterPlugins, computedFields);
+        wbCdxApi = new WbCdxApi(filterPlugins, computedFields, queryConfig);
 
         router = new Router();
         router.on(GET, "/", interpolated("dashboard.html"));

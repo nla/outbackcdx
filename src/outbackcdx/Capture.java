@@ -778,4 +778,12 @@ public class Capture {
         }
         return out.toString();
     }
+
+    public boolean isSelfRedirect(UrlCanonicalizer canonicalizer) {
+        if (redirecturl == null) return false;
+        if (status < 300 || status >= 400) return false;
+        if (redirecturl.equals(original)) return true;
+        String redirectUrlKey = canonicalizer.surtCanonicalize(redirecturl);
+        return urlkey.equals(redirectUrlKey);
+    }
 }

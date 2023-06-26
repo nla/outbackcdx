@@ -23,14 +23,16 @@ import static outbackcdx.NanoHTTPD.Response.Status.OK;
 public class WbCdxApi {
     private final Iterable<FilterPlugin> filterPlugins;
     private final Map<String, ComputedField> computedFields;
+    private final QueryConfig queryConfig;
 
-    public WbCdxApi(Iterable<FilterPlugin> filterPlugins, Map<String, ComputedField> computedFields) {
+    public WbCdxApi(Iterable<FilterPlugin> filterPlugins, Map<String, ComputedField> computedFields, QueryConfig queryConfig) {
         this.filterPlugins = filterPlugins;
         this.computedFields = computedFields;
+        this.queryConfig = queryConfig;
     }
 
     public Response queryIndex(Web.Request request, Index index) {
-        Query query = new Query(request.params(), filterPlugins);
+        Query query = new Query(request.params(), filterPlugins, queryConfig);
 
         FormatFactory format;
         String contentType;
