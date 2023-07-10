@@ -11,6 +11,7 @@ import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 
 import java.io.IOException;
 import java.time.Period;
+import java.util.function.Function;
 
 import static com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS;
 
@@ -24,9 +25,9 @@ public class Json {
                         @Override
                         public Period deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JacksonException {
                             JsonNode node = p.getCodec().readTree(p);
-                            int years = node.get("years").asInt(0);
-                            int months = node.get("months").asInt(0);
-                            int days = node.get("days").asInt(0);
+                            int years = node.hasNonNull("years") ? node.get("years").asInt(0) : 0;
+                            int months = node.hasNonNull("months") ? node.get("months").asInt(0) : 0;
+                            int days = node.hasNonNull("days") ? node.get("days").asInt(0) : 0;
                             return Period.of(years, months, days);
                         }
                     })
