@@ -86,6 +86,6 @@ public class WbCdxApiTest {
         try (WbCdxApi.JsonFormat format = new WbCdxApi.JsonFormat(query, Collections.emptyMap(), sw)) {
             format.writeCapture(capture);
         }
-        assertEquals("[[\"org,example)/\",19870102030405,\"http://example.org/\",\"text/html\",200,\"M5ORM4XQ5QCEZEDRNZRGSWXPCOGUVASI\",\"-\",\"-\",null,100,\"test.warc.gz\"]]", sw.toString());
+        assertEquals("[[\"urlkey\",\"timestamp\",\"url\",\"mime\",\"status\",\"digest\",\"redirecturl\",\"robotflags\",\"length\",\"offset\",\"filename\"],[\"org,example)/\",19870102030405,\"http://example.org/\",\"text/html\",200,\"M5ORM4XQ5QCEZEDRNZRGSWXPCOGUVASI\",\"-\",\"-\",null,100,\"test.warc.gz\"]]", sw.toString());
     }
 }

@@ -159,6 +159,7 @@ public class WbCdxApi {
             super(query, computedFields, writer);
             this.jsonGenerator = JSON_MAPPER.createGenerator(writer);
             jsonGenerator.writeStartArray();
+            jsonGenerator.writeArray(query.fields, 0, query.fields.length);
         }
 
         @Override
