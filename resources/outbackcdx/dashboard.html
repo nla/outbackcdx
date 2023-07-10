@@ -778,7 +778,7 @@
 <script type="x-template" id="access-rule-list-template">
     <main id="access-rule-list">
         <div class="row">
-            <input placeholder="Search" class="searchbox" :value="this.$route.query.search" @input="onQueryInput">
+            <input placeholder="Search" class="searchbox" :value="this.$route.query.search" @input="onQueryInput" @paste="onQueryInput">
 
             <router-link :to="{name: 'access-rule', params: { collection: $route.params.collection, ruleId: 'new' }}" class="button">New Rule</router-link>
             <a :href="'/' + $route.params.collection + '/access/rules?output=csv'" class="button">Export CSV</a>
