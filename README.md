@@ -219,14 +219,16 @@ collections:
   testcol:
     archive_paths: /tmp/warcs/
     #archive_paths: http://remote.example.org/warcs/
-    index:
-      type: cdx
-      api_url: http://localhost:8080/myindex?url={url}&closest={closest}&sort=closest
-    
-      # outbackcdx doesn't serve warc records 
-      # so we blank replay_url to force pywb to read the warc file itself
-      replay_url: ""
+    index_paths: cdx+http://localhost:8080/myindex
 ```
+
+See [pywb's documentation](https://pywb.readthedocs.io/en/master/manual/outbackcdx.html#configure-pywb-with-outbackcdx) 
+for more details.
+
+**Recommendation:** In some cases where an index contains huge numbers of snapshots of the same URL Pywb can request
+too many records and run out of memory. To prevent this from happening when using with pywb it's currently recommended 
+to run OutbackCDX with a record scan cap option like `-r 10000`. Future versions of OutbackCDX will likely apply a
+default limit to the number of records returned.
 
 ### Heritrix
 
