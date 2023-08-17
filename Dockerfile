@@ -1,4 +1,4 @@
-FROM maven:3-adoptopenjdk-11 as build-env
+FROM maven:3-eclipse-temurin-17 as build-env
 
 RUN apt-get update \
  && apt-get install -y libsnappy-dev \
@@ -11,7 +11,7 @@ RUN apt-get update \
 RUN cd /tmp && \
     git clone https://github.com/facebook/rocksdb.git && \
     cd rocksdb && \
-    git checkout 6.0.fb && \
+    git checkout v8.1.1 && \
     DEBUG_LEVEL=0 CXXFLAGS='-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess' make tools && \
     cp /tmp/rocksdb/ldb /usr/bin/ && \
     cp /tmp/rocksdb/sst_dump /usr/bin/
@@ -29,7 +29,7 @@ RUN export JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF8 && \
     mvn -B -s /usr/share/maven/ref/settings-docker.xml -DskipTests package && \
     mvn package
 
-FROM adoptopenjdk:11-jdk-hotspot
+FROM eclipse-temurin:17
 
 RUN apt-get update && apt-get install -y libsnappy-dev dumb-init \
  && rm -rf /var/lib/apt/lists/*
