@@ -1,5 +1,7 @@
 package outbackcdx;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+
 public class AccessDecision {
     private final boolean allowed;
     private final AccessRule rule;
@@ -15,7 +17,12 @@ public class AccessDecision {
         return allowed;
     }
 
+    public AccessRule getRule() {
+        return rule;
+    }
+
     public String getPublicMessage() {
+        if (rule == null) return null;
         return rule.publicMessage;
     }
 }

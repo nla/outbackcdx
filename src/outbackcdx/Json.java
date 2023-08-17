@@ -1,66 +1,46 @@
 package outbackcdx;
 
+import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.util.StdDateFormat;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.TypeAdapter;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
-import com.google.gson.stream.JsonWriter;
 
 import java.io.IOException;
 import java.time.Period;
+import java.util.function.Function;
+
+import static com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS;
 
 public class Json {
-    public static final Gson GSON = new GsonBuilder()
-            .setPrettyPrinting()
-            .setDateFormat("yyyy-MM-dd'T'HH:mm:ssZ")
-            .registerTypeAdapter(Period.class, new PeriodTypeAdapter())
-            .create();
     public static final CBORFactory CBOR_FACTORY = new CBORFactory();
     public static final ObjectMapper CBOR_MAPPER = new ObjectMapper(CBOR_FACTORY);
     public static final JsonFactory JSON_FACTORY = new JsonFactory();
-    public static final ObjectMapper JSON_MAPPER = new ObjectMapper(JSON_FACTORY);
-
-    private static class PeriodTypeAdapter extends TypeAdapter<Period> {
-        @Override
-        public void write(JsonWriter out, Period value) throws IOException {
-            if (value == null) {
-                out.nullValue();
-                return;
-            }
-            out.beginObject();
-            out.name("years");
-            out.value(value.getYears());
-            out.name("months");
-            out.value(value.getMonths());
-            out.name("days");
-            out.value(value.getDays());
-            out.endObject();
-        }
-
-        @Override
-        public Period read(JsonReader in) throws IOException {
-            if (in.peek() == JsonToken.NULL) {
-                in.nextNull();
-                return null;
-            }
-            int years = 0;
-            int months = 0;
-            int days = 0;
-            in.beginObject();
-            while (in.hasNext()) {
-                switch (in.nextName()) {
-                    case "years": years = in.nextInt(); break;
-                    case "months": months = in.nextInt(); break;
-                    case "days": days = in.nextInt(); break;
-                    default: in.skipValue(); break;
-                }
-            }
-            in.endObject();
-            return Period.of(years, months, days);
-        }
-    }
+    public static final ObjectMapper JSON_MAPPER = new ObjectMapper(JSON_FACTORY)
+            .registerModule(new SimpleModule()
+                    .addDeserializer(Period.class, new JsonDeserializer<Period>() {
+                        @Override
+                        public Period deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JacksonException {
+                            JsonNode node = p.getCodec().readTree(p);
+                            int years = node.hasNonNull("years") ? node.get("years").asInt(0) : 0;
+                            int months = node.hasNonNull("months") ? node.get("months").asInt(0) : 0;
+                            int days = node.hasNonNull("days") ? node.get("days").asInt(0) : 0;
+                            return Period.of(years, months, days);
+                        }
+                    })
+                    .addSerializer(Period.class, new JsonSerializer<Period>() {
+                        @Override
+                        public void serialize(Period value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+                            gen.writeStartObject();
+                            gen.writeNumberField("years", value.getYears());
+                            gen.writeNumberField("months", value.getMonths());
+                            gen.writeNumberField("days", value.getDays());
+                            gen.writeEndObject();
+                        }
+                    }))
+            .disable(WRITE_DATES_AS_TIMESTAMPS)
+            .setDateFormat(new StdDateFormat().withColonInTimeZone(true));
 }

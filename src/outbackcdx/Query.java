@@ -1,21 +1,28 @@
 package outbackcdx;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.function.Predicate;
 
 public class Query {
     private static final String DEFAULT_FIELDS = "urlkey,timestamp,url,mime,status,digest,redirecturl,robotflags,length,offset,filename";
     private static final String DEFAULT_FIELDS_CDX14 = DEFAULT_FIELDS + ",originalLength,originalOffset,originalFilename";
 
-    public static final long MIN_TIMESTAMP = 0l;
-    public static final long MAX_TIMESTAMP = 99999999999999l;
+    public static final long MIN_TIMESTAMP = 0L;
+    public static final long MAX_TIMESTAMP = 99999999999999L;
 
     String accessPoint;
     MatchType matchType;
     Sort sort;
     String url;
+    String method;
+    String requestBody;
     String urlkey;
     String closest;
     String[] fields;
+    boolean omitSelfRedirects;
     boolean allFields;
     boolean outputJson;
     long limit;
@@ -25,8 +32,14 @@ public class Query {
     String collapseToLastSpec;
 
     public Query(MultiMap<String, String> params, Iterable<FilterPlugin> filterPlugins) {
+        this(params, filterPlugins, new QueryConfig());
+    }
+
+    public Query(MultiMap<String, String> params, Iterable<FilterPlugin> filterPlugins, QueryConfig queryConfig) {
         accessPoint = params.get("accesspoint");
         url = params.get("url");
+        method = params.get("method");
+        requestBody = params.get("requestBody");
         urlkey = params.get("urlkey");
         matchType = MatchType.valueOf(params.getOrDefault("matchType", "default").toUpperCase());
         sort = Sort.valueOf(params.getOrDefault("sort", "default").toUpperCase());
@@ -37,6 +50,7 @@ public class Query {
         if (params.containsKey("to")) {
             to = timestamp14Long(params.get("to"), '9');
         }
+        omitSelfRedirects = Boolean.parseBoolean(params.getOrDefault("omitSelfRedirects", String.valueOf(queryConfig.omitSelfRedirects)));
 
         predicate = capture -> true;
         if (params.getAll("filter") != null) {
@@ -75,7 +89,7 @@ public class Query {
     /**
      * Pads timestamp with {@code padDigit} if shorter than 14 digits, or truncates
      * to 14 digits if longer than 14 digits, and converts to long.
-     *
+     * <p>
      * For example:
      * <ul>
      * <li>"2019" -> 20190000000000l
@@ -90,12 +104,7 @@ public class Query {
             buf.append(padDigit);
         }
         buf.setLength(14);
-        long result = Long.parseLong(buf.toString());
-        return result;
-    }
-
-    public String getAccessPoint() {
-        return accessPoint;
+        return Long.parseLong(buf.toString());
     }
 
     public void addPredicate(Predicate<Capture> predicate) {
@@ -131,7 +140,8 @@ public class Query {
             if (matchType != MatchType.EXACT) {
                 throw new IllegalArgumentException("sort=reverse is currently only implemented for exact matches");
             }
-        } else if (from != MIN_TIMESTAMP || to != MAX_TIMESTAMP) {
+        }
+        if (from != MIN_TIMESTAMP || to != MAX_TIMESTAMP) {
             if (matchType != MatchType.EXACT) {
                 throw new IllegalArgumentException("from={timestamp} and to={timestamp} are currently only implemented for exact matches");
             }
@@ -141,16 +151,36 @@ public class Query {
         }
     }
 
-    Iterable<Capture> execute(Index index) {
+    String buildUrlKey(UrlCanonicalizer canonicalizer) {
+        String urlToCanonicalize;
+        if (method != null && !method.equalsIgnoreCase("GET")) {
+            try {
+                StringBuilder builder = new StringBuilder(url);
+                builder.append(url.contains("?") ? "&" : "?");
+                builder.append("__wb_method=").append(URLEncoder.encode(method.toUpperCase(Locale.ROOT), StandardCharsets.UTF_8.name()));
+                if (requestBody != null) {
+                    builder.append("&").append(requestBody);
+                }
+                urlToCanonicalize = builder.toString();
+            } catch (UnsupportedEncodingException e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            urlToCanonicalize = url;
+        }
+        return canonicalizer.surtCanonicalize(urlToCanonicalize);
+    }
+
+    CloseableIterator<Capture> execute(Index index) {
         compatibilityHacks();
         expandWildcards();
         validate();
 
         if (urlkey == null) {
-            urlkey = index.canonicalizer.surtCanonicalize(url);
+            urlkey = buildUrlKey(index.canonicalizer);
         }
 
-        Iterable<Capture> captures = index.execute(this);
+        CloseableIterator<Capture> captures = index.execute(this);
         if (collapseToLastSpec != null) {
             captures = Filter.collapseToLast(captures, collapseToLastSpec);
         }
@@ -167,7 +197,7 @@ public class Query {
     }
 
     enum MatchType {
-        DEFAULT, EXACT, PREFIX, HOST, DOMAIN, RANGE;
+        DEFAULT, EXACT, PREFIX, HOST, DOMAIN, RANGE
     }
 
     enum Sort {

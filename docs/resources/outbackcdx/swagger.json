@@ -38,6 +38,21 @@
             "example": "https://www.example.com"
           },
           {
+            "name": "method",
+            "in": "query",
+            "type": "string",
+            "description": "HTTP request method to match",
+            "example": "POST",
+            "default": "GET"
+          },
+          {
+            "name": "requestBody",
+            "in": "query",
+            "type": "string",
+            "description": "Encoded request body to match (for POST and POST request methods)",
+            "example": "section=about&page=2"
+          },
+          {
             "name": "urlkey",
             "in": "query",
             "type": "string",
@@ -123,14 +138,14 @@
             "in": "query",
             "description": "Field to collapse on, optionally with :number suffix to collapse on substring of field; in other words, return only the **first** row when of the series multiple consecutive rows have the same value for the supplied field",
             "type": "string",
-            "example": "timestamp:12",
+            "example": "timestamp:12"
           },
           {
             "name": "collapseToLast",
             "in": "query",
             "description": "Field to collapse on, optionally with :number suffix to collapse on substring of field; in other words, return only the **last** row when of the series multiple consecutive rows have the same value for the supplied field",
             "type": "string",
-            "example": "timestamp:12",
+            "example": "timestamp:12"
           },
           {
             "name": "accesspoint",

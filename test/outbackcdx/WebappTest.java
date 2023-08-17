@@ -19,12 +19,12 @@ import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 import java.io.*;
-import java.nio.charset.Charset;
 import java.util.*;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static org.junit.Assert.*;
-import static outbackcdx.Json.GSON;
+import static outbackcdx.Json.JSON_MAPPER;
 import static outbackcdx.NanoHTTPD.Method.*;
 import static outbackcdx.NanoHTTPD.Response.Status.*;
 
@@ -43,12 +43,11 @@ public class WebappTest {
                 "- url_prefix: 'com,facebook)/pages_reaction_units/more'\n" +
                 "  fuzzy_lookup:\n" +
                 "  - page_id\n" +
-                "  - cursor\n" +
-                "";
-        UrlCanonicalizer canon = new UrlCanonicalizer(new ByteArrayInputStream(yaml.getBytes("UTF-8")));
+                "  - cursor\n";
+        UrlCanonicalizer canon = new UrlCanonicalizer(new ByteArrayInputStream(yaml.getBytes(UTF_8)));
 
         DataStore manager = new DataStore(root, -1, null, Long.MAX_VALUE, canon);
-        webapp = new Webapp(manager, false, Collections.emptyMap(), canon, Collections.emptyMap(), 10000);
+        webapp = new Webapp(manager, false, Collections.emptyMap(), canon, Collections.emptyMap(), 10000, new QueryConfig());
     }
 
     @After
@@ -60,12 +59,20 @@ public class WebappTest {
     public void test() throws Exception {
         POST("/test", "- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n");
         POST("/test", "- 20060614070159 http://nla.gov.au/ text/html 200 XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n");
+        POST("/test", "- 20210203115119 {\"url\": \"http://nla.gov.au/\", " +
+                "\"mime\": \"text/plain\", \"status\": \"200\", \"digest\": \"PPPCCEPOOWFMGGO5635HFZXGFRLRGWIX\", " +
+                "\"length\": \"832\", \"offset\": \"1234\", \"filename\": \"example.warc.gz\", \"method\": \"POST\", \"requestBody\": \"x=1&y=2\"}");
         {
             String response = GET("/test", "url", "nla.gov.au");
             assertTrue(response.contains("au,gov,nla)/ 20050614070159"));
-            assertTrue(!response.contains("example"));
+            assertFalse(response.contains("example"));
         }
 
+        {
+            String response = GET("/test", "url", "nla.gov.au", "method", "POST", "requestBody", "x=1&y=2");
+            assertTrue(response.contains("20210203115119"));
+            assertFalse(response.contains("20050614070159"));
+        }
 
         {
             String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F");
@@ -148,6 +155,36 @@ public class WebappTest {
     }
 
     @Test
+    public void testSelfRedirectFiltering() throws Exception {
+        POST("/test",
+                "- 20170819040336 http://redirtest.com/ text/html 301 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX https://www.redirtest.com/ - 123 0 foo.warc.gz\n" +
+                "- 20170819040337 https://redirtest.com/ text/html 301 BKMCCEPOOWFMGGO5635HFZXGFRLRGWIX https://www.redirtest.com/ - 123 300 foo.warc.gz\n" +
+                "- 20170819040338 http://www.redirtest.com/ text/html 301 CKMCCEPOOWFMGGO5635HFZXGFRLRGWIX https://www.redirtest.com/ - 123 600 foo.warc.gz\n" +
+                "- 20170819040339 https://www.redirtest.com/ text/html 200 DKMCCEPOOWFMGGO5635HFZXGFRLRGWIX https://www.redirtest.com/ - 1024 900 foo.warc.gz\n" +
+                "- 20200101010101 https://www.redirtest.com/ text/html 307 EKMCCEPOOWFMGGO5635HFZXGFRLRGWIX https://www.newsite.com/ - 1024 1200 foo.warc.gz\n");
+
+        // omitSelfRedirects=true should omit self redirects
+        {
+            String response = GET("/test", "url", "http://redirtest.com/", "omitSelfRedirects", "true");
+            assertFalse("http-bare -> https-www should be omitted", response.contains("20170819040336"));
+            assertFalse("https-bare -> https-www should be omitted", response.contains("20170819040337"));
+            assertFalse("http-www -> https-www should be omitted", response.contains("20170819040338"));
+            assertTrue("keep 200 response", response.contains("20170819040339"));
+            assertTrue("keep external redirect", response.contains("20200101010101"));
+        }
+
+        // omitSelfRedirects=false should keep all records
+        {
+            String response = GET("/test", "url", "http://redirtest.com/", "omitSelfRedirects", "false");
+            assertTrue(response.contains("20170819040336"));
+            assertTrue(response.contains("20170819040337"));
+            assertTrue(response.contains("20170819040338"));
+            assertTrue(response.contains("20170819040339"));
+            assertTrue(response.contains("20200101010101"));
+        }
+    }
+
+    @Test
     public void testDelete() throws Exception {
         POST("/test", "- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n");
         POST("/test", "- 20060614070159 http://nla.gov.au/ text/html 200 XKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20040614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20060614070144-00003-crawling016.archive.org\n");
@@ -163,7 +200,7 @@ public class WebappTest {
         {
             String response = GET("/test", "q", "type:urlquery url:http%3A%2F%2Fnla.gov.au%2F");
             assertTrue(response.contains("20050614070159"));
-            assertTrue(!response.contains("20060614070159"));
+            assertFalse(response.contains("20060614070159"));
         }
     }
 
@@ -177,26 +214,29 @@ public class WebappTest {
 
         long publicPolicyId = createPolicy("Normal", "public", "staff");
         long staffPolicyId = createPolicy("Restricted", "staff");
-
-        assertEquals(5, GSON.fromJson(GET("/testap/access/policies"), AccessPolicy[].class).length);
+        
+        assertEquals(5, JSON_MAPPER.readValue(GET("/testap/access/policies"), AccessPolicy[].class).length);
 
         createRule(publicPolicyId, "*");
         long ruleIdC = createRule(staffPolicyId, "*.c.ex.org");
         long ruleIdA = createRule(staffPolicyId, "*.a.ex.org");
+        long[] multiRuleIds = createRules(staffPolicyId, "*.a.multi.ex.org", "*.b.multi.ex.org");
 
 
         // default sort should be rule id
         {
-            AccessRule[] actualRules = GSON.fromJson(GET("/testap/access/rules"), AccessRule[].class);
-            assertEquals(3, actualRules.length);
+            AccessRule[] actualRules = JSON_MAPPER.readValue(GET("/testap/access/rules"), AccessRule[].class);
+            assertEquals(5, actualRules.length);
             assertEquals(ruleIdC, (long) actualRules[1].id);
             assertEquals(ruleIdA, (long) actualRules[2].id);
+            assertEquals(multiRuleIds[0], (long) actualRules[3].id);
+            assertEquals(multiRuleIds[1], (long) actualRules[4].id);
         }
 
         // check sorting by SURT
         {
-            AccessRule[] actualRules = GSON.fromJson(GET("/testap/access/rules", "sort", "surt"), AccessRule[].class);
-            assertEquals(3, actualRules.length);
+            AccessRule[] actualRules = JSON_MAPPER.readValue(GET("/testap/access/rules", "sort", "surt"), AccessRule[].class);
+            assertEquals(5, actualRules.length);
             assertEquals(ruleIdA, (long) actualRules[1].id);
             assertEquals(ruleIdC, (long) actualRules[2].id);
         }
@@ -214,9 +254,10 @@ public class WebappTest {
         // try modifying a policy
         //
 
-        AccessPolicy policy = GSON.fromJson(GET("/testap/access/policies/" + staffPolicyId), AccessPolicy.class);
+        AccessPolicy policy = JSON_MAPPER.readValue(GET("/testap/access/policies/" + staffPolicyId), AccessPolicy.class);
         policy.accessPoints.remove("staff");
-        POST("/testap/access/policies", GSON.toJson(policy));
+        
+        POST("/testap/access/policies", JSON_MAPPER.writeValueAsString(policy));
 
         assertEquals(asList("http://b.ex.org/"),
                 cdxUrls(GET("/testap/ap/staff", "url", "*.ex.org")));
@@ -225,11 +266,11 @@ public class WebappTest {
         // try modifying a rule
         //
 
-        AccessRule rule = GSON.fromJson(GET("/testap/access/rules/" + ruleIdA), AccessRule.class);
+        AccessRule rule = JSON_MAPPER.readValue(GET("/testap/access/rules/" + ruleIdA), AccessRule.class);
         rule.urlPatterns.clear();
         rule.urlPatterns.add("*.b.ex.org");
 
-        POST("/testap/access/rules", GSON.toJson(rule));
+        POST("/testap/access/rules", JSON_MAPPER.writeValueAsString(rule));
 
         assertEquals(asList("http://a.ex.org/", "http://a.ex.org/"),
                 cdxUrls(GET("/testap/ap/public", "url", "*.ex.org")));
@@ -251,16 +292,16 @@ public class WebappTest {
         AccessRule badRule = new AccessRule();
         badRule.policyId = staffPolicyId;
         badRule.urlPatterns.add("*.example.org/with/a/path");
-        POST("/testap/access/rules", GSON.toJson(badRule), BAD_REQUEST);
+        POST("/testap/access/rules", JSON_MAPPER.writeValueAsString(badRule), BAD_REQUEST);
 
         AccessRule badRule2 = new AccessRule();
         badRule2.policyId = staffPolicyId;
         badRule2.urlPatterns.add("");
-        POST("/testap/access/rules", GSON.toJson(badRule2), BAD_REQUEST);
+        POST("/testap/access/rules", JSON_MAPPER.writeValueAsString(badRule2), BAD_REQUEST);
 
         AccessRule badRule3 = new AccessRule();
         badRule3.policyId = staffPolicyId;
-        POST("/testap/access/rules", GSON.toJson(badRule3), BAD_REQUEST);
+        POST("/testap/access/rules", JSON_MAPPER.writeValueAsString(badRule3), BAD_REQUEST);
 
     }
 
@@ -276,8 +317,20 @@ public class WebappTest {
         AccessRule rule = new AccessRule();
         rule.policyId = policyId;
         rule.urlPatterns.addAll(asList(surts));
-        String response = POST("/testap/access/rules", GSON.toJson(rule), CREATED);
-        return GSON.fromJson(response, Id.class).id;
+        String response = POST("/testap/access/rules", JSON_MAPPER.writeValueAsString(rule), CREATED);
+        return JSON_MAPPER.readValue(response, Id.class).id;
+    }
+
+    private long[] createRules(long policyId, String... surts) throws Exception {
+        List<AccessRule> rules = new ArrayList<>();
+        for (String surt: surts) {
+            AccessRule rule = new AccessRule();
+            rule.policyId = policyId;
+            rule.urlPatterns.add(surt);
+            rules.add(rule);
+        }
+        String response = POST("/testap/access/rules", JSON_MAPPER.writeValueAsString(rules), OK);
+        return JSON_MAPPER.readValue(response, long[].class);
     }
 
     private long createPolicy(String name, String... accessPoints) throws Exception {
@@ -285,8 +338,8 @@ public class WebappTest {
         publicPolicy.name = name;
         publicPolicy.accessPoints.addAll(asList(accessPoints));
 
-        String response = POST("/testap/access/policies", GSON.toJson(publicPolicy), CREATED);
-        return GSON.fromJson(response, Id.class).id;
+        String response = POST("/testap/access/policies", JSON_MAPPER.writeValueAsString(publicPolicy), CREATED);
+        return JSON_MAPPER.readValue(response, Id.class).id;
     }
 
     public static class Id {
@@ -346,7 +399,7 @@ public class WebappTest {
     private static class DummySession implements NanoHTTPD.IHTTPSession {
         private final NanoHTTPD.Method method;
         InputStream stream = new ByteArrayInputStream(new byte[0]);
-        MultiMap<String, String> parms = new MultiMap<String, String>();
+        MultiMap<String, String> parms = new MultiMap<>();
         String url;
 
         public DummySession(NanoHTTPD.Method method, String url) {
@@ -355,7 +408,7 @@ public class WebappTest {
         }
 
         public DummySession data(String data) {
-            stream = new ByteArrayInputStream(data.getBytes(Charset.forName("UTF-8")));
+            stream = new ByteArrayInputStream(data.getBytes(UTF_8));
             return this;
         }
 
@@ -365,7 +418,7 @@ public class WebappTest {
         }
 
         @Override
-        public void execute() throws IOException {
+        public void execute() {
             // nothing
         }
 

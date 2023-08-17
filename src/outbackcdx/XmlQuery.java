@@ -1,7 +1,5 @@
 package outbackcdx;
 
-import org.apache.commons.collections4.iterators.PeekingIterator;
-
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
@@ -11,7 +9,6 @@ import java.net.URLDecoder;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.logging.Logger;
@@ -125,54 +122,65 @@ public class XmlQuery {
         long numReturned = 0;
         long numResults = 0;
         boolean scanningForClosestDate = queryDate != null;
-        PeekingIterator<Capture> iterator = new PeekingIterator<>(index.queryAP(queryUrl, accessPoint).iterator());
-        while (iterator.hasNext()) {
-            Capture capture = iterator.next();
-            if (numResults < offset) { // skip matches before offset
-                numResults++;
-                continue;
-            } else if (numResults >= offset + limit) {
-                if (numResults < maxNumResults) { // count matches after limit up to maxNumResults
-                    numResults++;
-                    continue;
+
+        try (CloseableIterator<Capture> iterator = index.queryAP(queryUrl, accessPoint)) {
+            Capture next = null;
+            while (true) {
+                Capture capture;
+                if (next != null) {
+                    capture = next;
+                    next = null;
+                } else if (iterator.hasNext()) {
+                    capture = iterator.next();
                 } else {
                     break;
                 }
-            }
-            numResults++;
-
-            if (!wroteHeader) {
-                out.writeStartElement("results");
-                wroteHeader = true;
-            }
-            out.writeStartElement("result");
-            writeElement(out, "compressedoffset", capture.compressedoffset);
-            if (capture.length != -1) {
-                writeElement(out, "compressedendoffset", capture.length);
-            }
-            writeElement(out, "mimetype", capture.mimetype);
-            writeElement(out, "file", capture.file);
-            writeElement(out, "redirecturl", capture.redirecturl);
-            writeElement(out, "urlkey", capture.urlkey);
-            writeElement(out, "digest", capture.digest);
-            writeElement(out, "httpresponsecode", capture.status);
-            writeElement(out, "robotflags", capture.robotflags);
-            writeElement(out, "url", capture.original);
-            writeElement(out, "capturedate", capture.timestamp);
-
-            // if the query includes a date annotate the closest capture to that date
-            // since we scan the captures in date order we just have to wait until the next capture is further away
-            // from the query date than the current one, annotate it and then stop
-            if (scanningForClosestDate) {
-                Capture next = iterator.peek();
-                if (next == null || Math.abs(queryDate - capture.timestamp) < Math.abs(queryDate - next.timestamp)) {
-                    writeElement(out, "closest", "true");
-                    scanningForClosestDate = false;
+                if (numResults < offset) { // skip matches before offset
+                    numResults++;
+                    continue;
+                } else if (numResults >= offset + limit) {
+                    if (numResults < maxNumResults) { // count matches after limit up to maxNumResults
+                        numResults++;
+                        continue;
+                    } else {
+                        break;
+                    }
                 }
-            }
+                numResults++;
 
-            out.writeEndElement(); // </result>
-            numReturned++;
+                if (!wroteHeader) {
+                    out.writeStartElement("results");
+                    wroteHeader = true;
+                }
+                out.writeStartElement("result");
+                writeElement(out, "compressedoffset", capture.compressedoffset);
+                if (capture.length != -1) {
+                    writeElement(out, "compressedendoffset", capture.length);
+                }
+                writeElement(out, "mimetype", capture.mimetype);
+                writeElement(out, "file", capture.file);
+                writeElement(out, "redirecturl", capture.redirecturl);
+                writeElement(out, "urlkey", capture.urlkey);
+                writeElement(out, "digest", capture.digest);
+                writeElement(out, "httpresponsecode", capture.status);
+                writeElement(out, "robotflags", capture.robotflags);
+                writeElement(out, "url", capture.original);
+                writeElement(out, "capturedate", capture.timestamp);
+
+                // if the query includes a date annotate the closest capture to that date
+                // since we scan the captures in date order we just have to wait until the next capture is further away
+                // from the query date than the current one, annotate it and then stop
+                if (scanningForClosestDate) {
+                    next = iterator.hasNext() ? iterator.next() : null;
+                    if (next == null || Math.abs(queryDate - capture.timestamp) < Math.abs(queryDate - next.timestamp)) {
+                        writeElement(out, "closest", "true");
+                        scanningForClosestDate = false;
+                    }
+                }
+
+                out.writeEndElement(); // </result>
+                numReturned++;
+            }
         }
 
         if (wroteHeader) {
@@ -197,35 +205,36 @@ public class XmlQuery {
         boolean wroteHeader = false;
         long numResults = 0;
         long numReturned = 0;
-        Resources it = new Resources(index.prefixQueryAP(queryUrl, accessPoint).iterator());
-        while (it.hasNext()) {
-            Resource resource = it.next();
-            if (numResults < offset) {
-                numResults++;
-                continue;
-            } else if (numResults >= offset + limit) {
-                if (numResults < maxNumResults) { // count matches after limit up to maxNumResults
+        try (Resources it = new Resources(index.prefixQueryAP(queryUrl, accessPoint))) {
+            while (it.hasNext()) {
+                Resource resource = it.next();
+                if (numResults < offset) {
                     numResults++;
                     continue;
-                } else {
-                    break;
+                } else if (numResults >= offset + limit) {
+                    if (numResults < maxNumResults) { // count matches after limit up to maxNumResults
+                        numResults++;
+                        continue;
+                    } else {
+                        break;
+                    }
                 }
-            }
-            numResults++;
+                numResults++;
 
-            if (!wroteHeader) {
-                out.writeStartElement("results");
-                wroteHeader = true;
+                if (!wroteHeader) {
+                    out.writeStartElement("results");
+                    wroteHeader = true;
+                }
+                out.writeStartElement("result");
+                writeElement(out, "urlkey", resource.lastCapture.urlkey);
+                writeElement(out, "originalurl", resource.lastCapture.original);
+                writeElement(out, "numversions", resource.versions);
+                writeElement(out, "numcaptures", resource.captures);
+                writeElement(out, "firstcapturets", resource.firstCapture.timestamp);
+                writeElement(out, "lastcapturets", resource.lastCapture.timestamp);
+                out.writeEndElement(); // </result>
+                numReturned++;
             }
-            out.writeStartElement("result");
-            writeElement(out, "urlkey", resource.lastCapture.urlkey);
-            writeElement(out, "originalurl", resource.lastCapture.original);
-            writeElement(out, "numversions", resource.versions);
-            writeElement(out, "numcaptures", resource.captures);
-            writeElement(out, "firstcapturets", resource.firstCapture.timestamp);
-            writeElement(out, "lastcapturets", resource.lastCapture.timestamp);
-            out.writeEndElement(); // </result>
-            numReturned++;
         }
 
         if (wroteHeader) {
@@ -260,11 +269,11 @@ public class XmlQuery {
     /**
      * Groups together all captures of the same URL.
      */
-    private static class Resources implements Iterator<Resource> {
-        private final Iterator<Capture> captures;
+    private static class Resources implements CloseableIterator<Resource> {
+        private final CloseableIterator<Capture> captures;
         private Capture capture = null;
 
-        Resources(Iterator<Capture> captures) {
+        Resources(CloseableIterator<Capture> captures) {
             this.captures = captures;
         }
 
@@ -298,6 +307,11 @@ public class XmlQuery {
             }
 
             return result;
+        }
+
+        @Override
+        public void close() {
+            captures.close();
         }
     }
 

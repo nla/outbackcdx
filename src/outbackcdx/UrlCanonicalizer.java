@@ -29,7 +29,7 @@ import org.snakeyaml.engine.v2.api.LoadSettings;
  */
 public class UrlCanonicalizer {
     static final Pattern WWW_PREFIX = Pattern.compile("^www\\d*\\.");
-    private static final Pattern PATH_SESSIONIDS[] = {
+    private static final Pattern[] PATH_SESSIONIDS = {
             Pattern.compile("/\\([0-9a-z]{24}\\)(/[^\\?]+.aspx)"),
             Pattern.compile(";jsessionid=[0-9a-z]{32}()$")
     };
@@ -201,8 +201,7 @@ public class UrlCanonicalizer {
                 String reSnip = "[?&](" + escaped + "=[^&]+)";
                 tmpList.set(i, reSnip);
             }
-            String result = String.join(".*", tmpList);
-            return result;
+            return String.join(".*", tmpList);
         }
 
         public String apply(String surt) {
@@ -237,8 +236,7 @@ public class UrlCanonicalizer {
                         } else {
                             pref = surt + '?';
                         }
-                        String newSurt = "fuzzy:" + pref + String.join("&", groups);
-                        return newSurt;
+                        return "fuzzy:" + pref + String.join("&", groups);
                     }
                 }
             }
@@ -273,7 +271,7 @@ public class UrlCanonicalizer {
      * 
      * @param fuzzyYamlFile pywb rules.yaml file
      */
-    public UrlCanonicalizer(String fuzzyYamlFile) throws FileNotFoundException, IOException, ConfigurationException {
+    public UrlCanonicalizer(String fuzzyYamlFile) throws IOException, ConfigurationException {
         if (fuzzyYamlFile != null) {
             try (FileInputStream input = new FileInputStream(fuzzyYamlFile)) {
                 loadRules(input);
@@ -336,7 +334,7 @@ public class UrlCanonicalizer {
         }
         result.append(host);
         if (url.getPort() != -1) {
-            result.append(':').append(Integer.toString(url.getPort()));
+            result.append(':').append(url.getPort());
         }
         result.append(url.getPath());
         if (url.getQuery() != null) {
@@ -454,7 +452,7 @@ public class UrlCanonicalizer {
     static String canonicalizeQuery(String query) {
         if (query != null) {
             query = query.toLowerCase();
-            String fields[] = query.split("&");
+            String[] fields = query.split("&");
             Arrays.sort(fields);
             ArrayList<String> filtered = new ArrayList<String>();
             for (String field : fields) {

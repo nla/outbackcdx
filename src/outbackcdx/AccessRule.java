@@ -1,6 +1,6 @@
 package outbackcdx;
 
-import com.google.gson.stream.JsonWriter;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -14,8 +14,9 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-import static outbackcdx.Json.GSON;
+import static outbackcdx.Json.JSON_MAPPER;
 
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.NON_PRIVATE)
 public class AccessRule {
     Long id;
     Long policyId;
@@ -43,7 +44,7 @@ public class AccessRule {
     public boolean matchesDates(Date captureTime, Date accessTime) {
         return (captured == null || captured.contains(captureTime)) &&
                 (accessed == null || accessed.contains(accessTime)) &&
-                (period == null || period.equals(period.ZERO) || isWithinPeriod(captureTime, accessTime));
+                (period == null || period.equals(Period.ZERO) || isWithinPeriod(captureTime, accessTime));
     }
 
     private boolean isWithinPeriod(Date captureTime, Date accessTime) {
@@ -172,13 +173,7 @@ public class AccessRule {
     }
 
     static void toJSON(Collection<AccessRule> rules, Function<Long,String> policyNames, Writer out) throws IOException {
-        JsonWriter json = GSON.newJsonWriter(out);
-        json.beginArray();
-        for (AccessRule rule : rules) {
-            GSON.toJson(rule, AccessRule.class, json);
-        }
-        json.endArray();
-        json.close();
+        JSON_MAPPER.writeValue(out, rules);
     }
 
     public boolean contains(String str) {

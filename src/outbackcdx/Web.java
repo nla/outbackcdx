@@ -1,13 +1,14 @@
 package outbackcdx;
 
-import static outbackcdx.Json.GSON;
-import static outbackcdx.NanoHTTPD.Response.Status.*;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import outbackcdx.NanoHTTPD.IHTTPSession;
+import outbackcdx.NanoHTTPD.Method;
+import outbackcdx.NanoHTTPD.Response;
+import outbackcdx.auth.Authorizer;
+import outbackcdx.auth.Permission;
+import outbackcdx.auth.Permit;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -15,12 +16,8 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import outbackcdx.NanoHTTPD.IHTTPSession;
-import outbackcdx.NanoHTTPD.Method;
-import outbackcdx.NanoHTTPD.Response;
-import outbackcdx.auth.Authorizer;
-import outbackcdx.auth.Permission;
-import outbackcdx.auth.Permit;
+import static outbackcdx.Json.JSON_MAPPER;
+import static outbackcdx.NanoHTTPD.Response.Status.*;
 
 class Web {
     private static final Map<String,String> versionCache = new HashMap<>();
@@ -52,7 +49,7 @@ class Web {
                 return e.response;
             } catch (Exception e) {
                 e.printStackTrace();
-                return new Response(INTERNAL_ERROR, "text/plain", e.toString() + "\n");
+                return new Response(INTERNAL_ERROR, "text/plain", e + "\n");
             }
         }
     }
@@ -203,8 +200,8 @@ class Web {
         return baos.toString("utf-8");
     }
 
-    static Response jsonResponse(Object data) {
-        Response response =  new Response(OK, "application/json", GSON.toJson(data));
+    static Response jsonResponse(Object data) throws JsonProcessingException {
+        Response response =  new Response(OK, "application/json", JSON_MAPPER.writeValueAsString(data));
         response.addHeader("Access-Control-Allow-Origin", "*");
         return response;
     }
@@ -318,7 +315,7 @@ class Web {
         }
     }
 
-    public static interface Request {
+    public interface Request {
         String method();
 
         /**

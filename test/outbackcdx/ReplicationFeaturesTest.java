@@ -4,6 +4,7 @@ import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 
 import outbackcdx.NanoHTTPD.Response.Status;
+import outbackcdx.auth.NullAuthorizer;
 import outbackcdx.auth.Permit;
 
 import java.io.*;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.util.Scanner;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static outbackcdx.NanoHTTPD.Method.*;
 import static outbackcdx.NanoHTTPD.Response.Status.OK;
 
@@ -29,7 +31,7 @@ public class ReplicationFeaturesTest {
     public void setUp() throws IOException {
         File root = folder.newFolder();
         manager = new DataStore(root, 256, null, Long.MAX_VALUE, null);
-        webapp = new Webapp(manager, false, Collections.emptyMap(), null, Collections.emptyMap(), 10000);
+        webapp = new Webapp(manager, false, Collections.emptyMap(), null, Collections.emptyMap(), 10000, new QueryConfig());
     }
 
     @After
@@ -50,14 +52,37 @@ public class ReplicationFeaturesTest {
     }
 
     @Test
-    public void testSequenceNumber() throws Exception {
-        FeatureFlags.setSecondaryMode(false);
-        // post some CDX
-        POST("/testa", "- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n", OK);
-        // get the sequenceNumber, should be 1
-        String output = GET("/testa/sequence", OK);
-        assertEquals("2", output);
-        FeatureFlags.setSecondaryMode(false);
+    public void testChangePolling() throws Exception {
+        POST("/src", "- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n", OK);
+        POST("/dest", "- 20050614070159 http://nla.gov.au/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n- 20030614070159 http://example.com/ text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - - - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n", OK);
+        try (UWeb.UServer server = new UWeb.UServer("localhost", 0, "", webapp, new NullAuthorizer())) {
+            server.start();
+            ChangePollingThread pollingThread = new ChangePollingThread("http://localhost:" + server.port() + "/src", 1000, 10 * 1024 * 1024, manager);
+
+            // Override the destination collection (by default it'll try to replicate src to itself)
+            pollingThread.collection = "dest";
+            pollingThread.index = manager.getIndex("dest", false);
+
+            // Run an initial replication
+            pollingThread.finalUrl = pollingThread.primaryReplicationUrl + "/changes?size=" + pollingThread.batchSize + "&since=" + 0;
+            pollingThread.replicate();
+
+            long initialSrcSeqNo = Long.parseLong(GET("/src/sequence", OK));
+
+            // Now add a new record to the source collection
+            POST("/src", "- 20050614070159 http://nla.gov.au/two text/html 200 AKMCCEPOOWFMGGO5635HFZXGFRLRGWIX - 337023 NLA-AU-CRAWL-000-20050614070144-00003-crawling016.archive.org\n", OK);
+
+            long updatedSrcSeqNo = Long.parseLong(GET("/src/sequence", OK));
+            assertTrue(updatedSrcSeqNo > initialSrcSeqNo);
+
+            // Replicate again
+            pollingThread.finalUrl = pollingThread.primaryReplicationUrl + "/changes?size=" + pollingThread.batchSize + "&since=" + initialSrcSeqNo;
+            pollingThread.replicate();
+
+            // We should see the new record now appears in the destination collection too
+            String response = GET("/dest", OK, "url", "http://nla.gov.au/two");
+            assertTrue(response.contains("http://nla.gov.au/two"));
+        }
     }
 
     /*@Test

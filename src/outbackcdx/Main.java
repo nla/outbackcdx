@@ -41,6 +41,7 @@ public class Main {
         System.err.println("  -m max-open-files     Limit the number of open .sst files to control memory usage");
         System.err.println("                        (default " + maxOpenSstFilesHeuristic() + " based on system RAM and ulimit -n)");
         System.err.println("  --max-num-results N   Max number of records to scan to calculate numresults statistic in the XML protocol (default 10000)");
+        System.err.println("  --omit-self-redirects Omit self redirects from query results by default");
         System.err.println("  -p port               Local port to listen on");
         System.err.println("  -t count              Number of web server threads");
         System.err.println("  -r count              Cap on number of rocksdb records to scan to serve a single request");
@@ -85,6 +86,7 @@ public class Main {
         String fuzzyYaml = null;
         long maxNumResults = 10000;
         Map<String,ComputedField> computedFields = new HashMap<>();
+        QueryConfig queryConfig = new QueryConfig();
 
         Map<String,Object> dashboardConfig = new HashMap<>();
         dashboardConfig.put("featureFlags", FeatureFlags.asMap());
@@ -140,6 +142,9 @@ public class Main {
                 case "--max-num-results":
                     maxNumResults = Long.parseLong(args[++i]);
                     break;
+                case "--omit-self-redirects":
+                    queryConfig.omitSelfRedirects = true;
+                    break;
                 case "-v":
                     verbose = true;
                     break;
@@ -180,7 +185,7 @@ public class Main {
         try {
             UrlCanonicalizer canonicalizer = new UrlCanonicalizer(fuzzyYaml);
             try (DataStore dataStore = new DataStore(dataPath, maxOpenSstFiles, replicationWindow, scanCap, canonicalizer)) {
-                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields, maxNumResults);
+                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields, maxNumResults, queryConfig);
                 if (undertow) {
                     UWeb.UServer server = new UWeb.UServer(host, port, contextPath, controller, authorizer);
                     server.start();

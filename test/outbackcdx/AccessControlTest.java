@@ -1,11 +1,13 @@
 package outbackcdx;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.rocksdb.*;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.time.Period;
 import java.util.ArrayList;
 import java.util.Date;
@@ -29,7 +31,7 @@ public class AccessControlTest {
         try (Options options = new Options()
                      .setCreateIfMissing(true)
                      .setEnv(env)) {
-            db = RocksDB.open(options, "test");
+            db = RocksDB.open(options, Paths.get("test").toAbsolutePath().toString());
             ruleCf = db.getDefaultColumnFamily();
             policyCf = db.createColumnFamily(new ColumnFamilyDescriptor("policies".getBytes(StandardCharsets.UTF_8)));
             accessControl = new AccessControl(db, ruleCf, policyCf);
@@ -118,12 +120,11 @@ public class AccessControlTest {
     }
 
     @Test
-    public void testJson() {
-        // GSON can't handle Period on Java 17 so check that our custom type adapter works
+    public void testJson() throws JsonProcessingException {
         AccessRule rule = new AccessRule();
         rule.period = Period.ofDays(1);
-        String json = Json.GSON.toJson(rule);
-        AccessRule rule2 = Json.GSON.fromJson(json, AccessRule.class);
+        String json = Json.JSON_MAPPER.writeValueAsString(rule);
+        AccessRule rule2 = Json.JSON_MAPPER.readValue(json, AccessRule.class);
         assertEquals(rule.period, rule2.period);
     }
 }

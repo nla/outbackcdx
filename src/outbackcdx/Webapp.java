@@ -1,11 +1,12 @@
 package outbackcdx;
 
 
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
-
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.rocksdb.*;
-
+import org.rocksdb.TransactionLogIterator.BatchResult;
 import outbackcdx.NanoHTTPD.IStreamer;
 import outbackcdx.NanoHTTPD.Response;
 import outbackcdx.NanoHTTPD.Response.Status;
@@ -17,7 +18,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -25,12 +25,10 @@ import java.util.stream.StreamSupport;
 
 import static java.lang.System.out;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static outbackcdx.Json.GSON;
+import static outbackcdx.Json.JSON_MAPPER;
 import static outbackcdx.NanoHTTPD.Method.*;
 import static outbackcdx.NanoHTTPD.Response.Status.*;
 import static outbackcdx.Web.*;
-
-import org.rocksdb.TransactionLogIterator.BatchResult;
 
 class Webapp implements Web.Handler {
     private final boolean verbose;
@@ -45,7 +43,7 @@ class Webapp implements Web.Handler {
 
     private static ServiceLoader<FilterPlugin> fpLoader = ServiceLoader.load(FilterPlugin.class);
 
-    private Response configJson(Web.Request req) {
+    private Response configJson(Web.Request req) throws JsonProcessingException {
         return jsonResponse(dashboardConfig);
     }
 
@@ -59,7 +57,7 @@ class Webapp implements Web.Handler {
         return found ? ok() : notFound();
     }
 
-    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields, long maxNumResults) {
+    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields, long maxNumResults, QueryConfig queryConfig) {
         this.dataStore = dataStore;
         this.verbose = verbose;
         this.dashboardConfig = dashboardConfig;
@@ -79,7 +77,7 @@ class Webapp implements Web.Handler {
             }
         }
 
-        wbCdxApi = new WbCdxApi(filterPlugins, computedFields);
+        wbCdxApi = new WbCdxApi(filterPlugins, computedFields, queryConfig);
 
         router = new Router();
         router.on(GET, "/", interpolated("dashboard.html"));
@@ -109,6 +107,8 @@ class Webapp implements Web.Handler {
         router.on(GET, "/<collection>/changes", request -> changeFeed(request));
         router.on(GET, "/<collection>/sequence", request -> sequence(request));
         router.on(POST, "/<collection>/truncate_replication", request -> flushWal(request));
+        router.on(POST, "/<collection>/compact", request -> compact(request), Permission.INDEX_EDIT);
+        router.on(POST, "/<collection>/upgrade", request -> upgrade(request), Permission.INDEX_EDIT);
 
         if (FeatureFlags.experimentalAccessControl()) {
             router.on(GET, "/<collection>/ap/<accesspoint>", request -> query(request));
@@ -133,7 +133,23 @@ class Webapp implements Web.Handler {
         return jsonResponse(map);
     }
 
-    Response listCollections(Web.Request request) {
+    Response upgrade(Web.Request request) throws Web.ResponseException, IOException {
+        Index index = getIndex(request);
+        boolean success = index.upgradeInBackground();
+        Map<String,Boolean> map = new HashMap<>();
+        map.put("success", success);
+        return jsonResponse(map);
+    }
+
+    Response compact(Web.Request request) throws Web.ResponseException, IOException {
+        Index index = getIndex(request);
+        boolean success = index.compactInBackground();
+        Map<String,Boolean> map = new HashMap<>();
+        map.put("success", success);
+        return jsonResponse(map);
+    }
+
+    Response listCollections(Web.Request request) throws JsonProcessingException {
         return jsonResponse(dataStore.listCollections());
     }
 
@@ -151,7 +167,7 @@ class Webapp implements Web.Handler {
         }
 
         Response response = new Response(Response.Status.OK, "application/json",
-                GSON.toJson(map));
+                JSON_MAPPER.writeValueAsString(map));
         response.addHeader("Access-Control-Allow-Origin", "*");
         return response;
     }
@@ -160,9 +176,12 @@ class Webapp implements Web.Handler {
         Index index = getIndex(request);
         String key = request.param("key", "");
         long limit = Long.parseLong(request.param("limit", "1000"));
-        List<Capture> results = StreamSupport.stream(index.capturesAfter(key).spliterator(), false)
-                .limit(limit)
-                .collect(Collectors.<Capture>toList());
+        List<Capture> results = new ArrayList<>();
+        try (CloseableIterator<Capture> it = index.capturesAfter(key)) {
+            while (it.hasNext() && results.size() < limit) {
+                results.add(it.next());
+            }
+        }
         return jsonResponse(results);
     }
 
@@ -368,7 +387,7 @@ class Webapp implements Web.Handler {
                 BufferedOutputStream output = new BufferedOutputStream(outputStream);
                 output.write("[\n".getBytes(UTF_8));
 
-                long size = 0l;
+                long size = 0L;
                 long initialSeqNo = -1;
                 while (true) {
                     BatchResult batch = logReader.getBatch();
@@ -417,7 +436,7 @@ class Webapp implements Web.Handler {
         final Index index = getIndex(request);
 
         if (verbose) {
-            out.println(String.format("%s Received request %s. Retrieving deltas for collection <%s> since sequenceNumber %s", new Date(), request, collection, since));
+            out.printf("%s Received request %s. Retrieving deltas for collection <%s> since sequenceNumber %s%n", new Date(), request, collection, since);
         }
 
         try {
@@ -436,7 +455,7 @@ class Webapp implements Web.Handler {
                 e.printStackTrace();
             }
             throw new Web.ResponseException(
-                    new Response(Status.INTERNAL_ERROR, "text/plain", e.toString() + "\n"));
+                    new Response(Status.INTERNAL_ERROR, "text/plain", e + "\n"));
         }
     }
 
@@ -473,8 +492,8 @@ class Webapp implements Web.Handler {
         return new Response(OK, "text/html", page);
     }
 
-    private <T> T fromJson(Web.Request request, Class<T> clazz) {
-        return GSON.fromJson(new InputStreamReader(request.inputStream(), UTF_8), clazz);
+    private <T> T fromJson(Web.Request request, Class<T> clazz) throws IOException {
+        return JSON_MAPPER.readValue(request.inputStream(), clazz);
     }
 
     private Response getAccessPolicy(Web.Request req) throws IOException, Web.ResponseException {
@@ -505,19 +524,10 @@ class Webapp implements Web.Handler {
                 return new Response(BAD_REQUEST, "text/plain", formatStackTrace(e));
             }
         } else { // JSON format
-            JsonReader reader = GSON.newJsonReader(new InputStreamReader(request.inputStream(), UTF_8));
-            if (reader.peek() == JsonToken.BEGIN_ARRAY) {
-                reader.beginArray();
-                rules = new ArrayList<>();
-                while (reader.hasNext()) {
-                    AccessRule rule = GSON.fromJson(reader, AccessRule.class);
-                    rules.add(rule);
-                }
-                reader.endArray();
-            } else { // single rule
-                rules = Arrays.asList((AccessRule)GSON.fromJson(reader, AccessRule.class));
-                single = true;
-            }
+            ObjectMapper mapper = JSON_MAPPER.copy().enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
+            JsonNode tree = mapper.readTree(request.inputStream());
+            single = !tree.isArray();
+            rules = mapper.treeToValue(tree, mapper.getTypeFactory().constructCollectionType(List.class, AccessRule.class));
         }
 
         // validate rules
@@ -552,15 +562,15 @@ class Webapp implements Web.Handler {
         return new Response(OK, null, "");
     }
 
-    private Response created(long id) {
+    private Response created(long id) throws JsonProcessingException {
         Map<String,String> map = new HashMap<>();
         map.put("id", Long.toString(id));
-        return new Response(CREATED, "application/json", GSON.toJson(map));
+        return new Response(CREATED, "application/json", JSON_MAPPER.writeValueAsString(map));
     }
 
     private Response getAccessRule(Web.Request req) throws IOException, Web.ResponseException, RocksDBException {
         Index index = getIndex(req);
-        Long ruleId = Long.parseLong(req.param("ruleId"));
+        long ruleId = Long.parseLong(req.param("ruleId"));
         AccessRule rule = index.accessControl.rule(ruleId);
         if (rule == null) {
             return notFound();
@@ -568,7 +578,7 @@ class Webapp implements Web.Handler {
         return jsonResponse(rule);
     }
 
-    private Response getNewAccessRule(Web.Request request) {
+    private Response getNewAccessRule(Web.Request request) throws JsonProcessingException {
         AccessRule rule = new AccessRule();
         return jsonResponse(rule);
     }

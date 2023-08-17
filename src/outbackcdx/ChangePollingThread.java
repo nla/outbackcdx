@@ -1,27 +1,24 @@
 package outbackcdx;
 
 
-import static outbackcdx.Json.GSON;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.util.Base64;
-import java.util.Date;
-
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.databind.MappingIterator;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.client.HttpClients;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteBatch;
 
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+
+import static outbackcdx.Json.JSON_MAPPER;
 
 public class ChangePollingThread extends Thread {
     final byte[] SEQ_NUM_KEY = "#ReplicationSequence".getBytes();
@@ -53,6 +50,7 @@ public class ChangePollingThread extends Thread {
                 try {
                     ChangePollingThread.this.join(60000);
                 } catch (InterruptedException e) {
+                    // ok
                 }
             }
         });
@@ -89,7 +87,7 @@ public class ChangePollingThread extends Thread {
                     e.printStackTrace();
                 }
 
-                long sleepTime = (pollingInterval * 1000) - (System.currentTimeMillis() - startTime);
+                long sleepTime = (pollingInterval * 1000L) - (System.currentTimeMillis() - startTime);
                 if (sleepTime > 0 && !shuttingDown) {
                     try {
                         Thread.sleep(sleepTime);
@@ -107,7 +105,13 @@ public class ChangePollingThread extends Thread {
 
     }
 
-    private void replicate() throws IOException, RocksDBException {
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.PUBLIC_ONLY)
+    public static class ChangeEvent {
+        public long sequenceNumber;
+        public byte[] writeBatch;
+    }
+
+    void replicate() throws IOException, RocksDBException {
         long start = System.currentTimeMillis();
 
         int countCommitted = 0;
@@ -123,8 +127,6 @@ public class ChangePollingThread extends Thread {
         CloseableHttpClient httpclient =
             HttpClientBuilder.create().setDefaultRequestConfig(config).build();
         HttpGet request = new HttpGet(finalUrl);
-        long sequenceNumber = 0;
-        String writeBatch = null;
         System.out.println(new Date() + " " + getName() + ": requesting replication from " + finalUrl);
         HttpResponse response = httpclient.execute(request);
 
@@ -134,31 +136,18 @@ public class ChangePollingThread extends Thread {
             throw new IOException("Received '" + response.getStatusLine() + "' response from " + finalUrl +": \n" + contentString);
         }
         InputStream content = response.getEntity().getContent();
-        JsonReader reader = GSON.newJsonReader(new InputStreamReader(content));
-        reader.beginArray();
-        while (reader.peek() != JsonToken.END_DOCUMENT && !shuttingDown) {
-            JsonToken nextToken = reader.peek();
-            if (JsonToken.BEGIN_OBJECT.equals(nextToken)) {
-                reader.beginObject();
-            } else if(JsonToken.NAME.equals(nextToken)){
-                String name  =  reader.nextName();
-                if(name.equals("sequenceNumber")){
-                    sequenceNumber = Long.valueOf(reader.nextString());
-                } else if (name.equals("writeBatch")){
-                    writeBatch = reader.nextString();
-                }
-            } else if (JsonToken.END_OBJECT.equals(nextToken)){
-                reader.endObject();
-                assert writeBatch != null;
-                commitWriteBatch(index, sequenceNumber, writeBatch);
+
+        try (MappingIterator<ChangeEvent> iterator = JSON_MAPPER.readerFor(ChangeEvent.class).readValues(content)) {
+            while (iterator.hasNext()) {
+                ChangeEvent item = iterator.next();
+                assert item.writeBatch != null;
+                commitWriteBatch(index, item.sequenceNumber, item.writeBatch);
                 if (firstCommitted == null) {
-                    firstCommitted = sequenceNumber;
+                    firstCommitted = item.sequenceNumber;
                 }
-                lastCommitted = sequenceNumber;
+                lastCommitted = item.sequenceNumber;
                 countCommitted++;
-                totalLengthCommitted += writeBatch.length();
-            } else if (JsonToken.END_ARRAY.equals(nextToken)){
-                reader.endArray();
+                totalLengthCommitted += item.writeBatch.length;
             }
         }
 
@@ -170,14 +159,10 @@ public class ChangePollingThread extends Thread {
                 + " sequence number is now " + index.getLatestSequenceNumber());
     }
 
-    private void commitWriteBatch(Index index, long sequenceNumber, String writeBatch) throws RocksDBException {
-        Base64.Decoder decoder = Base64.getDecoder();
-        byte[] decodedWriteBatch = decoder.decode(writeBatch);
-        try (WriteBatch batch = new WriteBatch(decodedWriteBatch)){
-            batch.put(SEQ_NUM_KEY, String.valueOf(sequenceNumber).getBytes("ASCII"));
+    private void commitWriteBatch(Index index, long sequenceNumber, byte[] writeBatchData) throws RocksDBException {
+        try (WriteBatch batch = new WriteBatch(writeBatchData)){
+            batch.put(SEQ_NUM_KEY, String.valueOf(sequenceNumber).getBytes(StandardCharsets.US_ASCII));
             index.commitBatch(batch);
-        } catch (UnsupportedEncodingException e){
-            throw new RuntimeException(e); // ASCII is everywhere; this shouldn't happen.
         }
     }
 }

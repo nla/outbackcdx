@@ -7,6 +7,7 @@ import org.rocksdb.*;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,13 +21,13 @@ public class IndexTest {
     private static RocksMemEnv env;
 
     @BeforeClass
-    public static void setUp() throws RocksDBException {
+    public static void setUp() throws RocksDBException, IOException {
         RocksDB.loadLibrary();
         env = new RocksMemEnv(Env.getDefault());
         try (Options options = new Options()
                 .setCreateIfMissing(true)
                 .setEnv(env)) {
-            db = RocksDB.open(options, "test");
+            db = RocksDB.open(options, Paths.get("test").toAbsolutePath().toString());
             defaultCf = db.getDefaultColumnFamily();
             aliasCf = db.createColumnFamily(new ColumnFamilyDescriptor("alias".getBytes(StandardCharsets.UTF_8)));
             index = new Index("test", db, defaultCf, aliasCf, null);
@@ -41,6 +42,13 @@ public class IndexTest {
         env.close();
     }
 
+    private static List<Capture> list(CloseableIterator<Capture> iterator) {
+        List<Capture> captures = new ArrayList<>();
+        iterator.forEachRemaining(captures::add);
+        iterator.close();
+        return captures;
+    }
+
     @Test
     public void testClosest() throws IOException {
         try (Index.Batch batch = index.beginUpdate()) {
@@ -51,8 +59,7 @@ public class IndexTest {
             batch.commit();
         }
 
-        List<Capture> results = new ArrayList<>();
-        index.closestQuery("org,closest)/", 20060129000000L, null).forEach(results::add);
+        List<Capture> results = list(index.closestQuery("org,closest)/", 20060129000000L, null));
         assertEquals(20060201000000L, results.get(0).timestamp);
         assertEquals(20060101000000L, results.get(1).timestamp);
         assertEquals(20070101000000L, results.get(2).timestamp);
@@ -67,8 +74,7 @@ public class IndexTest {
             batch.commit();
         }
 
-        List<Capture> results = new ArrayList<>();
-        index.closestQuery("org,post)/?__wb_method=post&__wb_post_data=dgvzdao=", 20200528143307L, null).forEach(results::add);
+        List<Capture> results = list(index.closestQuery("org,post)/?__wb_method=post&__wb_post_data=dgvzdao=", 20200528143307L, null));
         assertEquals("org,post)/?__wb_method=post&__wb_post_data=dgvzdao=", results.get(0).urlkey);
     }
 
@@ -82,8 +88,7 @@ public class IndexTest {
         }
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.query("org,a)/", null).forEach(results::add);
+            List<Capture> results = list(index.query("org,a)/", null));
             assertEquals(3, results.size());
             assertEquals(20050101000000L, results.get(0).timestamp);
             assertEquals(20060101000000L, results.get(1).timestamp);
@@ -96,8 +101,7 @@ public class IndexTest {
         }
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.query("org,a)/", null).forEach(results::add);
+            List<Capture> results = list(index.query("org,a)/", null));
             assertEquals(2, results.size());
             assertEquals(20050101000000L, results.get(0).timestamp);
             assertEquals(20070101000000L, results.get(1).timestamp);
@@ -116,24 +120,21 @@ public class IndexTest {
         }
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.reverseQuery("org,a)/", null).forEach(results::add);
+            List<Capture> results = list(index.reverseQuery("org,a)/", null));
             assertEquals(20070101000000L, results.get(0).timestamp);
             assertEquals(20060101000000L, results.get(1).timestamp);
             assertEquals(20050101000000L, results.get(2).timestamp);
         }
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.reverseQuery("org,b)/", null).forEach(results::add);
+            List<Capture> results = list(index.reverseQuery("org,b)/", null));
             assertEquals(1, results.size());
             assertEquals(19960101000000L, results.get(0).timestamp);
         }
 
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.query("org,a)/", null).forEach(results::add);
+            List<Capture> results = list(index.query("org,a)/", null));
             assertEquals(20050101000000L, results.get(0).timestamp);
             assertEquals(20060101000000L, results.get(1).timestamp);
             assertEquals(20070101000000L, results.get(2).timestamp);
@@ -154,15 +155,13 @@ public class IndexTest {
         }
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.query("org,fromto)/", 20060000000000l, 20080000000000l, null).forEach(results::add);
+            List<Capture> results = list(index.query("org,fromto)/", 20060000000000l, 20080000000000l, null));
             assertEquals(20060101000000L, results.get(0).timestamp);
             assertEquals(20070101000000L, results.get(1).timestamp);
         }
 
         {
-            List<Capture> results = new ArrayList<>();
-            index.reverseQuery("org,fromto)/", 20060000000000l, 20080000000000l, null).forEach(results::add);
+            List<Capture> results = list(index.reverseQuery("org,fromto)/", 20060000000000l, 20080000000000l, null));
             assertEquals(20070101000000L, results.get(0).timestamp);
             assertEquals(20060101000000L, results.get(1).timestamp);
         }
@@ -181,11 +180,46 @@ public class IndexTest {
                 batch.commit();
             }
 
-            List<Capture> results = new ArrayList<>();
-            index.query("org,v4)/", null).forEach(results::add);
+            List<Capture> results = list(index.query("org,v4)/", null));
             assertEquals(3, results.size());
         } finally {
             FeatureFlags.setIndexVersion(oldVersion);
         }
+    }
+
+    @Test
+    public void testUpgradeInPlace() throws IOException, RocksDBException {
+        int initialVersion = FeatureFlags.indexVersion();
+        try {
+
+
+            // First create some records in the old format
+            FeatureFlags.setIndexVersion(3);
+            try (Index.Batch batch = index.beginUpdate()) {
+                batch.putCapture(Capture.fromCdxLine("- 20050101000000 http://example.org/ text/html 200 - - 0 w1", index.canonicalizer));
+                batch.putCapture(Capture.fromCdxLine("- 20050102000000 http://example.org/ text/html 200 - - 10 w1", index.canonicalizer));
+                batch.putCapture(Capture.fromCdxLine("- 20050103000000 http://example.org/ text/html 200 - - 10 w1", index.canonicalizer));
+                batch.commit();
+            }
+
+            {
+                List<Capture> results = list(index.query("org,example)/", null));
+                assertEquals(3, results.size());
+            }
+
+            // Now upgrade the index
+            FeatureFlags.setIndexVersion(5);
+            index.upgrade();
+
+            {
+                List<Capture> results = list(index.query("org,example)/", null));
+                assertEquals(3, results.size());
+            }
+
+        } finally {
+            FeatureFlags.setIndexVersion(initialVersion);
+        }
+
+        // Now upgrade the index
     }
 }
