@@ -11,7 +11,7 @@ RUN apt-get update \
 RUN cd /tmp && \
     git clone https://github.com/facebook/rocksdb.git && \
     cd rocksdb && \
-    git checkout 6.0.fb && \
+    git checkout v8.1.1 && \
     DEBUG_LEVEL=0 CXXFLAGS='-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess' make tools && \
     cp /tmp/rocksdb/ldb /usr/bin/ && \
     cp /tmp/rocksdb/sst_dump /usr/bin/
