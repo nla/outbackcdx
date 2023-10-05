@@ -254,9 +254,9 @@ Canonicalisation Aliases
 
 Alias records allow the grouping of URLs so they will deliver as if they are different snapshots of the same page.
 
-    @alias <source-url> <target-url>
+    @alias <alias-url> <target-url>
     
-For example:
+For example, if an index contains records for `www.example.org` URLs, aliases can be added so queries for `legacy.example.org` URLs will resolve to `www.example.org`:
 
     @alias http://legacy.example.org/page-one http://www.example.org/page1
     @alias http://legacy.example.org/page-two http://www.example.org/page2
