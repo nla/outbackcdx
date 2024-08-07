@@ -57,14 +57,14 @@ public class WbCdxApi {
         }
 
         CloseableIterator<Capture> captures = query.execute(index);
-        if (CDX_PLUS_WORKAROUND && !captures.hasNext() && query.url != null && query.url.contains("%20")) {
+        if (CDX_PLUS_WORKAROUND && !captures.hasNext() && query.url != null && (query.url.contains("%20") || query.url.contains(" "))) {
             /*
              * XXX: NLA has a bunch of bad WARC files that contain + instead of %20 in the URLs. This is a dirty
              * workaround until we can fix them. If we found no results try again with + in place of %20.
              */
             captures.close();
             query.urlkey = null;
-            query.url = query.url.replace("%20", "+");
+            query.url = query.url.replace("%20", "+").replace(" ", "+");
             captures = query.execute(index);
         }
         CloseableIterator<Capture> finalCaptures = captures;
