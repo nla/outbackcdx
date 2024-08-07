@@ -21,6 +21,7 @@ import static outbackcdx.NanoHTTPD.Response.Status.OK;
  * pywb: https://github.com/ikreymer/pywb/wiki/CDX-Server-API
  */
 public class WbCdxApi {
+    private static final boolean CDX_PLUS_WORKAROUND = "1".equals(System.getenv("CDX_PLUS_WORKAROUND"));
     private final Iterable<FilterPlugin> filterPlugins;
     private final Map<String, ComputedField> computedFields;
     private final QueryConfig queryConfig;
@@ -56,11 +57,23 @@ public class WbCdxApi {
         }
 
         CloseableIterator<Capture> captures = query.execute(index);
+        if (CDX_PLUS_WORKAROUND && !captures.hasNext() && query.url != null && query.url.contains("%20")) {
+            /*
+             * XXX: NLA has a bunch of bad WARC files that contain + instead of %20 in the URLs. This is a dirty
+             * workaround until we can fix them. If we found no results try again with + in place of %20.
+             */
+            captures.close();
+            query.urlkey = null;
+            query.url = query.url.replace("%20", "+");
+            captures = query.execute(index);
+        }
+        CloseableIterator<Capture> finalCaptures = captures;
+
         Response response = new Response(OK, contentType, outputStream -> {
             Writer out = new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8));
             OutputFormat outf = format.construct(query, computedFields, out);
             long row = 0;
-            try (CloseableIterator<Capture> it = captures) {
+            try (CloseableIterator<Capture> it = finalCaptures) {
                 while (it.hasNext()) {
                     Capture capture = it.next();
                     if (row >= query.limit) {
@@ -74,7 +87,7 @@ public class WbCdxApi {
                 e.printStackTrace();
                 out.write("warning: output may be incomplete, error occurred processing captures\n");
             } finally {
-                captures.close();
+                finalCaptures.close();
             }
 
             outf.close();
