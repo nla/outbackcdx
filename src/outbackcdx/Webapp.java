@@ -7,9 +7,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.rocksdb.*;
 import org.rocksdb.TransactionLogIterator.BatchResult;
-import outbackcdx.NanoHTTPD.IStreamer;
-import outbackcdx.NanoHTTPD.Response;
-import outbackcdx.NanoHTTPD.Response.Status;
 import outbackcdx.auth.Permission;
 
 import javax.xml.stream.XMLStreamException;
@@ -26,8 +23,8 @@ import java.util.stream.StreamSupport;
 import static java.lang.System.out;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static outbackcdx.Json.JSON_MAPPER;
-import static outbackcdx.NanoHTTPD.Method.*;
-import static outbackcdx.NanoHTTPD.Response.Status.*;
+import static outbackcdx.Web.Method.*;
+import static outbackcdx.Web.Status.*;
 import static outbackcdx.Web.*;
 
 class Webapp implements Web.Handler {
@@ -166,7 +163,7 @@ class Webapp implements Web.Handler {
             }
         }
 
-        Response response = new Response(Response.Status.OK, "application/json",
+        Response response = new Response(OK, "application/json",
                 JSON_MAPPER.writeValueAsString(map));
         response.addHeader("Access-Control-Allow-Origin", "*");
         return response;
@@ -455,7 +452,7 @@ class Webapp implements Web.Handler {
                 e.printStackTrace();
             }
             throw new Web.ResponseException(
-                    new Response(Status.INTERNAL_ERROR, "text/plain", e + "\n"));
+                    new Response(INTERNAL_ERROR, "text/plain", e + "\n"));
         }
     }
 

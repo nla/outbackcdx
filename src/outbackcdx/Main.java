@@ -3,19 +3,15 @@ package outbackcdx;
 import com.sun.management.OperatingSystemMXBean;
 import com.sun.management.UnixOperatingSystemMXBean;
 
+import com.sun.net.httpserver.HttpServer;
 import outbackcdx.UrlCanonicalizer.ConfigurationException;
-import outbackcdx.auth.Authorizer;
-import outbackcdx.auth.JwtAuthorizer;
-import outbackcdx.auth.KeycloakConfig;
-import outbackcdx.auth.NullAuthorizer;
+import outbackcdx.auth.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.management.ManagementFactory;
-import java.net.InetAddress;
-import java.net.MalformedURLException;
-import java.net.ServerSocket;
-import java.net.URL;
+import java.net.*;
 import java.nio.channels.Channel;
 import java.nio.channels.ServerSocketChannel;
 import java.util.ArrayList;
@@ -194,19 +190,19 @@ public class Main {
                         Main.class.wait();
                     }
                 } else {
-                    ServerSocket socket = openSocket(host, port, inheritSocket);
-                    Web.Server server = new Web.Server(socket, contextPath, controller, authorizer);
+                    HttpServer httpServer = HttpServer.create(new InetSocketAddress((host == null ? "localhost" : host), port), 0);
+                    httpServer.createContext("/", new Web.SHandler(controller, authorizer));
                     ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
+                    httpServer.setExecutor(threadPool);
                     for (String collectionUrl: collectionUrls) {
                         ChangePollingThread cpt = new ChangePollingThread(collectionUrl, pollingInterval, batchSize, dataStore);
                         cpt.setDaemon(true);
                         cpt.start();
                     }
                     try {
-                        server.setAsyncRunner(threadPool);
-                        server.start();
+                        httpServer.start();
                         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                            server.stop();
+                            httpServer.stop(1);
                             dataStore.close();
                         }));
                         System.out.println("OutbackCDX http://" + (host == null ? "localhost" : host) + ":" + port + contextPath);

@@ -1,23 +1,23 @@
 package outbackcdx;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import outbackcdx.NanoHTTPD.IHTTPSession;
-import outbackcdx.NanoHTTPD.Method;
-import outbackcdx.NanoHTTPD.Response;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
 import outbackcdx.auth.Authorizer;
 import outbackcdx.auth.Permission;
 import outbackcdx.auth.Permit;
 
 import java.io.*;
-import java.net.ServerSocket;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static outbackcdx.Json.JSON_MAPPER;
-import static outbackcdx.NanoHTTPD.Response.Status.*;
+import static outbackcdx.Web.Status.*;
 
 class Web {
     private static final Map<String,String> versionCache = new HashMap<>();
@@ -26,75 +26,158 @@ class Web {
         Response handle(Request request) throws Exception;
     }
 
-    static class Server extends NanoHTTPD {
+    enum Method {
+        GET, POST, PUT, DELETE
+    }
+
+    public static class Status {
+        public static final int OK = 200, CREATED = 201,
+                TEMPORARY_REDIRECT = 307,
+                BAD_REQUEST = 400, FORBIDDEN = 403, NOT_FOUND = 404,
+                INTERNAL_ERROR = 500;
+    }
+
+    interface IStreamer {
+        void stream(OutputStream out) throws IOException;
+    }
+
+    static class Response {
+        private int status;
+        private final Map<String, List<String>> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        private final long bodyLength;
+        private final IStreamer bodyWriter;
+
+        public Response(int status, String mime, String body) {
+            this.status = status;
+            byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
+            this.bodyLength = bodyBytes.length;
+            this.bodyWriter = out -> out.write(bodyBytes);
+            if (mime != null) addHeader("Content-Type", mime);
+        }
+
+        public Response(int status, String mime, InputStream inputStream) {
+            this.status = status;
+            this.bodyLength = 0;
+            this.bodyWriter = out -> IOUtils.copy(inputStream, out);
+            if (mime != null) addHeader("Content-Type", mime);
+        }
+
+        public Response(int status, String mime, IStreamer bodyWriter) {
+            this.status = status;
+            this.bodyLength = 0;
+            this.bodyWriter = bodyWriter;
+            if (mime != null) addHeader("Content-Type", mime);
+        }
+
+        public void addHeader(String name, String value) {
+            headers.computeIfAbsent(name, k -> new ArrayList<>()).add(value);
+        }
+
+        public void setStatus(int status) {
+            this.status = status;
+        }
+
+        public int getStatus() {
+            return status;
+        }
+
+        public Map<String, List<String>> getHeaders() {
+            return headers;
+        }
+
+        public IStreamer getBodyWriter() {
+            return bodyWriter;
+        }
+    }
+
+    static class SHandler implements HttpHandler {
         private final Handler handler;
         private final Authorizer authorizer;
-        private final String contextPath;
 
-        Server(ServerSocket socket, String contextPath, Handler handler, Authorizer authorizer) {
-            super(socket);
-            this.contextPath = contextPath;
+        SHandler(Handler handler, Authorizer authorizer) {
             this.handler = handler;
             this.authorizer = authorizer;
         }
 
         @Override
-        public Response serve(IHTTPSession session) {
+        public void handle(HttpExchange exchange) throws IOException {
             try {
-                String authnHeader = session.getHeaders().getOrDefault("authorization", "");
-                Permit permit = authorizer.verify(authnHeader);
-                NRequest request = new NRequest(session, permit, contextPath);
-                return handler.handle(request);
-            } catch (Web.ResponseException e) {
-                return e.response;
-            } catch (Exception e) {
-                e.printStackTrace();
-                return new Response(INTERNAL_ERROR, "text/plain", e + "\n");
+                Response response;
+                try {
+                    String authnHeader = exchange.getRequestHeaders().getFirst("authorization");
+                    Permit permit = authorizer.verify(authnHeader);
+                    SRequest request = new SRequest(exchange, permit);
+                    response = handler.handle(request);
+                } catch (Web.ResponseException e) {
+                    response = e.response;
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    response = new Response(INTERNAL_ERROR, "text/plain", e + "\n");
+                }
+
+                exchange.getResponseHeaders().putAll(response.headers);
+                exchange.sendResponseHeaders(response.status, response.bodyLength);
+                response.bodyWriter.stream(exchange.getResponseBody());
+            } finally {
+                exchange.close();
             }
         }
     }
 
-    static class NRequest implements Request {
-        private final IHTTPSession session;
+    static class SRequest implements Request {
+        private final HttpExchange exchange;
         private final Permit permit;
-        private final String url;
-        private final String contextPath;
+        private final MultiMap<String, String> params = new MultiMap<>();
 
-        NRequest(IHTTPSession session, Permit permit, String contextPath) {
-            this.session = session;
+        SRequest(HttpExchange exchange, Permit permit) {
+            this.exchange = exchange;
             this.permit = permit;
-            this.contextPath = contextPath;
-            this.url = rebuildUrl();
+            parseQueryString(exchange.getRequestURI().getQuery());
+        }
+
+        private void parseQueryString(String query) {
+            if (query == null) return;
+            for (String pair : query.split("&")) {
+                if (pair.isEmpty()) continue;
+                String[] parts = pair.split("=", 2);
+                if (parts.length != 2) continue;
+                try {
+                    params.add(URLDecoder.decode(parts[0], "UTF-8"),
+                            URLDecoder.decode(parts[1], "UTF-8"));
+                } catch (UnsupportedEncodingException ignored) {
+                }
+            }
         }
 
         @Override
         public String method() {
-            return session.getMethod().name();
+            return exchange.getRequestMethod();
         }
 
         @Override
         public String path() {
-            return session.getUri();
+            return exchange.getRequestURI().getPath();
         }
 
         @Override
         public String contextPath() {
-            return contextPath;
+            String contextPath = exchange.getHttpContext().getPath();
+            return contextPath.equals("/") ? "" : contextPath;
         }
 
         @Override
         public MultiMap<String, String> params() {
-            return session.getParms();
+            return params;
         }
 
         @Override
         public String header(String name) {
-            return session.getHeaders().get(name);
+            return exchange.getRequestHeaders().getFirst(name);
         }
 
         @Override
         public InputStream inputStream() {
-            return session.getInputStream();
+            return exchange.getRequestBody();
         }
 
         @Override
@@ -109,7 +192,7 @@ class Web {
 
         @Override
         public String url() {
-            return url;
+            return exchange.getRequestURI().toString();
         }
     }
 

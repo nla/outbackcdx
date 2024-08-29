@@ -3,20 +3,16 @@ package outbackcdx;
 import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 
-import outbackcdx.NanoHTTPD.Response.Status;
+import outbackcdx.Web.Status;
 import outbackcdx.auth.NullAuthorizer;
-import outbackcdx.auth.Permit;
 
 import java.io.*;
-import java.nio.charset.Charset;
 import java.util.Collections;
-import java.util.Map;
-import java.util.Scanner;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static outbackcdx.NanoHTTPD.Method.*;
-import static outbackcdx.NanoHTTPD.Response.Status.OK;
+import static outbackcdx.Web.Method.*;
+import static outbackcdx.Web.Status.OK;
 
 
 public class ReplicationFeaturesTest {
@@ -104,111 +100,42 @@ public class ReplicationFeaturesTest {
         FeatureFlags.setSecondaryMode(false);
     }*/
 
-    private String GET(String url, NanoHTTPD.Response.Status expectedStatus) throws Exception {
-        ReplicationFeaturesTest.DummySession session = new ReplicationFeaturesTest.DummySession(GET, url);
-	NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
+    private String GET(String url, int expectedStatus) throws Exception {
+        Web.Response response = webapp.handle(new DummyRequest(GET, url));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
 
-    private String GET(String url, NanoHTTPD.Response.Status expectedStatus, String... parmKeysAndValues) throws Exception {
-        ReplicationFeaturesTest.DummySession session = new ReplicationFeaturesTest.DummySession(GET, url);
+    private String GET(String url, int expectedStatus, String... parmKeysAndValues) throws Exception {
+        DummyRequest request = new DummyRequest(GET, url);
         for (int i = 0; i < parmKeysAndValues.length; i += 2) {
-	    session.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
+	    request.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
 	}
-	NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
+	Web.Response response = webapp.handle(request);
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
 
-    private String DELETE(String url, NanoHTTPD.Response.Status expectedStatus) throws Exception {
-        ReplicationFeaturesTest.DummySession session = new ReplicationFeaturesTest.DummySession(DELETE, url);
-        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
+    private String DELETE(String url, int expectedStatus) throws Exception {
+        Web.Response response = webapp.handle(new DummyRequest(DELETE, url));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
 
-    private String POST(String url, String data, NanoHTTPD.Response.Status expectedStatus) throws Exception {
-        ReplicationFeaturesTest.DummySession session = new ReplicationFeaturesTest.DummySession(POST, url);
-        session.data(data);
-        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
+    private String POST(String url, String data, int expectedStatus) throws Exception {
+        Web.Response response = webapp.handle(new DummyRequest(POST, url, data));
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
 
-    private String slurp(NanoHTTPD.Response response) throws IOException {
-        NanoHTTPD.IStreamer streamer = response.getStreamer();
+    private String slurp(Web.Response response) throws IOException {
+        Web.IStreamer streamer = response.getBodyWriter();
         if (streamer != null) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             streamer.stream(out);
             return out.toString("UTF-8");
         }
-
-        InputStream data = response.getData();
-        if (data != null) {
-            Scanner scanner = new Scanner(response.getData(), "UTF-8").useDelimiter("\\Z");
-            if (scanner.hasNext()) {
-                return scanner.next();
-            }
-        }
-
         return "";
     }
 
-    private static class DummySession implements NanoHTTPD.IHTTPSession {
-        private final NanoHTTPD.Method method;
-        InputStream stream = new ByteArrayInputStream(new byte[0]);
-        MultiMap<String, String> parms = new MultiMap<String, String>();
-        String url;
-
-        public DummySession(NanoHTTPD.Method method, String url) {
-            this.url = url;
-            this.method = method;
-        }
-
-        public ReplicationFeaturesTest.DummySession data(String data) {
-            stream = new ByteArrayInputStream(data.getBytes(Charset.forName("UTF-8")));
-            return this;
-        }
-
-        public ReplicationFeaturesTest.DummySession parm(String key, String value) {
-            parms.put(key, value);
-            return this;
-        }
-
-        @Override
-        public void execute() throws IOException {
-            // nothing
-        }
-
-        @Override
-        public MultiMap<String, String> getParms() {
-            return parms;
-        }
-
-        @Override
-        public Map<String, String> getHeaders() {
-            return Collections.emptyMap();
-        }
-
-        @Override
-        public String getUri() {
-            return url;
-        }
-
-        @Override
-        public String getQueryParameterString() {
-            return "";
-        }
-
-        @Override
-        public NanoHTTPD.Method getMethod() {
-            return method;
-        }
-
-        @Override
-        public InputStream getInputStream() {
-            return stream;
-        }
-    }
 }

@@ -85,8 +85,8 @@ public class XmlQuery {
         out.writeEndElement();
     }
 
-    public NanoHTTPD.Response streamResults() {
-        return new NanoHTTPD.Response(NanoHTTPD.Response.Status.OK, "application/xml;charset=" + DEFAULT_ENCODING, outputStream -> {
+    public Web.Response streamResults() {
+        return new Web.Response(Web.Status.OK, "application/xml;charset=" + DEFAULT_ENCODING, outputStream -> {
             try {
                 XMLOutputFactory factory = XMLOutputFactory.newInstance();
                 XMLStreamWriter out = factory.createXMLStreamWriter(new BufferedOutputStream(outputStream), DEFAULT_ENCODING);

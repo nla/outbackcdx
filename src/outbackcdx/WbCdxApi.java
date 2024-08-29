@@ -1,7 +1,7 @@
 package outbackcdx;
 
 import com.fasterxml.jackson.core.JsonGenerator;
-import outbackcdx.NanoHTTPD.Response;
+import outbackcdx.Web.Response;
 
 import java.io.*;
 import java.util.*;
@@ -9,7 +9,7 @@ import java.util.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
 import static outbackcdx.Json.JSON_MAPPER;
-import static outbackcdx.NanoHTTPD.Response.Status.OK;
+import static outbackcdx.Web.Status.OK;
 
 /**
  * Implements a partial, semi-compatible subset of the various CDX server APIs.
@@ -32,7 +32,7 @@ public class WbCdxApi {
         this.queryConfig = queryConfig;
     }
 
-    public Response queryIndex(Web.Request request, Index index) {
+    public Web.Response queryIndex(Web.Request request, Index index) {
         Query query = new Query(request.params(), filterPlugins, queryConfig);
 
         FormatFactory format;

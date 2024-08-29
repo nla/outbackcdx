@@ -4,6 +4,7 @@ import io.undertow.Undertow;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.BlockingHandler;
 import io.undertow.util.Headers;
+import io.undertow.util.HttpString;
 import outbackcdx.auth.Authorizer;
 import outbackcdx.auth.Permission;
 import outbackcdx.auth.Permit;
@@ -39,7 +40,7 @@ public class UWeb {
             try {
                 Permit permit = authorizer.verify(authnHeader);
                 URequest request = new URequest(exchange, permit, contextPath);
-                NanoHTTPD.Response response = handler.handle(request);
+                Web.Response response = handler.handle(request);
                 sendResponse(exchange, response);
             } catch (Web.ResponseException e) {
                 sendResponse(exchange, e.response);
@@ -47,27 +48,21 @@ public class UWeb {
                 StringWriter sw = new StringWriter();
                 e.printStackTrace(new PrintWriter(sw));
                 e.printStackTrace();
-                sendResponse(exchange, new NanoHTTPD.Response(NanoHTTPD.Response.Status.INTERNAL_ERROR, "text/plain", sw.toString()));
+                sendResponse(exchange, new Web.Response(Web.Status.INTERNAL_ERROR, "text/plain", sw.toString()));
             }
         }
 
-        private void sendResponse(HttpServerExchange exchange, NanoHTTPD.Response response) throws IOException {
-            exchange.setStatusCode(response.getStatus().getRequestStatus());
-            if (response.getMimeType() != null) {
-                exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, response.getMimeType());
-            }
-            NanoHTTPD.IStreamer streamer = response.getStreamer();
+        private void sendResponse(HttpServerExchange exchange, Web.Response response) throws IOException {
+            exchange.setStatusCode(response.getStatus());
+            response.getHeaders().forEach((name, values) -> {
+                for (String value : values) {
+                    exchange.getResponseHeaders().add(HttpString.tryFromString(name), value);
+                }
+            });
+            Web.IStreamer streamer = response.getBodyWriter();
             OutputStream outputStream = exchange.getOutputStream();
             if (streamer != null) {
                 streamer.stream(outputStream);
-            } else {
-                InputStream stream = response.getData();
-                byte[] buf = new byte[8192];
-                while (true) {
-                    int n = stream.read(buf);
-                    if (n < 0) break;
-                    outputStream.write(buf, 0, n);
-                }
             }
             outputStream.close();
         }

@@ -25,8 +25,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static org.junit.Assert.*;
 import static outbackcdx.Json.JSON_MAPPER;
-import static outbackcdx.NanoHTTPD.Method.*;
-import static outbackcdx.NanoHTTPD.Response.Status.*;
+import static outbackcdx.Web.Method.*;
+import static outbackcdx.Web.Status.*;
 
 public class WebappTest {
     @Rule
@@ -349,107 +349,40 @@ public class WebappTest {
     private String POST(String url, String data) throws Exception {
         return POST(url, data, OK);
     }
-    private String POST(String url, String data, NanoHTTPD.Response.Status expectedStatus, String... parmKeysAndValues) throws Exception {
-        DummySession session = new DummySession(POST, url);
-        session.data(data);
+    private String POST(String url, String data, int expectedStatus, String... parmKeysAndValues) throws Exception {
+        DummyRequest session = new DummyRequest(POST, url, data);
         for (int i = 0; i < parmKeysAndValues.length; i += 2) {
             session.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
         }
-        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
+        Web.Response response = webapp.handle(session);
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }
 
     private String GET(String url, String... parmKeysAndValues) throws Exception {
-        DummySession session = new DummySession(GET, url);
+        DummyRequest session = new DummyRequest(GET, url);
         for (int i = 0; i < parmKeysAndValues.length; i += 2) {
             session.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
         }
-        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
+        Web.Response response = webapp.handle(session);
         assertEquals(OK, response.getStatus());
         return slurp(response);
     }
 
     private String DELETE(String url) throws Exception {
-        DummySession session = new DummySession(DELETE, url);
-        NanoHTTPD.Response response = webapp.handle(new Web.NRequest(session, Permit.full(), ""));
+        DummyRequest session = new DummyRequest(DELETE, url);
+        Web.Response response = webapp.handle(session);
         assertEquals(OK, response.getStatus());
         return slurp(response);
     }
 
-    private String slurp(NanoHTTPD.Response response) throws IOException {
-        NanoHTTPD.IStreamer streamer = response.getStreamer();
+    private String slurp(Web.Response response) throws IOException {
+        Web.IStreamer streamer = response.getBodyWriter();
         if (streamer != null) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             streamer.stream(out);
             return out.toString("UTF-8");
         }
-
-        InputStream data = response.getData();
-        if (data != null) {
-            Scanner scanner = new Scanner(response.getData(), "UTF-8").useDelimiter("\\Z");
-            if (scanner.hasNext()) {
-                return scanner.next();
-            }
-        }
-
         return "";
-    }
-
-    private static class DummySession implements NanoHTTPD.IHTTPSession {
-        private final NanoHTTPD.Method method;
-        InputStream stream = new ByteArrayInputStream(new byte[0]);
-        MultiMap<String, String> parms = new MultiMap<>();
-        String url;
-
-        public DummySession(NanoHTTPD.Method method, String url) {
-            this.url = url;
-            this.method = method;
-        }
-
-        public DummySession data(String data) {
-            stream = new ByteArrayInputStream(data.getBytes(UTF_8));
-            return this;
-        }
-
-        public DummySession parm(String key, String value) {
-            parms.add(key, value);
-            return this;
-        }
-
-        @Override
-        public void execute() {
-            // nothing
-        }
-
-        @Override
-        public MultiMap<String, String> getParms() {
-            return parms;
-        }
-
-        @Override
-        public Map<String, String> getHeaders() {
-            return Collections.emptyMap();
-        }
-
-        @Override
-        public String getUri() {
-            return url;
-        }
-
-        @Override
-        public String getQueryParameterString() {
-            return "";
-        }
-
-        @Override
-        public NanoHTTPD.Method getMethod() {
-            return method;
-        }
-
-        @Override
-        public InputStream getInputStream() {
-            return stream;
-        }
     }
 }
