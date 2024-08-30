@@ -41,7 +41,7 @@ public class UWeb {
                 Permit permit = authorizer.verify(authnHeader);
                 URequest request = new URequest(exchange, permit, contextPath);
                 Web.Response response = handler.handle(request);
-                sendResponse(exchange, response);
+                if (response != Web.Response.ALREADY_SENT) sendResponse(exchange, response);
             } catch (Web.ResponseException e) {
                 sendResponse(exchange, e.response);
             } catch (Exception e) {
@@ -143,6 +143,16 @@ public class UWeb {
         @Override
         public String url() {
             return url;
+        }
+
+        @Override
+        public OutputStream streamResponse(int status, String contentType, Map<String, String> headers) throws IOException {
+            if (headers != null) {
+                headers.forEach((name, value) ->
+                        exchange.getResponseHeaders().add(HttpString.tryFromString(name), value));
+            }
+            exchange.setStatusCode(status);
+            return exchange.getOutputStream();
         }
     }
 }

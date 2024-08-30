@@ -1,7 +1,6 @@
 package outbackcdx;
 
 import com.fasterxml.jackson.core.JsonGenerator;
-import outbackcdx.Web.Response;
 
 import java.io.*;
 import java.util.*;
@@ -21,7 +20,6 @@ import static outbackcdx.Web.Status.OK;
  * pywb: https://github.com/ikreymer/pywb/wiki/CDX-Server-API
  */
 public class WbCdxApi {
-    private static final boolean CDX_PLUS_WORKAROUND = "1".equals(System.getenv("CDX_PLUS_WORKAROUND"));
     private final Iterable<FilterPlugin> filterPlugins;
     private final Map<String, ComputedField> computedFields;
     private final QueryConfig queryConfig;
@@ -32,7 +30,7 @@ public class WbCdxApi {
         this.queryConfig = queryConfig;
     }
 
-    public Web.Response queryIndex(Web.Request request, Index index) {
+    public Web.Response queryIndex(Web.Request request, Index index) throws IOException {
         Query query = new Query(request.params(), filterPlugins, queryConfig);
 
         FormatFactory format;
@@ -56,26 +54,16 @@ public class WbCdxApi {
                 break;
         }
 
-        CloseableIterator<Capture> captures = query.execute(index);
-        if (CDX_PLUS_WORKAROUND && !captures.hasNext() && query.url != null && (query.url.contains("%20") || query.url.contains(" "))) {
-            /*
-             * XXX: NLA has a bunch of bad WARC files that contain + instead of %20 in the URLs. This is a dirty
-             * workaround until we can fix them. If we found no results try again with + in place of %20.
-             */
-            captures.close();
-            query.urlkey = null;
-            query.url = query.url.replace("%20", "+").replace(" ", "+");
-            captures = query.execute(index);
-        }
-        CloseableIterator<Capture> finalCaptures = captures;
+        try (CloseableIterator<Capture> captures = query.execute(index);
+             OutputStream outputStream = request.streamResponse(OK, contentType,
+                     Map.of("Access-Control-Allow-Origin", "*",
+                             "outbackcdx-urlkey", query.urlkey));
+             Writer out = new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8))) {
 
-        Response response = new Response(OK, contentType, outputStream -> {
-            Writer out = new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8));
-            OutputFormat outf = format.construct(query, computedFields, out);
             long row = 0;
-            try (CloseableIterator<Capture> it = finalCaptures) {
-                while (it.hasNext()) {
-                    Capture capture = it.next();
+            try (OutputFormat outf = format.construct(query, computedFields, out)) {
+                while (captures.hasNext()) {
+                    Capture capture = captures.next();
                     if (row >= query.limit) {
                         break;
                     }
@@ -86,16 +74,10 @@ public class WbCdxApi {
                 System.err.println(new Date() + ": exception " + e + " thrown processing captures");
                 e.printStackTrace();
                 out.write("warning: output may be incomplete, error occurred processing captures\n");
-            } finally {
-                finalCaptures.close();
             }
+        }
 
-            outf.close();
-            out.flush();
-        });
-        response.addHeader("Access-Control-Allow-Origin", "*");
-        response.addHeader("outbackcdx-urlkey", query.urlkey);
-        return response;
+        return Web.Response.ALREADY_SENT;
     }
 
     interface FormatFactory {

@@ -110,9 +110,12 @@ public class ReplicationFeaturesTest {
     private String GET(String url, int expectedStatus, String... parmKeysAndValues) throws Exception {
         DummyRequest request = new DummyRequest(GET, url);
         for (int i = 0; i < parmKeysAndValues.length; i += 2) {
-	    request.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
-	}
-	Web.Response response = webapp.handle(request);
+            request.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
+        }
+        Web.Response response = webapp.handle(request);
+        if (response == Web.Response.ALREADY_SENT) {
+            response = request.streamedResponse();
+        }
         assertEquals(expectedStatus, response.getStatus());
         return slurp(response);
     }

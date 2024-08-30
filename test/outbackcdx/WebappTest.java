@@ -359,11 +359,12 @@ public class WebappTest {
     }
 
     private String GET(String url, String... parmKeysAndValues) throws Exception {
-        DummyRequest session = new DummyRequest(GET, url);
+        DummyRequest request = new DummyRequest(GET, url);
         for (int i = 0; i < parmKeysAndValues.length; i += 2) {
-            session.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
+            request.parm(parmKeysAndValues[i], parmKeysAndValues[i + 1]);
         }
-        Web.Response response = webapp.handle(session);
+        Web.Response response = webapp.handle(request);
+        if (response == Web.Response.ALREADY_SENT) response = request.streamedResponse();
         assertEquals(OK, response.getStatus());
         return slurp(response);
     }

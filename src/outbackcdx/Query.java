@@ -9,6 +9,7 @@ import java.util.function.Predicate;
 public class Query {
     private static final String DEFAULT_FIELDS = "urlkey,timestamp,url,mime,status,digest,redirecturl,robotflags,length,offset,filename";
     private static final String DEFAULT_FIELDS_CDX14 = DEFAULT_FIELDS + ",originalLength,originalOffset,originalFilename";
+    private static final boolean CDX_PLUS_WORKAROUND = "1".equals(System.getenv("CDX_PLUS_WORKAROUND"));
 
     public static final long MIN_TIMESTAMP = 0L;
     public static final long MAX_TIMESTAMP = 99999999999999L;
@@ -184,6 +185,18 @@ public class Query {
         if (collapseToLastSpec != null) {
             captures = Filter.collapseToLast(captures, collapseToLastSpec);
         }
+
+        if (CDX_PLUS_WORKAROUND && !captures.hasNext() && url != null && (url.contains("%20") || url.contains(" "))) {
+            /*
+             * XXX: NLA has a bunch of bad WARC files that contain + instead of %20 in the URLs. This is a dirty
+             * workaround until we can fix them. If we found no results try again with + in place of %20.
+             */
+            captures.close();
+            urlkey = null;
+            url = url.replace("%20", "+").replace(" ", "+");
+            captures = execute(index);
+        }
+
         return captures;
     }
 

@@ -41,11 +41,13 @@ class Web {
         void stream(OutputStream out) throws IOException;
     }
 
-    static class Response {
+    public static class Response {
         private int status;
         private final Map<String, List<String>> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         private final long bodyLength;
         private final IStreamer bodyWriter;
+
+        public static final Response ALREADY_SENT = new Response(-1, null, "");
 
         public Response(int status, String mime, String body) {
             this.status = status;
@@ -115,9 +117,11 @@ class Web {
                     response = new Response(INTERNAL_ERROR, "text/plain", e + "\n");
                 }
 
-                exchange.getResponseHeaders().putAll(response.headers);
-                exchange.sendResponseHeaders(response.status, response.bodyLength);
-                response.bodyWriter.stream(exchange.getResponseBody());
+                if (response != Response.ALREADY_SENT) {
+                    exchange.getResponseHeaders().putAll(response.headers);
+                    exchange.sendResponseHeaders(response.status, response.bodyLength);
+                    response.bodyWriter.stream(exchange.getResponseBody());
+                }
             } finally {
                 exchange.close();
             }
@@ -190,6 +194,13 @@ class Web {
         @Override
         public String url() {
             return exchange.getRequestURI().toString();
+        }
+
+        @Override
+        public OutputStream streamResponse(int status, String contentType, Map<String, String> headers) throws IOException {
+            if (headers != null) headers.forEach(exchange.getResponseHeaders()::add);
+            exchange.sendResponseHeaders(status, 0);
+            return exchange.getResponseBody();
         }
     }
 
@@ -461,5 +472,7 @@ class Web {
         }
 
         String url();
+
+        OutputStream streamResponse(int status, String contentType, Map<String, String> headers) throws IOException;
     }
 }
