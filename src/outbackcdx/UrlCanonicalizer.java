@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.netpreserve.urlcanon.Canonicalizer;
+import org.netpreserve.urlcanon.ParsedUrl;
 import org.snakeyaml.engine.v2.api.Load;
 import org.snakeyaml.engine.v2.api.LoadSettings;
 
@@ -370,7 +372,10 @@ public class UrlCanonicalizer {
         try {
             return canonicalize(makeUrl(rawUrl)).toString();
         } catch (MalformedURLException e) {
-            return rawUrl;
+            // if Java's URL parser rejected the input fallback urlcanon instead
+            ParsedUrl parsedUrl = ParsedUrl.parseUrl(rawUrl);
+            Canonicalizer.AGGRESSIVE.canonicalize(parsedUrl);
+            return parsedUrl.toString();
         }
     }
 
