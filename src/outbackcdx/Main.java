@@ -190,6 +190,7 @@ public class Main {
                         Main.class.wait();
                     }
                 } else {
+                    System.setProperty("sun.net.httpserver.nodelay", "true");
                     HttpServer httpServer = HttpServer.create(new InetSocketAddress((host == null ? "localhost" : host), port), 0);
                     httpServer.createContext("/", new Web.SHandler(controller, authorizer));
                     ExecutorService threadPool = Executors.newFixedThreadPool(webThreads);
