@@ -87,7 +87,7 @@ class Webapp implements Web.Handler {
         router.on(GET, "/swagger.json", serve("swagger.json"));
         router.on(GET, "/lib/vue-router/2.0.0/vue-router.js", serve("lib/vue-router/2.0.0/vue-router.js"));
         router.on(GET, "/lib/vue/" + version("org.webjars.npm", "vue") + "/vue.js", serve("/META-INF/resources/webjars/vue/" + version("org.webjars.npm", "vue") + "/dist/vue.js"));
-        router.on(GET, "/lib/lodash/" + version("org.webjars", "lodash") + "/lodash.min.js", serve("/META-INF/resources/webjars/lodash/" + version("org.webjars", "lodash") + "/lodash.min.js"));
+        router.on(GET, "/lib/lodash/" + version("org.webjars", "lodash") + "/lodash.js", serve("/META-INF/resources/webjars/lodash/" + version("org.webjars", "lodash") + "/lodash.js"));
         router.on(GET, "/lib/moment/" + version("org.webjars.npm", "moment") + "/moment.min.js", serve("/META-INF/resources/webjars/moment/" + version("org.webjars.npm", "moment") + "/min/moment.min.js"));
         router.on(GET, "/lib/pikaday/" + version("org.webjars.npm", "pikaday") + "/pikaday.js", serve("/META-INF/resources/webjars/pikaday/" + version("org.webjars.npm", "pikaday") + "/pikaday.js"));
         router.on(GET, "/lib/pikaday/" + version("org.webjars.npm", "pikaday") + "/pikaday.css", serve("/META-INF/resources/webjars/pikaday/" + version("org.webjars.npm", "pikaday") + "/css/pikaday.css"));
