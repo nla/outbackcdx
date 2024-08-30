@@ -58,7 +58,7 @@ class Web {
         public Response(int status, String mime, InputStream inputStream) {
             this.status = status;
             this.bodyLength = 0;
-            this.bodyWriter = out -> IOUtils.copy(inputStream, out);
+            this.bodyWriter = inputStream::transferTo;
             if (mime != null) addHeader("Content-Type", mime);
         }
 
