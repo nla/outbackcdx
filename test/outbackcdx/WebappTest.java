@@ -11,7 +11,6 @@ import org.w3c.dom.Node;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import outbackcdx.UrlCanonicalizer.ConfigurationException;
-import outbackcdx.auth.Permit;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -381,7 +380,7 @@ public class WebappTest {
         if (streamer != null) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             streamer.stream(out);
-            return out.toString("UTF-8");
+            return out.toString(UTF_8);
         }
         return "";
     }

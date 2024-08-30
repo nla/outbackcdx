@@ -4,7 +4,6 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 import java.io.BufferedOutputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -12,6 +11,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.logging.Logger;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Implements the Wayback RemoteCollection XmlQuery interface.
@@ -63,20 +64,16 @@ public class XmlQuery {
     }
 
     private static Map<String,String> decodeQueryString(String q) {
-        try {
-            Map<String,String> m = new HashMap<>();
-            for (String entry : q.split(" ")) {
-                String[] fields = entry.split(":", 2);
-                // we use URLDecoder rather than URLCanonicalize here to match Wayback's encoding behaviour
-                // (spaces encoded as + rather than %20)
-                String key = URLDecoder.decode(fields[0], "UTF-8");
-                String value = URLDecoder.decode(fields[1], "UTF-8");
-                m.put(key, value);
-            }
-            return m;
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
+        Map<String,String> m = new HashMap<>();
+        for (String entry : q.split(" ")) {
+            String[] fields = entry.split(":", 2);
+            // we use URLDecoder rather than URLCanonicalize here to match Wayback's encoding behaviour
+            // (spaces encoded as + rather than %20)
+            String key = URLDecoder.decode(fields[0], UTF_8);
+            String value = URLDecoder.decode(fields[1], UTF_8);
+            m.put(key, value);
         }
+        return m;
     }
 
     private static void writeElement(XMLStreamWriter out, String name, Object value) throws XMLStreamException {

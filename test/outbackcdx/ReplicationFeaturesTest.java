@@ -9,6 +9,7 @@ import outbackcdx.auth.NullAuthorizer;
 import java.io.*;
 import java.util.Collections;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static outbackcdx.Web.Method.*;
@@ -133,7 +134,7 @@ public class ReplicationFeaturesTest {
         if (streamer != null) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             streamer.stream(out);
-            return out.toString("UTF-8");
+            return out.toString(UTF_8);
         }
         return "";
     }

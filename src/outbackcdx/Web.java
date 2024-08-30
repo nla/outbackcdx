@@ -11,11 +11,11 @@ import java.io.*;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static outbackcdx.Json.JSON_MAPPER;
 import static outbackcdx.Web.Status.*;
 
@@ -49,7 +49,7 @@ class Web {
 
         public Response(int status, String mime, String body) {
             this.status = status;
-            byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
+            byte[] bodyBytes = body.getBytes(UTF_8);
             this.bodyLength = bodyBytes.length;
             this.bodyWriter = out -> out.write(bodyBytes);
             if (mime != null) addHeader("Content-Type", mime);
@@ -141,11 +141,8 @@ class Web {
                 if (pair.isEmpty()) continue;
                 String[] parts = pair.split("=", 2);
                 if (parts.length != 2) continue;
-                try {
-                    params.add(URLDecoder.decode(parts[0], "UTF-8"),
-                            URLDecoder.decode(parts[1], "UTF-8"));
-                } catch (UnsupportedEncodingException ignored) {
-                }
+                params.add(URLDecoder.decode(parts[0], UTF_8),
+                        URLDecoder.decode(parts[1], UTF_8));
             }
         }
 
@@ -280,7 +277,7 @@ class Web {
         for (int n = stream.read(buffer); n >= 0; n = stream.read(buffer)) {
             baos.write(buffer, 0, n);
         }
-        return baos.toString("utf-8");
+        return baos.toString(UTF_8);
     }
 
     static Response jsonResponse(Object data) throws JsonProcessingException {
@@ -454,13 +451,9 @@ class Web {
                     for (String value: params().getAll(key)) {
                         buf.append(first ? '?' : '&');
                         first = false;
-                        try {
-                            buf.append(URLEncoder.encode(key, "UTF-8"));
-                            buf.append('=');
-                            buf.append(URLEncoder.encode(value, "UTF-8"));
-                        } catch (UnsupportedEncodingException e) {
-                            throw new RuntimeException(e); // not possible
-                        }
+                        buf.append(URLEncoder.encode(key, UTF_8));
+                        buf.append('=');
+                        buf.append(URLEncoder.encode(value, UTF_8));
                     }
                 }
             }
