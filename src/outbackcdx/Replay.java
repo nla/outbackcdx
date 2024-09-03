@@ -15,7 +15,8 @@ import static java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME;
 import static outbackcdx.Web.Status.*;
 
 public class Replay {
-    private static final Set<String> X_ARCHIVE_ORIG_HEADERS = Set.of("age", "alt-svc", "cache-control", "cookie",
+    private static final Set<String> X_ARCHIVE_ORIG_HEADERS = Set.of("access-control-allow-origin",
+            "age", "alt-svc", "cache-control", "cookie",
             "connection", "content-md5", "content-security-policy",
             "content-security-policy-report-only", "date", "etag", "last-modified", "memento-datetime",
             "p3p", "pragma", "public-key-pins", "retry-after", "server", "status", "strict-transport-security",
