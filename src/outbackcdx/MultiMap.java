@@ -1,12 +1,6 @@
 package outbackcdx;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Mostly acts like a {@code Map<K,V>}, but secretly supports a list of values
@@ -16,6 +10,15 @@ import java.util.Set;
 public class MultiMap<K, V> implements Map<K, V> {
     
     protected Map<K,List<V>> inner;
+
+    @SuppressWarnings("unchecked")
+    public static <K,V> MultiMap<K,V> of(Object... entries) {
+        var map = new MultiMap<K,V>();
+        for (int i = 0; i < entries.length; i += 2) {
+            map.add((K)entries[i], (V)entries[i + 1]);
+        }
+        return map;
+    }
 
     public MultiMap() {
         inner = new HashMap<>();
@@ -94,7 +97,39 @@ public class MultiMap<K, V> implements Map<K, V> {
 
     @Override
     public Set<Entry<K, V>> entrySet() {
-        throw new RuntimeException("not implemented");
+        return new AbstractSet<>() {
+
+            @Override
+            public Iterator<Entry<K, V>> iterator() {
+                return new Iterator<>() {
+                    final Iterator<Entry<K, List<V>>> entryIterator = inner.entrySet().iterator();
+                    K key;
+                    Iterator<V> values;
+
+                    @Override
+                    public boolean hasNext() {
+                        while (values == null || !values.hasNext()) {
+                            if (!entryIterator.hasNext()) return false;
+                            Entry<K, List<V>> next = entryIterator.next();
+                            key = next.getKey();
+                            values = next.getValue().iterator();
+                        }
+                        return true;
+                    }
+
+                    @Override
+                    public Entry<K, V> next() {
+                        if (!hasNext()) throw new NoSuchElementException();
+                        return new AbstractMap.SimpleEntry<>(key, values.next());
+                    }
+                };
+            }
+
+            @Override
+            public int size() {
+                return inner.values().stream().mapToInt(List::size).sum();
+            }
+        };
     }
 
     public List<V> getAll(K k) {

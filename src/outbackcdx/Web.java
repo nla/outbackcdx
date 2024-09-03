@@ -197,7 +197,7 @@ class Web {
         }
 
         @Override
-        public OutputStream streamResponse(int status, String contentType, Map<String, String> headers) throws IOException {
+        public OutputStream streamResponse(int status, MultiMap<String, String> headers) throws IOException {
             if (headers != null) headers.forEach(exchange.getResponseHeaders()::add);
             exchange.sendResponseHeaders(status, 0);
             return exchange.getResponseBody();
@@ -473,6 +473,6 @@ class Web {
 
         String url();
 
-        OutputStream streamResponse(int status, String contentType, Map<String, String> headers) throws IOException;
+        OutputStream streamResponse(int status, MultiMap<String, String> headers) throws IOException;
     }
 }

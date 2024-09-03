@@ -14,7 +14,6 @@ class DummyRequest implements Web.Request {
     private ByteArrayOutputStream streamedResponseBody;
     private int streamedStatus;
     private Map<String, String> streamedHeaders;
-    private String streamedContentType;
 
     public DummyRequest(Web.Method method, String url) {
         this(method, url, null);
@@ -73,11 +72,10 @@ class DummyRequest implements Web.Request {
     }
 
     @Override
-    public OutputStream streamResponse(int status, String contentType, Map<String, String> headers) throws IOException {
+    public OutputStream streamResponse(int status, MultiMap<String, String> headers) throws IOException {
         this.streamedResponseBody = new ByteArrayOutputStream();
         this.streamedStatus = status;
         this.streamedHeaders = headers;
-        this.streamedContentType = contentType;
         return streamedResponseBody;
     }
 
@@ -86,7 +84,7 @@ class DummyRequest implements Web.Request {
     }
 
     public Web.Response streamedResponse() {
-        Web.Response response = new Web.Response(streamedStatus, streamedContentType,
+        Web.Response response = new Web.Response(streamedStatus, streamedHeaders.get("Content-Type"),
                 new ByteArrayInputStream(streamedResponseBody.toByteArray()));
         if (streamedHeaders != null) streamedHeaders.forEach(response::addHeader);
         return response;

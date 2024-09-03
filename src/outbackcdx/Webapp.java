@@ -37,6 +37,7 @@ class Webapp implements Web.Handler {
     private final Map<String, ComputedField> computedFields;
     private final long maxNumResults;
     private final WbCdxApi wbCdxApi;
+    private final Replay replay;
 
     private static ServiceLoader<FilterPlugin> fpLoader = ServiceLoader.load(FilterPlugin.class);
 
@@ -54,7 +55,7 @@ class Webapp implements Web.Handler {
         return found ? ok() : notFound();
     }
 
-    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields, long maxNumResults, QueryConfig queryConfig) {
+    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields, long maxNumResults, QueryConfig queryConfig, Replay replay) {
         this.dataStore = dataStore;
         this.verbose = verbose;
         this.dashboardConfig = dashboardConfig;
@@ -64,6 +65,7 @@ class Webapp implements Web.Handler {
         this.canonicalizer = canonicalizer;
         this.computedFields = computedFields;
         this.maxNumResults = maxNumResults;
+        this.replay = replay;
 
         this.filterPlugins = new ArrayList<FilterPlugin>();
         if (FeatureFlags.filterPlugins()) {
@@ -106,6 +108,7 @@ class Webapp implements Web.Handler {
         router.on(POST, "/<collection>/truncate_replication", request -> flushWal(request));
         router.on(POST, "/<collection>/compact", request -> compact(request), Permission.INDEX_EDIT);
         router.on(POST, "/<collection>/upgrade", request -> upgrade(request), Permission.INDEX_EDIT);
+        router.on(GET, "/<collection>/<date:[0-9]+>id_/<url:.*>", this::replayIdentity);
 
         if (FeatureFlags.experimentalAccessControl()) {
             router.on(GET, "/<collection>/ap/<accesspoint>", request -> query(request));
@@ -663,6 +666,14 @@ class Webapp implements Web.Handler {
         return jsonResponse(responses);
     }
 
+    private Response replayIdentity(Request request) throws ResponseException, IOException {
+        if (replay == null) return new Response(404, "text/plain", "Replay not enabled (try setting --warc-base-url)");
+        String date = request.param("date");
+        String url = request.param("url");
+        Index index = getIndex(request);
+        return replay.replayIdentity(index, date, url, request);
+    }
+
     @Override
     public Response handle(Web.Request request) throws Exception {
         if (!request.path().startsWith(request.contextPath() + "/")) {
@@ -674,5 +685,4 @@ class Webapp implements Web.Handler {
         }
         return response;
     }
-
 }

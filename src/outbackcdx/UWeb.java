@@ -146,7 +146,7 @@ public class UWeb {
         }
 
         @Override
-        public OutputStream streamResponse(int status, String contentType, Map<String, String> headers) throws IOException {
+        public OutputStream streamResponse(int status, MultiMap<String, String> headers) {
             if (headers != null) {
                 headers.forEach((name, value) ->
                         exchange.getResponseHeaders().add(HttpString.tryFromString(name), value));

@@ -41,6 +41,7 @@ public class Main {
         System.err.println("  -p port               Local port to listen on");
         System.err.println("  -t count              Number of web server threads");
         System.err.println("  -r count              Cap on number of rocksdb records to scan to serve a single request");
+        System.err.println("  --warc-base-url URL   Enables replay of WARC records by reading WARC files with this URL prefix");
         System.err.println("  -x                    Output CDX14 by default (instead of CDX11)");
         System.err.println("  -v                    Verbose logging");
         System.err.println("  -y file               Custom fuzzy match canonicalization YAML configuration file");
@@ -83,6 +84,7 @@ public class Main {
         long maxNumResults = 10000;
         Map<String,ComputedField> computedFields = new HashMap<>();
         QueryConfig queryConfig = new QueryConfig();
+        String warcBaseUrl = null;
 
         Map<String,Object> dashboardConfig = new HashMap<>();
         dashboardConfig.put("featureFlags", FeatureFlags.asMap());
@@ -166,6 +168,9 @@ public class Main {
                 case "--batch-size":
                     batchSize = Long.parseLong(args[++i]);
                     break;
+                case "--warc-base-url":
+                    warcBaseUrl = args[++i];
+                    break;
                 case "-x":
                     FeatureFlags.setCdx14(true);
                     break;
@@ -180,8 +185,12 @@ public class Main {
 
         try {
             UrlCanonicalizer canonicalizer = new UrlCanonicalizer(fuzzyYaml);
+            Replay replay = null;
+            if (warcBaseUrl != null) {
+                replay = new Replay(warcBaseUrl);
+            }
             try (DataStore dataStore = new DataStore(dataPath, maxOpenSstFiles, replicationWindow, scanCap, canonicalizer)) {
-                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields, maxNumResults, queryConfig);
+                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields, maxNumResults, queryConfig, replay);
                 if (undertow) {
                     UWeb.UServer server = new UWeb.UServer(host, port, contextPath, controller, authorizer);
                     server.start();

@@ -55,8 +55,9 @@ public class WbCdxApi {
         }
 
         try (CloseableIterator<Capture> captures = query.execute(index);
-             OutputStream outputStream = request.streamResponse(OK, contentType,
-                     Map.of("Access-Control-Allow-Origin", "*",
+             OutputStream outputStream = request.streamResponse(OK,
+                     MultiMap.of("Content-Type", contentType,
+                             "Access-Control-Allow-Origin", "*",
                              "outbackcdx-urlkey", query.urlkey));
              Writer out = new BufferedWriter(new OutputStreamWriter(outputStream, UTF_8))) {
 
