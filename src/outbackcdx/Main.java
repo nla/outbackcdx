@@ -14,6 +14,8 @@ import java.lang.management.ManagementFactory;
 import java.net.*;
 import java.nio.channels.Channel;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -39,8 +41,9 @@ public class Main {
         System.err.println("  --max-num-results N   Max number of records to scan to calculate numresults statistic in the XML protocol (default 10000)");
         System.err.println("  --omit-self-redirects Omit self redirects from query results by default");
         System.err.println("  -p port               Local port to listen on");
-        System.err.println("  -t count              Number of web server threads");
         System.err.println("  -r count              Cap on number of rocksdb records to scan to serve a single request");
+        System.err.println("  --service-worker FILE Sets a JavaScript file to use as the replay service worker");
+        System.err.println("  -t count              Number of web server threads");
         System.err.println("  --warc-base-url URL   Enables replay of WARC records by reading WARC files with this URL prefix");
         System.err.println("  -x                    Output CDX14 by default (instead of CDX11)");
         System.err.println("  -v                    Verbose logging");
@@ -85,6 +88,7 @@ public class Main {
         Map<String,ComputedField> computedFields = new HashMap<>();
         QueryConfig queryConfig = new QueryConfig();
         String warcBaseUrl = null;
+        String serviceWorker = null;
 
         Map<String,Object> dashboardConfig = new HashMap<>();
         dashboardConfig.put("featureFlags", FeatureFlags.asMap());
@@ -168,6 +172,15 @@ public class Main {
                 case "--batch-size":
                     batchSize = Long.parseLong(args[++i]);
                     break;
+                case "--service-worker":
+                    Path path = Path.of(args[++i]);
+                    try {
+                        serviceWorker = Files.readString(path);
+                    } catch (IOException e) {
+                        System.err.println("Error reading service worker from " + path + ": " + e);
+                        System.exit(1);
+                    }
+                    break;
                 case "--warc-base-url":
                     warcBaseUrl = args[++i];
                     break;
@@ -190,7 +203,7 @@ public class Main {
                 replay = new Replay(warcBaseUrl);
             }
             try (DataStore dataStore = new DataStore(dataPath, maxOpenSstFiles, replicationWindow, scanCap, canonicalizer)) {
-                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields, maxNumResults, queryConfig, replay);
+                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields, maxNumResults, queryConfig, replay, serviceWorker);
                 if (undertow) {
                     UWeb.UServer server = new UWeb.UServer(host, port, contextPath, controller, authorizer);
                     server.start();

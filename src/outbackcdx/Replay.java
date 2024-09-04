@@ -7,6 +7,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.file.Path;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Locale;
 import java.util.Set;
@@ -28,6 +29,16 @@ public class Replay {
         this.warcBaseUrl = warcBaseUrl;
     }
 
+    public Web.Response replay(Index index, String date, String url, String modifier, Web.Request request) throws IOException {
+        if (modifier.equals("id_")) {
+            return replayIdentity(index, date, url, request);
+        } else if (modifier.isEmpty()) {
+            return new Web.Response(200, "text/html", "<!doctype html><body><script src=/replay.js></script>");
+        } else {
+            throw new IllegalArgumentException("modifier must be either id_ or empty");
+        }
+    }
+
     public Web.Response replayIdentity(Index index, String date, String url, Web.Request request) throws IOException {
         Capture capture = findClosestCapture(index, date, url);
         if (capture == null) return new Web.Response(NOT_FOUND, "text/plain", "Not in archive");
@@ -37,9 +48,10 @@ public class Replay {
             WarcRecord record = warcReader.next().orElse(null);
             if (record == null) throw new IOException("Missing WARC record");
 
+            OffsetDateTime captureDate = record.date().atOffset(ZoneOffset.UTC);
             MultiMap<String, String> headers = new MultiMap<>();
             headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Memento-Datetime", RFC_1123_DATE_TIME.format(record.date().atOffset(ZoneOffset.UTC)));
+            headers.add("Memento-Datetime", RFC_1123_DATE_TIME.format(captureDate));
             if (record instanceof WarcResponse) {
                 HttpResponse http = ((WarcResponse) record).http();
                 http.headers().map().forEach((name, values) -> {

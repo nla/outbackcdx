@@ -38,6 +38,7 @@ class Webapp implements Web.Handler {
     private final long maxNumResults;
     private final WbCdxApi wbCdxApi;
     private final Replay replay;
+    private final String serviceWorker;
 
     private static ServiceLoader<FilterPlugin> fpLoader = ServiceLoader.load(FilterPlugin.class);
 
@@ -55,10 +56,11 @@ class Webapp implements Web.Handler {
         return found ? ok() : notFound();
     }
 
-    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields, long maxNumResults, QueryConfig queryConfig, Replay replay) {
+    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields, long maxNumResults, QueryConfig queryConfig, Replay replay, String serviceWorker) {
         this.dataStore = dataStore;
         this.verbose = verbose;
         this.dashboardConfig = dashboardConfig;
+        this.serviceWorker = serviceWorker;
         if (canonicalizer == null) {
             canonicalizer = new UrlCanonicalizer();
         }
@@ -86,6 +88,8 @@ class Webapp implements Web.Handler {
         router.on(GET, "/database.svg", serve("database.svg"));
         router.on(GET, "/outback.svg", serve("outback.svg"));
         router.on(GET, "/favicon.ico", serve("outback.svg"));
+        router.on(GET, "/replay.js", serve("replay.js"));
+        router.on(GET, "/sw.js", this::serviceWorker);
         router.on(GET, "/swagger.json", serve("swagger.json"));
         router.on(GET, "/lib/vue-router/2.0.0/vue-router.js", serve("lib/vue-router/2.0.0/vue-router.js"));
         router.on(GET, "/lib/vue/" + version("org.webjars.npm", "vue") + "/vue.js", serve("/META-INF/resources/webjars/vue/" + version("org.webjars.npm", "vue") + "/dist/vue.js"));
@@ -108,7 +112,7 @@ class Webapp implements Web.Handler {
         router.on(POST, "/<collection>/truncate_replication", request -> flushWal(request));
         router.on(POST, "/<collection>/compact", request -> compact(request), Permission.INDEX_EDIT);
         router.on(POST, "/<collection>/upgrade", request -> upgrade(request), Permission.INDEX_EDIT);
-        router.on(GET, "/<collection>/<date:[0-9]+>id_/<url:.*>", this::replayIdentity);
+        router.on(GET, "/<collection>/<date:[0-9]+><modifier:id_|>/<url:.*>", this::replay);
 
         if (FeatureFlags.experimentalAccessControl()) {
             router.on(GET, "/<collection>/ap/<accesspoint>", request -> query(request));
@@ -666,12 +670,18 @@ class Webapp implements Web.Handler {
         return jsonResponse(responses);
     }
 
-    private Response replayIdentity(Request request) throws ResponseException, IOException {
-        if (replay == null) return new Response(404, "text/plain", "Replay not enabled (try setting --warc-base-url)");
+    private Response replay(Request request) throws ResponseException, IOException {
+        if (replay == null) return new Response(NOT_FOUND, "text/plain", "Replay not configured (try setting --warc-base-url)");
         String date = request.param("date");
         String url = request.param("url");
+        String modifier = request.param("modifier");
         Index index = getIndex(request);
-        return replay.replayIdentity(index, date, url, request);
+        return replay.replay(index, date, url, modifier, request);
+    }
+
+    private Response serviceWorker(Request request) {
+        if (serviceWorker == null) return new Response(NOT_FOUND, "text/plain", "Service worker not configured (try setting --service-worker)");
+        return new Response(OK, "application/javascript", serviceWorker);
     }
 
     @Override
