@@ -16,6 +16,15 @@ Access policies define sets of access points which can be referenced in rules. F
 |3| On-site only            | on-site, staff |
 |4| Staff only              | staff |
 
+# Enabling it
+
+Currently access control is off by default and needs to be enabled by setting the environment variable:
+
+    EXPERIMENTAL_ACCESS_CONTROL=1
+
+It may be enabled by default in future versions of OutbackCDX. The 'experimental' label is a out of date. NLA have been using it in production for many years without issues.
+
+Note that enabling it will cause some extra RocksDB column families to be created to store rules and policies.
 
 # Rules
 
