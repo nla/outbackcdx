@@ -46,7 +46,11 @@ public class XmlQuery {
             limit = Long.parseLong(countParam);
         } else {
             // deprecated
-            limit = Long.parseLong(query.getOrDefault("limit", "10000"));
+            if (query.containsKey("limit")) {
+                limit = Long.parseLong(query.get("limit"));
+            } else {
+                limit = maxNumResults;
+            }
         }
 
         String startPageParam = params.get("start_page");
