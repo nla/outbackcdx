@@ -83,6 +83,8 @@ equivalent SURT prefix.
   "https://example.org/bad.html"]
 ```
 
+A bare `*` pattern matches all URLs and can be used to set a default rule.
+
 ### Captured between {start} and {end}
 
 Matches resources captured during a given time range. If the start or end of the range is null the rule matches
