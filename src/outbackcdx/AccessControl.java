@@ -241,8 +241,10 @@ class AccessControl {
      * Converts an exact URL, a URL containing pywb-style "*" wildcards to a SSURT prefix.
      * SSURTs are passed through unaltered. Exact matches are suffixed with a space.
      */
-     static String toSsurtPrefix(String pattern) {
-        if (pattern.startsWith("*.")) {
+    static String toSsurtPrefix(String pattern) {
+        if (pattern.equals("*")) {
+            return "";
+        } else if (pattern.startsWith("*.")) {
             if (pattern.contains("/")) {
                 throw new IllegalArgumentException("can't use a domain wildcard with a path");
             }

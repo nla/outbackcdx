@@ -127,5 +127,58 @@ public class AccessControlTest {
         AccessRule rule2 = Json.JSON_MAPPER.readValue(json, AccessRule.class);
         assertEquals(rule.period, rule2.period);
     }
+
+    @Test
+    public void testWildcardPatternOverride() throws RocksDBException {
+        // Create two policies: one public, one staff-only
+        AccessPolicy publicPolicy = new AccessPolicy();
+        publicPolicy.name = "Public Access";
+        publicPolicy.accessPoints.add("public");
+        publicPolicy.accessPoints.add("staff");
+        long publicPolicyId = accessControl.put(publicPolicy);
+
+        AccessPolicy staffOnlyPolicy = new AccessPolicy();
+        staffOnlyPolicy.name = "Staff Only Access";
+        staffOnlyPolicy.accessPoints.add("staff");
+        long staffOnlyPolicyId = accessControl.put(staffOnlyPolicy);
+
+        // Create a wildcard rule that restricts access to staff only
+        AccessRule wildcardRule = new AccessRule();
+        wildcardRule.urlPatterns.add("*");
+        wildcardRule.policyId = staffOnlyPolicyId;
+        wildcardRule.publicMessage = "Default access is restricted to staff";
+        accessControl.put(wildcardRule, "test-user");
+
+        // Create a specific rule that allows public access to a particular domain
+        AccessRule specificRule = new AccessRule();
+        specificRule.urlPatterns.add("*.open.gov.au");
+        specificRule.policyId = publicPolicyId;
+        accessControl.put(specificRule, "test-user");
+
+        // Test that the wildcard rule restricts public access to a general URL
+        {
+            AccessDecision decision = accessControl.checkAccess("public", "http://example.com/test.html", new Date(), new Date());
+            assertFalse("Wildcard rule should restrict public access to general URLs", decision.isAllowed());
+            assertEquals("Default access is restricted to staff", decision.getPublicMessage());
+        }
+
+        // Test that the specific rule overrides the wildcard and allows public access
+        {
+            AccessDecision decision = accessControl.checkAccess("public", "http://test.open.gov.au/document.html", new Date(), new Date());
+            assertTrue("Specific rule should override wildcard and allow public access", decision.isAllowed());
+        }
+
+        // Test that staff can access both general content (through wildcard) and specific content
+        {
+            AccessDecision decision = accessControl.checkAccess("staff", "http://example.com/test.html", new Date(), new Date());
+            assertTrue("Staff should be able to access general content via wildcard rule", decision.isAllowed());
+        }
+
+        // Test that staff can also access the specifically allowed content
+        {
+            AccessDecision decision = accessControl.checkAccess("staff", "http://test.open.gov.au/document.html", new Date(), new Date());
+            assertTrue("Staff should be able to access open content", decision.isAllowed());
+        }
+    }
 }
 
