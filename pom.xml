@@ -164,4 +164,10 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <scm>
+        <url>https://github.com/nla/outbackcdx</url>
+        <connection>scm:git:git@github.com:nla/outbackcdx</connection>
+        <developerConnection>scm:git:git@github.com:nla/outbackcdx</developerConnection>
+    </scm>
 </project>
