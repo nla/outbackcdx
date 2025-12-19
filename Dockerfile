@@ -1,4 +1,4 @@
-FROM maven:3-eclipse-temurin-17 as build-env
+FROM maven:3-eclipse-temurin-25 as build-env
 
 RUN apt-get update \
  && apt-get install -y libsnappy-dev \
@@ -9,10 +9,9 @@ RUN apt-get update \
 # see outbackcdx pom.xml for rocksdb version (rocksdbjni) and
 # check branches with https://github.com/facebook/rocksdb
 RUN cd /tmp && \
-    git clone https://github.com/facebook/rocksdb.git && \
+    git clone --depth 1 --branch v9.5.2 --single-branch https://github.com/facebook/rocksdb.git && \
     cd rocksdb && \
-    git checkout v8.1.1 && \
-    DEBUG_LEVEL=0 CXXFLAGS='-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess' make tools && \
+    DEBUG_LEVEL=0 CXXFLAGS='-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess' make -j4 ldb sst_dump && \
     cp /tmp/rocksdb/ldb /usr/bin/ && \
     cp /tmp/rocksdb/sst_dump /usr/bin/
 
@@ -29,7 +28,7 @@ RUN export JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF8 && \
     mvn -B -s /usr/share/maven/ref/settings-docker.xml -DskipTests package && \
     mvn package
 
-FROM eclipse-temurin:17
+FROM eclipse-temurin:25
 
 RUN apt-get update && apt-get install -y libsnappy-dev dumb-init \
  && rm -rf /var/lib/apt/lists/*
