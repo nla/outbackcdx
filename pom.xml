@@ -53,7 +53,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-release-plugin</artifactId>
-                <version>3.2.0</version>
+                <version>3.3.1</version>
                 <configuration>
                     <tagNameFormat>@{version}</tagNameFormat>
                 </configuration>
@@ -90,7 +90,7 @@
         <dependency>
             <groupId>org.netpreserve</groupId>
             <artifactId>jwarc</artifactId>
-            <version>0.32.0</version>
+            <version>0.33.0</version>
         </dependency>
         <dependency>
             <groupId>org.netpreserve</groupId>
