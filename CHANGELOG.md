@@ -1,5 +1,18 @@
 # OutbackCDX Changelog
 
+## 1.1.1 (2026-01-19)
+
+### Bug fixes
+
+- Fixed `--context-path` when using the default web server (no `-u` option).
+
+### Dependency upgrades
+
+* **jackson-dataformat-cbor**: 2.20.1 → 2.21.0
+* **jwarc**: 0.32.0 → 0.34.0
+* **nimbus-jose-jwt**: 10.6 → 10.7
+* **undertow-core**: 2.3.20.Final → 2.3.22.Final
+
 ## 1.1.0 (2025-12-19)
 
 ### New features
