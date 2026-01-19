@@ -1,4 +1,4 @@
-FROM maven:3-eclipse-temurin-25 as build-env
+FROM docker.io/library/maven:3-eclipse-temurin-25 as build-env
 
 RUN apt-get update \
  && apt-get install -y libsnappy-dev \
@@ -28,7 +28,7 @@ RUN export JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF8 && \
     mvn -B -s /usr/share/maven/ref/settings-docker.xml -DskipTests package && \
     mvn package
 
-FROM eclipse-temurin:25
+FROM docker.io/library/eclipse-temurin:25
 
 RUN apt-get update && apt-get install -y libsnappy-dev dumb-init \
  && rm -rf /var/lib/apt/lists/*
