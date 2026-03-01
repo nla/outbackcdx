@@ -53,7 +53,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-release-plugin</artifactId>
-                <version>3.2.0</version>
+                <version>3.3.1</version>
                 <configuration>
                     <tagNameFormat>@{version}</tagNameFormat>
                 </configuration>
@@ -65,7 +65,7 @@
         <dependency>
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>
-            <version>1.20.0</version>
+            <version>1.21.0</version>
         </dependency>
         <dependency>
             <groupId>org.rocksdb</groupId>
@@ -75,12 +75,12 @@
         <dependency>
             <groupId>io.undertow</groupId>
             <artifactId>undertow-core</artifactId>
-            <version>2.3.22.Final</version>
+            <version>2.3.23.Final</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-cbor</artifactId>
-            <version>2.21.0</version>
+            <version>2.21.1</version>
         </dependency>
         <dependency>
             <groupId>com.googlecode.concurrent-trees</groupId>
@@ -90,7 +90,7 @@
         <dependency>
             <groupId>org.netpreserve</groupId>
             <artifactId>jwarc</artifactId>
-            <version>0.34.0</version>
+            <version>0.35.0</version>
         </dependency>
         <dependency>
             <groupId>org.netpreserve</groupId>
@@ -100,7 +100,7 @@
         <dependency>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
-            <version>10.7</version>
+            <version>10.8</version>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
