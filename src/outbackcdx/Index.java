@@ -4,6 +4,8 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Predicate;
@@ -164,6 +166,22 @@ public class Index {
     static String hostFromSurt(String surtPrefix) {
         int i = surtPrefix.indexOf(")/");
         return i < 0 ? surtPrefix : surtPrefix.substring(0, i);
+    }
+
+    /**
+     * Creates a consistent on-disk snapshot of this collection's RocksDB at {@code target}.
+     * The target directory must not already exist; RocksDB will create it. If on the same
+     * filesystem as the live DB, SST files are hard-linked (near-instant); otherwise they
+     * are copied. Safe to call while the database is being read and written.
+     */
+    public synchronized void checkpoint(Path target) throws RocksDBException, IOException {
+        if (Files.exists(target)) {
+            throw new IllegalArgumentException("Checkpoint target already exists: " + target);
+        }
+        Files.createDirectories(target.getParent());
+        try (Checkpoint cp = Checkpoint.create(db)) {
+            cp.createCheckpoint(target.toString());
+        }
     }
 
     public synchronized boolean compactInBackground() {

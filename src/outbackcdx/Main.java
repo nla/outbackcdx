@@ -53,6 +53,10 @@ public class Main {
         System.err.println("  --replication-window interval      interval, in seconds, to delete replication history from disk.");
         System.err.println("                                     0 disables automatic deletion. History files can be deleted manually by");
         System.err.println("                                     POSTing a replication sequenceNumber to /<collection>/truncate_replication");
+        System.err.println("  --checkpoint-dir dir               Base directory for hot checkpoints created via");
+        System.err.println("                                     POST /<collection>/checkpoint?name=<name>. Co-locating on the");
+        System.err.println("                                     same filesystem as the data dir is recommended: SST files are");
+        System.err.println("                                     then hardlinked (instant, no extra disk). Otherwise they are copied.");
         System.err.println();
         System.err.println("Secondary mode (runs read-only; polls upstream server on 'collection-url' for changes)");
         System.err.println("  --primary collection-url           URL of collection on upstream primary to poll for changes");
@@ -81,6 +85,7 @@ public class Main {
         int pollingInterval = 10;
         List<String> collectionUrls = new ArrayList<>();
         Long replicationWindow = null;
+        Path checkpointDir = null;
         long scanCap = Long.MAX_VALUE;
         long batchSize = 10*1024*1024;
         String fuzzyYaml = null;
@@ -169,6 +174,9 @@ public class Main {
                 case "--replication-window":
                     replicationWindow = Long.parseLong(args[++i]);
                     break;
+                case "--checkpoint-dir":
+                    checkpointDir = Path.of(args[++i]);
+                    break;
                 case "--batch-size":
                     batchSize = Long.parseLong(args[++i]);
                     break;
@@ -203,7 +211,7 @@ public class Main {
                 replay = new Replay(warcBaseUrl);
             }
             try (DataStore dataStore = new DataStore(dataPath, maxOpenSstFiles, replicationWindow, scanCap, canonicalizer)) {
-                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields, maxNumResults, queryConfig, replay, serviceWorker);
+                Webapp controller = new Webapp(dataStore, verbose, dashboardConfig, canonicalizer, computedFields, maxNumResults, queryConfig, replay, serviceWorker, checkpointDir);
                 if (undertow) {
                     UWeb.UServer server = new UWeb.UServer(host, port, contextPath, controller, authorizer);
                     server.start();

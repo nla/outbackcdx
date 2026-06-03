@@ -11,6 +11,7 @@ import outbackcdx.auth.Permission;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.*;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -39,6 +40,9 @@ class Webapp implements Web.Handler {
     private final WbCdxApi wbCdxApi;
     private final Replay replay;
     private final String serviceWorker;
+    private final Path checkpointDir;
+
+    private static final Pattern SAFE_CHECKPOINT_NAME = Pattern.compile("[A-Za-z0-9._-]+");
 
     private static ServiceLoader<FilterPlugin> fpLoader = ServiceLoader.load(FilterPlugin.class);
 
@@ -57,10 +61,15 @@ class Webapp implements Web.Handler {
     }
 
     Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields, long maxNumResults, QueryConfig queryConfig, Replay replay, String serviceWorker) {
+        this(dataStore, verbose, dashboardConfig, canonicalizer, computedFields, maxNumResults, queryConfig, replay, serviceWorker, null);
+    }
+
+    Webapp(DataStore dataStore, boolean verbose, Map<String, Object> dashboardConfig, UrlCanonicalizer canonicalizer, Map<String, ComputedField> computedFields, long maxNumResults, QueryConfig queryConfig, Replay replay, String serviceWorker, Path checkpointDir) {
         this.dataStore = dataStore;
         this.verbose = verbose;
         this.dashboardConfig = dashboardConfig;
         this.serviceWorker = serviceWorker;
+        this.checkpointDir = checkpointDir;
         if (canonicalizer == null) {
             canonicalizer = new UrlCanonicalizer();
         }
@@ -111,6 +120,7 @@ class Webapp implements Web.Handler {
         router.on(GET, "/<collection>/sequence", request -> sequence(request));
         router.on(POST, "/<collection>/truncate_replication", request -> flushWal(request));
         router.on(POST, "/<collection>/compact", request -> compact(request), Permission.INDEX_EDIT);
+        router.on(POST, "/<collection>/checkpoint", request -> checkpoint(request), Permission.INDEX_EDIT);
         router.on(POST, "/<collection>/upgrade", request -> upgrade(request), Permission.INDEX_EDIT);
         router.on(GET, "/<collection>/<date:[0-9]+><modifier:id_|>/<url:.*>", this::replay);
 
@@ -151,6 +161,36 @@ class Webapp implements Web.Handler {
         Map<String,Boolean> map = new HashMap<>();
         map.put("success", success);
         return jsonResponse(map);
+    }
+
+    /**
+     * Creates a consistent on-disk RocksDB checkpoint of this collection at
+     * {@code <checkpoint-dir>/<name>/<collection>/}. {@code name} defaults to
+     * "cp-<epoch-ms>" if not supplied. Requires the server to have been
+     * started with --checkpoint-dir; otherwise returns 501.
+     */
+    Response checkpoint(Web.Request request) throws Web.ResponseException, IOException {
+        if (checkpointDir == null) {
+            return new Response(501, "text/plain",
+                    "Checkpoint endpoint not configured. Start outbackcdx with --checkpoint-dir <path>.\n");
+        }
+        String name = request.param("name", "cp-" + System.currentTimeMillis());
+        if (!SAFE_CHECKPOINT_NAME.matcher(name).matches()) {
+            return badRequest("Invalid 'name' parameter; must match [A-Za-z0-9._-]+\n");
+        }
+        Index index = getIndex(request);
+        Path target = checkpointDir.resolve(name).resolve(index.name);
+        try {
+            index.checkpoint(target);
+        } catch (RocksDBException | IllegalArgumentException e) {
+            return new Response(INTERNAL_ERROR, "text/plain",
+                    "Checkpoint failed: " + e.getMessage() + "\n");
+        }
+        Map<String,Object> body = new HashMap<>();
+        body.put("collection", index.name);
+        body.put("name", name);
+        body.put("path", target.toString());
+        return jsonResponse(body);
     }
 
     Response listCollections(Web.Request request) throws JsonProcessingException {
