@@ -1,5 +1,23 @@
 # OutbackCDX Changelog
 
+## 1.2.0 (2026-06-05)
+
+### New features
+
+- Added `/checkpoint` endpoint for live backups
+
+### Dependency upgrades
+
+* **commons-codec**: 1.20.0 → 1.22.0
+* **jackson-dataformat-cbor**: 2.21.0 → 2.21.3
+* **jwarc**: 0.34.0 → 0.36.0
+* **maven-release-plugin**: 3.2.0 → 3.3.1
+* **maven-shade-plugin**: 3.6.1 → 3.6.2
+* **nimbus-jose-jwt**: 10.7 → 10.9
+* **Package**: From → To
+* **rocksdbjni**: 9.5.2 → 10.10.1
+* **undertow-core**: 2.3.22.Final → 2.3.24.Final
+
 ## 1.1.1 (2026-01-19)
 
 ### Bug fixes
