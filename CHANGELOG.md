@@ -1,5 +1,11 @@
 # OutbackCDX Changelog
 
+## 1.2.1 (2026-06-08)
+
+### Bug fixes
+
+- Fixed query string parsing when using the default web server (no `-u` option). [#145](https://github.com/nla/outbackcdx/pull/145)
+
 ## 1.2.0 (2026-06-05)
 
 ### New features
