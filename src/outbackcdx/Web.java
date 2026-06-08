@@ -136,7 +136,7 @@ class Web {
         SRequest(HttpExchange exchange, Permit permit) {
             this.exchange = exchange;
             this.permit = permit;
-            parseQueryString(exchange.getRequestURI().getQuery());
+            parseQueryString(exchange.getRequestURI().getRawQuery());
         }
 
         private void parseQueryString(String query) {
