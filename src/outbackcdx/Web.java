@@ -118,9 +118,19 @@ class Web {
                 }
 
                 if (response != Response.ALREADY_SENT) {
-                    exchange.getResponseHeaders().putAll(response.headers);
-                    exchange.sendResponseHeaders(response.status, response.bodyLength);
-                    response.bodyWriter.stream(exchange.getResponseBody());
+                    try {
+                        exchange.getResponseHeaders().putAll(response.headers);
+                        exchange.sendResponseHeaders(response.status, response.bodyLength);
+                        response.bodyWriter.stream(exchange.getResponseBody());
+                    } finally {
+                        // Close streamers that own native resources (e.g. the
+                        // change feed iterator) after stream() returns, so a
+                        // response aborted before or during streaming can't leak.
+                        // Idempotent and null-safe.
+                        if (response.bodyWriter instanceof Closeable) {
+                            ((Closeable) response.bodyWriter).close();
+                        }
+                    }
                 }
             } finally {
                 exchange.close();
