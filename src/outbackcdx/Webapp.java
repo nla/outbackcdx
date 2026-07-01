@@ -435,13 +435,26 @@ class Webapp implements Web.Handler {
                 long initialSeqNo = -1;
                 while (true) {
                     BatchResult batch = logReader.getBatch();
+                    long sequenceNumber = batch.sequenceNumber();
 
                     output.write("{\"sequenceNumber\": \"".getBytes(UTF_8));
-                    output.write(Long.toString(batch.sequenceNumber()).getBytes(UTF_8));
+                    output.write(Long.toString(sequenceNumber).getBytes(UTF_8));
                     output.write("\", \"writeBatch\": \"".getBytes(UTF_8));
                     byte[] b64Batch;
-                    try {
-                        b64Batch = Base64.getEncoder().encode(batch.writeBatch().data());
+                    /*
+                     * BatchResult.writeBatch() hands back a WriteBatch that owns
+                     * its native handle; it is not freed by the iterator. Close
+                     * it each iteration or it leaks one native WriteBatch per
+                     * streamed batch -- unbounded native memory growth on a
+                     * replication primary whose change feed is polled
+                     * continuously. The leak is unrecoverable: this rocksdbjni
+                     * has no finalizer/Cleaner on AbstractNativeReference, so an
+                     * unclosed owning handle is never reclaimed, even under GC
+                     * pressure. (Unlike logReader, which must NOT be closed here
+                     * -- see the finally block below.)
+                     */
+                    try (WriteBatch writeBatch = batch.writeBatch()) {
+                        b64Batch = Base64.getEncoder().encode(writeBatch.data());
                     } catch (RocksDBException e) {
                         throw new IOException(e);
                     }
@@ -452,10 +465,10 @@ class Webapp implements Web.Handler {
                     size += b64Batch.length;
 
                     if (initialSeqNo < 0) {
-                        initialSeqNo = batch.sequenceNumber();
+                        initialSeqNo = sequenceNumber;
                     }
 
-                    if (logReader.isValid() && (size < batchSize || batch.sequenceNumber() == initialSeqNo)) {
+                    if (logReader.isValid() && (size < batchSize || sequenceNumber == initialSeqNo)) {
                         output.write(",\n".getBytes(UTF_8));
                     } else {
                         break;
