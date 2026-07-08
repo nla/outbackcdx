@@ -64,8 +64,7 @@ public class JwtAuthorizer implements Authorizer {
             }
             return new Permit(claimsSet.getStringClaim("preferred_username"), permissions);
         } catch (ParseException | BadJOSEException | JOSEException e) {
-            e.printStackTrace();
-            throw new AuthException("Invalid acccess token: " + e.getMessage(), e);
+            throw new AuthException("Invalid access token: " + e.getMessage(), e);
         }
     }
 }

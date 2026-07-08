@@ -3,6 +3,7 @@ package outbackcdx;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
+import outbackcdx.auth.AuthException;
 import outbackcdx.auth.Authorizer;
 import outbackcdx.auth.Permission;
 import outbackcdx.auth.Permit;
@@ -33,7 +34,7 @@ class Web {
     public static class Status {
         public static final int OK = 200, CREATED = 201,
                 TEMPORARY_REDIRECT = 307,
-                BAD_REQUEST = 400, FORBIDDEN = 403, NOT_FOUND = 404,
+                BAD_REQUEST = 400, UNAUTHORIZED = 401, FORBIDDEN = 403, NOT_FOUND = 404,
                 INTERNAL_ERROR = 500;
     }
 
@@ -112,6 +113,8 @@ class Web {
                     response = handler.handle(request);
                 } catch (Web.ResponseException e) {
                     response = e.response;
+                } catch (AuthException e) {
+                    response = new Response(UNAUTHORIZED, "text/plain", e.getMessage() + "\n");
                 } catch (Exception e) {
                     e.printStackTrace();
                     response = new Response(INTERNAL_ERROR, "text/plain", e + "\n");

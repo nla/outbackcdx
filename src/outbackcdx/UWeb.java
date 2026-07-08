@@ -5,6 +5,7 @@ import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.BlockingHandler;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
+import outbackcdx.auth.AuthException;
 import outbackcdx.auth.Authorizer;
 import outbackcdx.auth.Permission;
 import outbackcdx.auth.Permit;
@@ -44,6 +45,8 @@ public class UWeb {
                 if (response != Web.Response.ALREADY_SENT) sendResponse(exchange, response);
             } catch (Web.ResponseException e) {
                 sendResponse(exchange, e.response);
+            } catch (AuthException e) {
+                sendResponse(exchange, new Web.Response(Web.Status.UNAUTHORIZED, "text/plain", e.getMessage() + "\n"));
             } catch (Exception e) {
                 StringWriter sw = new StringWriter();
                 e.printStackTrace(new PrintWriter(sw));
