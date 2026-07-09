@@ -1,19 +1,24 @@
 FROM docker.io/library/maven:3-eclipse-temurin-25 as build-env
 
-RUN apt-get update \
- && apt-get install -y libsnappy-dev \
- && apt-get install -y build-essential \
- && rm -rf /var/lib/apt/lists/*
+#
+# Disabled rocksdb tools compile due to frequent failures and slow build times
+# TODO: maybe we could use https://github.com/HarperFast/rocksdb-prebuilds
+#
 
-# add rocksdb tools
-# see outbackcdx pom.xml for rocksdb version (rocksdbjni) and
-# check branches with https://github.com/facebook/rocksdb
-RUN cd /tmp && \
-    git clone --depth 1 --branch v9.5.2 --single-branch https://github.com/facebook/rocksdb.git && \
-    cd rocksdb && \
-    DEBUG_LEVEL=0 CXXFLAGS='-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess' make -j4 ldb sst_dump && \
-    cp /tmp/rocksdb/ldb /usr/bin/ && \
-    cp /tmp/rocksdb/sst_dump /usr/bin/
+#RUN apt-get update \
+# && apt-get install -y libsnappy-dev \
+# && apt-get install -y build-essential \
+# && rm -rf /var/lib/apt/lists/*
+#
+## add rocksdb tools
+## see outbackcdx pom.xml for rocksdb version (rocksdbjni) and
+## check branches with https://github.com/facebook/rocksdb
+#RUN cd /tmp && \
+#    git clone --depth 1 --branch v9.5.2 --single-branch https://github.com/facebook/rocksdb.git && \
+#    cd rocksdb && \
+#    DEBUG_LEVEL=0 CXXFLAGS='-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess' make -j4 ldb sst_dump && \
+#    cp /tmp/rocksdb/ldb /usr/bin/ && \
+#    cp /tmp/rocksdb/sst_dump /usr/bin/
 
 WORKDIR /build
 
@@ -35,8 +40,8 @@ RUN apt-get update && apt-get install -y libsnappy-dev dumb-init \
 
 
 COPY --from=build-env /build/target/outbackcdx-*.jar outbackcdx.jar
-COPY --from=build-env /usr/bin/ldb /usr/bin
-COPY --from=build-env /usr/bin/sst_dump /usr/bin
+#COPY --from=build-env /usr/bin/ldb /usr/bin
+#COPY --from=build-env /usr/bin/sst_dump /usr/bin
 
 RUN mkdir /cdx-data
 
