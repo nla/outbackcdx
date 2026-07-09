@@ -4,8 +4,8 @@
 
 ### Bug fixes
 
-* Fixed RocksDB resource leaks in replication. [#149](https://github.com/nla/outbackcdx/pull/149)
-* Return `401 Unauthorized` response on an invalid or expired access token. [#150](https://github.com/nla/outbackcdx/pull/150)
+* Fixed RocksDB resource leaks in replication. [#149](https://github.com/nla/outbackcdx/pull/149) [#150](https://github.com/nla/outbackcdx/pull/150)
+* Return `401 Unauthorized` response on an invalid or expired access token.
 
 ### Dependency upgrades
 
