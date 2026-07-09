@@ -415,9 +415,10 @@ class Webapp implements Web.Handler {
         return new Response(OK, "text/plain", output);
     }
 
-    static class ChangeFeedJsonStream implements IStreamer {
-        TransactionLogIterator logReader;
-        long batchSize;
+    static class ChangeFeedJsonStream implements IStreamer, Closeable {
+        final TransactionLogIterator logReader;
+        final long batchSize;
+        private boolean closed = false;
 
         ChangeFeedJsonStream(TransactionLogIterator logReader, long batchSize) {
             this.logReader = logReader;
@@ -477,6 +478,23 @@ class Webapp implements Web.Handler {
                 output.write("\n]\n".getBytes(UTF_8));
                 output.flush();
             } finally {
+                close();
+            }
+        }
+
+        /**
+         * Frees the native TransactionLogIterator, exactly once. Idempotent so
+         * both stream()'s finally and the server's finally -- which runs after
+         * stream() returns (see UWeb.sendResponse / Web.handle) -- can call it
+         * safely. The server's call is what prevents a leak when an aborted
+         * response means stream() is never invoked. logReader is never closed
+         * while stream() may still be iterating it; that use-after-free was the
+         * original segfault.
+         */
+        @Override
+        public synchronized void close() {
+            if (!closed) {
+                closed = true;
                 logReader.close();
             }
         }
@@ -496,16 +514,9 @@ class Webapp implements Web.Handler {
             out.printf("%s Received request %s. Retrieving deltas for collection <%s> since sequenceNumber %s%n", new Date(), request, collection, since);
         }
 
+        TransactionLogIterator logReader;
         try {
-            /* This method must not close logReader, or you will get a segfault.
-             * The response payload stream class ChangeFeedJsonStream closes it
-             * when it's finished with it. */
-            TransactionLogIterator logReader = index.getUpdatesSince(since);
-
-            ChangeFeedJsonStream streamer = new ChangeFeedJsonStream(logReader, size);
-            Response response = new Response(OK, "application/json", streamer);
-            response.addHeader("Access-Control-Allow-Origin", "*");
-            return response;
+            logReader = index.getUpdatesSince(since);
         } catch (RocksDBException e) {
             System.err.println(new Date() + " " + request.method() + " " + request.url() + " - " + e);
             if (!"Requested sequence not yet written in the db".equals(e.getMessage())) {
@@ -513,6 +524,25 @@ class Webapp implements Web.Handler {
             }
             throw new Web.ResponseException(
                     new Response(INTERNAL_ERROR, "text/plain", e + "\n"));
+        }
+
+        /*
+         * logReader is an owning native handle. Ownership transfers to the
+         * streamer -- which the server closes after stream(), see
+         * UWeb.sendResponse / Web.handle -- only once we successfully return the
+         * Response. If constructing/returning it throws first, the server never
+         * receives the streamer, so we must close logReader here. Do NOT close
+         * on the success path: stream() runs later and would hit a freed handle,
+         * which is the segfault the previous comment warned about.
+         */
+        try {
+            ChangeFeedJsonStream streamer = new ChangeFeedJsonStream(logReader, size);
+            Response response = new Response(OK, "application/json", streamer);
+            response.addHeader("Access-Control-Allow-Origin", "*");
+            return response;
+        } catch (RuntimeException | Error e) {
+            logReader.close();
+            throw e;
         }
     }
 

@@ -56,18 +56,28 @@ public class UWeb {
         }
 
         private void sendResponse(HttpServerExchange exchange, Web.Response response) throws IOException {
-            exchange.setStatusCode(response.getStatus());
-            response.getHeaders().forEach((name, values) -> {
-                for (String value : values) {
-                    exchange.getResponseHeaders().add(HttpString.tryFromString(name), value);
-                }
-            });
             Web.IStreamer streamer = response.getBodyWriter();
-            OutputStream outputStream = exchange.getOutputStream();
-            if (streamer != null) {
-                streamer.stream(outputStream);
+            try {
+                exchange.setStatusCode(response.getStatus());
+                response.getHeaders().forEach((name, values) -> {
+                    for (String value : values) {
+                        exchange.getResponseHeaders().add(HttpString.tryFromString(name), value);
+                    }
+                });
+                OutputStream outputStream = exchange.getOutputStream();
+                if (streamer != null) {
+                    streamer.stream(outputStream);
+                }
+                outputStream.close();
+            } finally {
+                // Streamers that own native resources (e.g. the change feed's
+                // TransactionLogIterator) implement Closeable; close here, after
+                // stream() has returned, so a response aborted before or during
+                // streaming can't leak. close() is idempotent and null-safe.
+                if (streamer instanceof Closeable) {
+                    ((Closeable) streamer).close();
+                }
             }
-            outputStream.close();
         }
 
         public void start() {
