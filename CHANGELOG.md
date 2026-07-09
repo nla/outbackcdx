@@ -1,5 +1,16 @@
 # OutbackCDX Changelog
 
+## 1.2.2 (2026-07-09)
+
+### Bug fixes
+
+* Fixed RocksDB resource leaks in replication. [#149](https://github.com/nla/outbackcdx/pull/149)
+* Return `401 Unauthorized` response on an invalid or expired access token. [#150](https://github.com/nla/outbackcdx/pull/150)
+
+### Dependency upgrades
+
+* **rocksdbjni**: 10.10.1 → 10.10.1.1
+
 ## 1.2.1 (2026-06-08)
 
 ### Bug fixes
