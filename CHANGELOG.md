@@ -10,6 +10,7 @@
 ### Dependency upgrades
 
 * **rocksdbjni**: 10.10.1 → 10.10.1.1
+* **jackson**: 2.21.3 → 2.22.0
 
 ## 1.2.1 (2026-06-08)
 
