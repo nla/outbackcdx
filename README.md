@@ -195,7 +195,61 @@ Return results ordered closest to furthest from a given timestamp:
 
 See the [API Documentation](https://nla.github.io/outbackcdx/api.html) for more details
 about the available options.
-        
+
+### Replication
+
+A secondary polls `/{collection}/changes` for write batches to apply, tracking
+its position in an internal `#ReplicationSequence` key:
+
+    /myindex/changes?since=1234&size=10485760
+
+`since` is the first sequence number wanted and is **inclusive**. Use `since=0`
+to replicate from the oldest record still available. `size` caps the approximate
+response size in bytes.
+
+The response codes matter to a secondary:
+
+| Code | Meaning |
+|------|---------|
+| 200  | One or more write batches follow, as JSON |
+| 204  | `since` is valid but nothing follows it yet. Leave the cursor alone and poll again |
+| 404  | No such collection on the primary. Collections are created on first write, so this may resolve on its own |
+| 410  | `since` has aged out of the write-ahead log and the data needed to catch up is gone. Requires reseeding the secondary from the primary, or resetting its cursor |
+
+The WAL retention set by `--replication-window` therefore bounds how far behind
+a secondary may fall. Because retention is enforced by age, a collection that
+stops receiving writes will eventually age out entirely, and a secondary that
+was still following it gets a 410. `since=0` is not exempt: a secondary cannot
+be created from the change feed alone unless the primary's WAL still reaches the
+collection's first write.
+
+`/{collection}/stats` reports the sequence numbers needed to monitor this,
+always, regardless of the `property` parameter:
+
+| Field | Meaning |
+|-------|---------|
+| `latestSequenceNumber` | The last sequence written here, as `/{collection}/sequence` returns |
+| `nextReplicationSequence` | The next sequence this node wants from its primary. Absent unless the node replicates this collection |
+| `oldestAvailableSequenceNumber` | The oldest sequence the WAL still covers. Absent when no WAL is retained |
+
+A secondary is caught up when its `nextReplicationSequence` equals the primary's
+`latestSequenceNumber` plus one, and is heading for a 410 as it approaches the
+primary's `oldestAvailableSequenceNumber`.
+
+### Seeding or repairing a secondary
+
+Copy the collection's directory from the primary and restart the secondary. On
+startup a collection holding data but no `#ReplicationSequence` is taken to be
+such a copy, so its own latest sequence is the primary's position when the copy
+was made, and the secondary resumes from there. An empty collection instead
+replicates from the oldest sequence the primary retains.
+
+The copy has to be newer than the primary's WAL retention, or the secondary gets
+a 410 and needs a fresher one. Copying a live RocksDB directory is not a
+consistent snapshot, so prefer `POST /{collection}/checkpoint?name=<name>` and
+copy the checkpoint; records a torn copy missed cannot be detected afterwards.
+
+
 Configuring replay tools
 ------------------------
 

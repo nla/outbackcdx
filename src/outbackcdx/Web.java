@@ -32,9 +32,10 @@ class Web {
     }
 
     public static class Status {
-        public static final int OK = 200, CREATED = 201,
-                TEMPORARY_REDIRECT = 307,
+        public static final int OK = 200, CREATED = 201, NO_CONTENT = 204,
+                NOT_MODIFIED = 304, TEMPORARY_REDIRECT = 307,
                 BAD_REQUEST = 400, UNAUTHORIZED = 401, FORBIDDEN = 403, NOT_FOUND = 404,
+                GONE = 410,
                 INTERNAL_ERROR = 500;
     }
 
@@ -123,7 +124,12 @@ class Web {
                 if (response != Response.ALREADY_SENT) {
                     try {
                         exchange.getResponseHeaders().putAll(response.headers);
-                        exchange.sendResponseHeaders(response.status, response.bodyLength);
+                        // HttpServer allows no body on these and logs a warning
+                        // per response unless the length is given as -1.
+                        boolean bodyForbidden = response.status == NO_CONTENT
+                                || response.status == NOT_MODIFIED;
+                        exchange.sendResponseHeaders(response.status,
+                                bodyForbidden ? -1 : response.bodyLength);
                         response.bodyWriter.stream(exchange.getResponseBody());
                     } finally {
                         // Close streamers that own native resources (e.g. the
