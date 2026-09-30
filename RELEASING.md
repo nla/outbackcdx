@@ -9,7 +9,7 @@ version=$(git describe --tags --abbrev=0)
 gh release create --draft $version
 gh release upload $version target/outbackcdx-$version.jar
 ```
-4. Build docker images:
+5. Build docker images:
 ```bash
 version=$(git describe --tags --abbrev=0)
 podman manifest create nlagovau/outbackcdx:$version
@@ -17,4 +17,4 @@ podman build --build-arg version=$version --platform linux/amd64,linux/arm64 --m
 podman manifest push --all nlagovau/outbackcdx:$version
 podman manifest push --all nlagovau/outbackcdx:$version nlagovau/outbackcdx:latest
 ```
-5. Copy release notes from [CHANGELOG.md](CHANGELOG.md) into [Github release](https://github.com/internetarchive/heritrix3/releases)
+6. Copy release notes from [CHANGELOG.md](CHANGELOG.md) into [Github release](https://github.com/nla/outbackcdx/releases)
