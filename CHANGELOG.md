@@ -1,5 +1,32 @@
 # OutbackCDX Changelog
 
+## 1.3.0 (unreleased)
+
+### New features
+
+* `/{collection}/stats` now reports `latestSequenceNumber`, `nextReplicationSequence` and `oldestAvailableSequenceNumber` so replication lag and WAL headroom can be monitored. [#153](https://github.com/nla/outbackcdx/pull/153)
+* A secondary can now be seeded or repaired by copying the collection directory (ideally a checkpoint) from the primary. On startup, a collection with data but no replication cursor resumes replicating from the copy's latest sequence. [#153](https://github.com/nla/outbackcdx/pull/153)
+
+### Bug fixes
+
+* Fixed a JVM crash (SIGSEGV) when requesting `/changes` for a sequence not covered by the retained WAL, such as on a collection that has never been written. [#153](https://github.com/nla/outbackcdx/pull/153)
+* Fixed the replication cursor never advancing past the last batch, which caused an idle primary to re-send the same batch on every poll and could eventually leave the secondary behind the primary's WAL retention window. [#153](https://github.com/nla/outbackcdx/pull/153)
+* `/changes` now returns `410 Gone` when the requested sequence has been purged from the WAL, instead of silently skipping records, and `204 No Content` when the secondary is caught up. [#153](https://github.com/nla/outbackcdx/pull/153)
+
+### Changes
+
+* The Docker image no longer includes the RocksDB `ldb` and `sst_dump` tools. Compiling them made image builds slow and prone to failure.
+
+### Dependency upgrades
+
+* **commons-codec**: 1.22.0 → 1.22.1
+* **jackson-dataformat-cbor**: 2.22.0 → 2.22.3
+* **jwarc**: 0.36.0 → 0.37.0
+* **moment**: 2.30.1 → 2.31.0
+* **nimbus-jose-jwt**: 10.9 → 10.10
+* **snakeyaml-engine**: 3.0.1 → 3.1.1
+* **undertow-core**: 2.3.24.Final → 2.3.26.Final
+
 ## 1.2.2 (2026-07-09)
 
 ### Bug fixes
