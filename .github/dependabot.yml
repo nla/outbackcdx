@@ -9,3 +9,7 @@ updates:
         update-types:
           - "patch"
           - "minor"
+    ignore:
+      # Undertow 2.4+ requires Java 17 but we still support Java 11
+      - dependency-name: "io.undertow:undertow-core"
+        versions: [">= 2.4.0"]
