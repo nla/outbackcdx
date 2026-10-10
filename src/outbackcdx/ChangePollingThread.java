@@ -8,8 +8,8 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
-import org.rocksdb.RocksDBException;
-import org.rocksdb.WriteBatch;
+import com.moaduda.onggi.StoreException;
+import com.moaduda.onggi.WriteBatch;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -63,8 +63,8 @@ public class ChangePollingThread extends Thread {
                 since = null;
                 try {
                     since = resolveSince();
-                } catch (RocksDBException e) {
-                    System.err.println(new Date() + " " + getName() + ": Received rocks db exception while looking up the value of the key " + new String(Index.REPLICATION_SEQUENCE_KEY) + " locally");
+                } catch (StoreException e) {
+                    System.err.println(new Date() + " " + getName() + ": Received a store exception while looking up the value of the key " + new String(Index.REPLICATION_SEQUENCE_KEY) + " locally");
                     e.printStackTrace();
                 }
                 if (since != null) {
@@ -76,8 +76,8 @@ public class ChangePollingThread extends Thread {
                     } catch (IOException e) {
                         System.err.println(new Date() + " " + getName() + ": I/O exception processing " + finalUrl);
                         e.printStackTrace();
-                    } catch (RocksDBException e){
-                        System.err.println(new Date() + " " + getName() + ": The plane has crashed into the mountain. RocksDB threw an exception during replication from "+ finalUrl);
+                    } catch (StoreException e){
+                        System.err.println(new Date() + " " + getName() + ": The plane has crashed into the mountain. Onggi threw an exception during replication from "+ finalUrl);
                         e.printStackTrace();
                     } catch (Exception e) {
                         System.err.println(new Date() + " " + getName() + ": Dang! something happened while processing " + finalUrl);
@@ -112,8 +112,8 @@ public class ChangePollingThread extends Thread {
      * Adopting that lets copy-and-restart recovery finish without an operator
      * writing the key by hand.
      */
-    String resolveSince() throws RocksDBException {
-        byte[] stored = index.db.get(Index.REPLICATION_SEQUENCE_KEY);
+    String resolveSince() {
+        byte[] stored = index.defaultCF.get(Index.REPLICATION_SEQUENCE_KEY);
         if (stored != null) {
             return new String(stored, StandardCharsets.US_ASCII);
         }
@@ -148,7 +148,7 @@ public class ChangePollingThread extends Thread {
             return null;
         }
 
-        index.db.put(Index.REPLICATION_SEQUENCE_KEY, String.valueOf(adopted).getBytes(StandardCharsets.US_ASCII));
+        index.defaultCF.put(Index.REPLICATION_SEQUENCE_KEY, String.valueOf(adopted).getBytes(StandardCharsets.US_ASCII));
         System.err.println(new Date() + " " + getName() + ": WARNING - collection " + collection + " holds data"
                 + " but no replication sequence, so it was copied from the primary. Adopting " + adopted
                 + " from local data. Records the copy itself was missing cannot be detected and will not be"
@@ -182,7 +182,7 @@ public class ChangePollingThread extends Thread {
         public byte[] writeBatch;
     }
 
-    void replicate() throws IOException, RocksDBException {
+    void replicate() throws IOException {
         long start = System.currentTimeMillis();
 
         int countCommitted = 0;
@@ -264,11 +264,12 @@ public class ChangePollingThread extends Thread {
                 + " sequence number is now " + index.getLatestSequenceNumber());
     }
 
-    private void commitWriteBatch(Index index, long sequenceNumber, byte[] writeBatchData) throws RocksDBException {
-        try (WriteBatch batch = new WriteBatch(writeBatchData)){
+    private void commitWriteBatch(Index index, long sequenceNumber, byte[] writeBatchData) {
+        {
+            WriteBatch batch = WriteBatch.fromBytes(index.store, writeBatchData);
             // count() must be read before the marker put below, which would
             long nextSequenceNumber = sequenceNumber + batch.count();
-            batch.put(Index.REPLICATION_SEQUENCE_KEY, String.valueOf(nextSequenceNumber).getBytes(StandardCharsets.US_ASCII));
+            batch.put(index.defaultCF, Index.REPLICATION_SEQUENCE_KEY, String.valueOf(nextSequenceNumber).getBytes(StandardCharsets.US_ASCII));
             index.commitBatch(batch);
         }
     }

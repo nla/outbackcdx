@@ -1,22 +1,16 @@
 package outbackcdx;
 
-import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.DBOptions;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
+import com.moaduda.onggi.Options;
+import com.moaduda.onggi.Store;
+import com.moaduda.onggi.StoreException;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.nio.file.Path;
 
 /**
- * Standalone CLI probe that opens a RocksDB at the given path with all of its
- * column families and exits. Intended for use as a corruption check from
+ * Standalone CLI probe that opens an Onggi store at the given path and exits. Intended for use as a corruption check from
  * shell scripts (e.g. systemd ExecStartPre on a replica) where we want
- * exactly the same open semantics OutbackCDX uses, not the weaker validation
- * that `ldb manifest_dump` provides.
+ * the same open semantics OutbackCDX uses: the manifest is replayed, every
+ * table it lists is opened and checked, and the WAL is replayed.
  *
  * Exit codes:
  *   0  - DB opened successfully
@@ -32,34 +26,9 @@ public class VerifyDb {
             System.exit(2);
         }
         String path = args[0];
-        RocksDB.loadLibrary();
-
-        List<byte[]> cfNames;
-        try (Options listOpts = new Options()) {
-            cfNames = RocksDB.listColumnFamilies(listOpts, path);
-        } catch (RocksDBException e) {
-            System.err.println("VerifyDb: listColumnFamilies failed for " + path + ": " + e.getMessage());
-            System.exit(1);
-            return;
-        }
-        if (cfNames.isEmpty()) {
-            cfNames = Collections.singletonList(RocksDB.DEFAULT_COLUMN_FAMILY);
-        }
-
-        List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
-        for (byte[] name : cfNames) {
-            descriptors.add(new ColumnFamilyDescriptor(name));
-        }
-        List<ColumnFamilyHandle> handles = new ArrayList<>();
-
-        try (DBOptions dbOpts = new DBOptions().setCreateIfMissing(false);
-             RocksDB db = RocksDB.open(dbOpts, path, descriptors, handles)) {
-            // Success — close handles cleanly.
-            for (ColumnFamilyHandle h : handles) {
-                h.close();
-            }
+        try (Store store = Store.open(Path.of(path), Options.defaults().withCreateIfMissing(false))) {
             System.exit(0);
-        } catch (RocksDBException e) {
+        } catch (StoreException e) {
             System.err.println("VerifyDb: open failed for " + path + ": " + e.getMessage());
             System.exit(1);
         }

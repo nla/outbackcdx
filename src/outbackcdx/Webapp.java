@@ -5,8 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.rocksdb.*;
-import org.rocksdb.TransactionLogIterator.BatchResult;
+import com.moaduda.onggi.Stats;
 import outbackcdx.auth.Permission;
 
 import javax.xml.stream.XMLStreamException;
@@ -54,7 +53,7 @@ class Webapp implements Web.Handler {
         return jsonResponse(getIndex(req).accessControl.listPolicies());
     }
 
-    private Response deleteAccessRule(Web.Request req) throws IOException, Web.ResponseException, RocksDBException {
+    private Response deleteAccessRule(Web.Request req) throws IOException, Web.ResponseException {
         long ruleId = Long.parseLong(req.param("ruleId"));
         boolean found = getIndex(req).accessControl.deleteRule(ruleId);
         return found ? ok() : notFound();
@@ -139,7 +138,7 @@ class Webapp implements Web.Handler {
         }
     }
 
-    Response flushWal(Web.Request request) throws Web.ResponseException, IOException, RocksDBException{
+    Response flushWal(Web.Request request) throws Web.ResponseException, IOException {
         Index index = getIndex(request);
         index.flushWal();
         Map<String,Boolean> map = new HashMap<>();
@@ -164,33 +163,12 @@ class Webapp implements Web.Handler {
     }
 
     /**
-     * Creates a consistent on-disk RocksDB checkpoint of this collection at
-     * {@code <checkpoint-dir>/<name>/<collection>/}. {@code name} defaults to
-     * "cp-<epoch-ms>" if not supplied. Requires the server to have been
-     * started with --checkpoint-dir; otherwise returns 501.
+     * Would create a hot checkpoint of this collection under
+     * {@code <checkpoint-dir>/<name>/<collection>/}. Onggi has no checkpoints
+     * until its milestone 6, so this always returns 501 for now.
      */
     Response checkpoint(Web.Request request) throws Web.ResponseException, IOException {
-        if (checkpointDir == null) {
-            return new Response(501, "text/plain",
-                    "Checkpoint endpoint not configured. Start outbackcdx with --checkpoint-dir <path>.\n");
-        }
-        String name = request.param("name", "cp-" + System.currentTimeMillis());
-        if (!SAFE_CHECKPOINT_NAME.matcher(name).matches()) {
-            return badRequest("Invalid 'name' parameter; must match [A-Za-z0-9._-]+\n");
-        }
-        Index index = getIndex(request);
-        Path target = checkpointDir.resolve(name).resolve(index.name);
-        try {
-            index.checkpoint(target);
-        } catch (RocksDBException | IllegalArgumentException e) {
-            return new Response(INTERNAL_ERROR, "text/plain",
-                    "Checkpoint failed: " + e.getMessage() + "\n");
-        }
-        Map<String,Object> body = new HashMap<>();
-        body.put("collection", index.name);
-        body.put("name", name);
-        body.put("path", target.toString());
-        return jsonResponse(body);
+        return new Response(501, "text/plain", "Checkpoints are not yet available on Onggi.\n");
     }
 
     Response listCollections(Web.Request request) throws JsonProcessingException {
@@ -202,29 +180,15 @@ class Webapp implements Web.Handler {
         Map<String,Object> map = new HashMap<>();
         map.put("estimatedRecordCount", index.estimatedRecordCount());
         map.put("latestSequenceNumber", index.getLatestSequenceNumber());
-        try {
-            // Together these let a monitoring client compute how far a replica is
-            // behind, and how much room it has left before its position ages out
-            // of the primary's WAL. Both are absent where they mean nothing: a
-            // primary has no cursor, and a collection may have no retained WAL.
-            index.getReplicationSequence().ifPresent(
-                    sequence -> map.put("nextReplicationSequence", sequence));
-            index.getOldestAvailableSequenceNumber().ifPresent(
-                    sequence -> map.put("oldestAvailableSequenceNumber", sequence));
-        } catch (RocksDBException e) {
-            throw new IOException(e);
-        }
+        // Together these let a monitoring client compute how far a replica is
+        // behind, and how much room it has left before its position ages out
+        // of the primary's WAL. Both are absent where they mean nothing: a
+        // primary has no cursor, and a collection may have no retained WAL.
+        index.getReplicationSequence().ifPresent(
+                sequence -> map.put("nextReplicationSequence", sequence));
+        index.getOldestAvailableSequenceNumber().ifPresent(
+                sequence -> map.put("oldestAvailableSequenceNumber", sequence));
 
-        String properties = req.param("property", "");
-        if (!properties.isEmpty()) {
-            for (String property : properties.split(",")) {
-                try {
-                    map.put(property, index.db.getProperty(property));
-                } catch (RocksDBException e) {
-                    map.put(property, "ERROR: " + e);
-                }
-            }
-        }
 
         Response response = new Response(OK, "application/json",
                 JSON_MAPPER.writeValueAsString(map));
@@ -277,11 +241,8 @@ class Webapp implements Web.Handler {
             PrintWriter writer = new PrintWriter(out);
             Map<String,CubeTally> tallyMap = new HashMap<>();
             Matcher mediaTypeMatcher = VALID_MEDIA_TYPE.matcher("");
-            try (ReadOptions readOptions = new ReadOptions().setTailing(true)
-                    .setFillCache(false)
-                    .setReadaheadSize(2*1024*1024);
-                 RocksIterator iterator = index.db.newIterator(readOptions)) {
-                for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
+            try (ScanCursor iterator = new ScanCursor(index.defaultCF)) {
+                for (; iterator.isValid(); iterator.next()) {
                     Capture capture = new Capture(iterator.key(), iterator.value());
 
                     // extract host from urlkey
@@ -427,209 +388,23 @@ class Webapp implements Web.Handler {
 
     Response sequence(Web.Request request) throws IOException, ResponseException {
         final Index index = getIndex(request);
-        String output = String.valueOf(index.db.getLatestSequenceNumber());
+        String output = String.valueOf(index.getLatestSequenceNumber());
         return new Response(OK, "text/plain", output);
     }
 
     /**
-     * A valid replication position with nothing to read. The cursor is fine and
-     * the client should leave it untouched.
+     * The change feed. Onggi has none until its milestone 6, so this always
+     * returns 501 for now.
      */
-    private static Response noContent() {
-        Response response = new Response(NO_CONTENT, null, "");
-        response.addHeader("Access-Control-Allow-Origin", "*");
-        return response;
-    }
-
-    static class ChangeFeedJsonStream implements IStreamer, Closeable {
-        final TransactionLogIterator logReader;
-        final long batchSize;
-        private boolean closed = false;
-
-        ChangeFeedJsonStream(TransactionLogIterator logReader, long batchSize) {
-            this.logReader = logReader;
-            this.batchSize = batchSize;
-        }
-
-        @Override
-        public void stream(OutputStream outputStream) throws IOException {
-            // build and stream json as bytes to avoid overhead of utf-16 String
-            try {
-                BufferedOutputStream output = new BufferedOutputStream(outputStream);
-                output.write("[\n".getBytes(UTF_8));
-
-                long size = 0L;
-                long initialSeqNo = -1;
-                /*
-                 * getBatch() must only be called while the iterator is
-                 * positioned on a batch. RocksDB's
-                 * TransactionLogIteratorImpl::GetBatch() moves current_batch_
-                 * out of the iterator and only asserts is_valid_ -- assertions
-                 * are disabled in production -- so calling it otherwise returns
-                 * a BatchResult wrapping a null pointer. The Java side then
-                 * constructs WriteBatch(0, true) and WriteBatch.data() reads a
-                 * member off a null base, killing the JVM with SIGSEGV rather
-                 * than throwing.
-                 *
-                 * getUpdatesSince() can hand back an unpositioned iterator, so
-                 * the check is needed before the first call and not only
-                 * between iterations (the loop's trailing isValid() already
-                 * covers the rest). An empty feed is then a normal empty JSON
-                 * array instead of a crash.
-                 */
-                while (logReader.isValid()) {
-                    BatchResult batch = logReader.getBatch();
-                    long sequenceNumber = batch.sequenceNumber();
-
-                    output.write("{\"sequenceNumber\": \"".getBytes(UTF_8));
-                    output.write(Long.toString(sequenceNumber).getBytes(UTF_8));
-                    output.write("\", \"writeBatch\": \"".getBytes(UTF_8));
-                    byte[] b64Batch;
-                    /*
-                     * BatchResult.writeBatch() hands back a WriteBatch that owns
-                     * its native handle; it is not freed by the iterator. Close
-                     * it each iteration or it leaks one native WriteBatch per
-                     * streamed batch -- unbounded native memory growth on a
-                     * replication primary whose change feed is polled
-                     * continuously. The leak is unrecoverable: this rocksdbjni
-                     * has no finalizer/Cleaner on AbstractNativeReference, so an
-                     * unclosed owning handle is never reclaimed, even under GC
-                     * pressure. (Unlike logReader, which must NOT be closed here
-                     * -- see the finally block below.)
-                     */
-                    try (WriteBatch writeBatch = batch.writeBatch()) {
-                        b64Batch = Base64.getEncoder().encode(writeBatch.data());
-                    } catch (RocksDBException e) {
-                        throw new IOException(e);
-                    }
-                    output.write(b64Batch);
-                    output.write("\"}".getBytes(UTF_8));
-
-                    logReader.next();
-                    size += b64Batch.length;
-
-                    if (initialSeqNo < 0) {
-                        initialSeqNo = sequenceNumber;
-                    }
-
-                    if (logReader.isValid() && (size < batchSize || sequenceNumber == initialSeqNo)) {
-                        output.write(",\n".getBytes(UTF_8));
-                    } else {
-                        break;
-                    }
-                }
-                output.write("\n]\n".getBytes(UTF_8));
-                output.flush();
-            } finally {
-                close();
-            }
-        }
-
-        /**
-         * Frees the native TransactionLogIterator, exactly once. Idempotent so
-         * both stream()'s finally and the server's finally -- which runs after
-         * stream() returns (see UWeb.sendResponse / Web.handle) -- can call it
-         * safely. The server's call is what prevents a leak when an aborted
-         * response means stream() is never invoked. logReader is never closed
-         * while stream() may still be iterating it; that use-after-free was the
-         * original segfault.
-         */
-        @Override
-        public synchronized void close() {
-            if (!closed) {
-                closed = true;
-                logReader.close();
-            }
-        }
-    }
-
     Response changeFeed(Web.Request request) throws Web.ResponseException, IOException {
-        String collection = request.param("collection");
-        long since = Long.parseLong(request.param("since", "0"));
-        long size = 10*1024*1024;
-        if (request.param("size") != null) {
-            size = Long.parseLong(request.param("size"));
-        }
-
-        final Index index = getIndex(request);
-
-        if (verbose) {
-            out.printf("%s Received request %s. Retrieving deltas for collection <%s> since sequenceNumber %s%n", new Date(), request, collection, since);
-        }
-
-        long latest = index.getLatestSequenceNumber();
-        OptionalLong oldestAvailable;
-        try {
-            oldestAvailable = index.getOldestAvailableSequenceNumber();
-        } catch (RocksDBException e) {
-            throw new IOException(e);
-        }
-
-        // getUpdatesSince() silently skips past a purged sequence rather than
-        // failing, so refuse it here, before an iterator exists and the status is
-        // committed. Sequence 0 holds no data, hence the clamp to 1.
-        long firstPossibleSequence = Math.max(since, 1);
-        boolean pointsAtRealData = firstPossibleSequence <= latest;
-        boolean walCoversIt = oldestAvailable.isPresent()
-                && firstPossibleSequence >= oldestAvailable.getAsLong();
-        if (pointsAtRealData && !walCoversIt) {
-            String detail = String.format(
-                    "Sequence %d is no longer available for collection %s. Oldest available: %s. "
-                    + "Latest: %d. The replica cannot catch up from the change feed and must be "
-                    + "reseeded from the primary, or its replication cursor reset to an available "
-                    + "sequence.%n",
-                    since, collection,
-                    oldestAvailable.isPresent() ? String.valueOf(oldestAvailable.getAsLong())
-                                                : "none (no WAL retained)",
-                    latest);
-            System.err.println(new Date() + " " + request.method() + " " + request.url() + " - " + detail.trim());
-            return new Response(GONE, "text/plain", detail);
-        }
-
-        // A valid position with nothing after it is 204, not 410.
-        TransactionLogIterator logReader;
-        try {
-            logReader = index.getUpdatesSince(since);
-        } catch (RocksDBException e) {
-            if ("Requested sequence not yet written in the db".equals(e.getMessage())) {
-                return noContent();
-            }
-            System.err.println(new Date() + " " + request.method() + " " + request.url() + " - " + e);
-            e.printStackTrace();
-            throw new Web.ResponseException(
-                    new Response(INTERNAL_ERROR, "text/plain", e + "\n"));
-        }
-        // Collection hasn't yet been written
-        if (!logReader.isValid()) {
-            logReader.close();
-            return noContent();
-        }
-
-        /*
-         * logReader is an owning native handle. Ownership transfers to the
-         * streamer -- which the server closes after stream(), see
-         * UWeb.sendResponse / Web.handle -- only once we successfully return the
-         * Response. If constructing/returning it throws first, the server never
-         * receives the streamer, so we must close logReader here. Do NOT close
-         * on the success path: stream() runs later and would hit a freed handle,
-         * which is the segfault the previous comment warned about.
-         */
-        try {
-            ChangeFeedJsonStream streamer = new ChangeFeedJsonStream(logReader, size);
-            Response response = new Response(OK, "application/json", streamer);
-            response.addHeader("Access-Control-Allow-Origin", "*");
-            return response;
-        } catch (RuntimeException | Error e) {
-            logReader.close();
-            throw e;
-        }
+        return new Response(501, "text/plain", "The change feed is not yet available on Onggi.\n");
     }
 
     Response query(Web.Request request) throws IOException, Web.ResponseException {
         Index index = getIndex(request);
         Map<String,String> params = request.params();
         if (params.keySet().size() == 1 && params.containsKey("collection")) {
-            return collectionDetails(index.db);
+            return collectionDetails(index);
         } else if (params.containsKey("q")) {
             return new XmlQuery(request, index, this.filterPlugins, canonicalizer, maxNumResults).streamResults();
         } else {
@@ -646,16 +421,19 @@ class Webapp implements Web.Handler {
         return index;
     }
 
-    private Response collectionDetails(RocksDB db) {
-        String page = "<form>URL: <input name=url type=url><button type=submit>Query</button></form>\n<pre>";
-        try {
-            page += db.getProperty("rocksdb.stats");
-            page += "\nEstimated number of records: " + db.getLongProperty("rocksdb.estimate-num-keys");
-        } catch (RocksDBException e) {
-            page += e.toString();
-            e.printStackTrace();
+    private Response collectionDetails(Index index) {
+        StringBuilder page = new StringBuilder("<form>URL: <input name=url type=url><button type=submit>Query</button></form>\n<pre>");
+        Stats stats = index.store.stats();
+        page.append("Level  Files  Bytes\n");
+        for (int level = 0; level < stats.levels().size(); level++) {
+            Stats.Level l = stats.levels().get(level);
+            page.append(String.format("%5d  %5d  %d%n", level, l.files(), l.bytes()));
         }
-        return new Response(OK, "text/html", page);
+        page.append("Memtable bytes: ").append(stats.memtableBytes()).append('\n');
+        page.append("Pending compaction bytes: ").append(stats.pendingCompactionBytes()).append('\n');
+        page.append("Write stall time: ").append(stats.writeStallTime()).append('\n');
+        page.append("\nEstimated number of records: ").append(index.estimatedRecordCount());
+        return new Response(OK, "text/html", page.toString());
     }
 
     private <T> T fromJson(Web.Request request, Class<T> clazz) throws IOException {
@@ -671,13 +449,13 @@ class Webapp implements Web.Handler {
         return jsonResponse(policy);
     }
 
-    private Response postAccessPolicy(Web.Request request) throws IOException, Web.ResponseException, RocksDBException {
+    private Response postAccessPolicy(Web.Request request) throws IOException, Web.ResponseException {
         AccessPolicy policy = fromJson(request, AccessPolicy.class);
         Long id = getIndex(request).accessControl.put(policy);
         return id == null ? ok() : created(id);
     }
 
-    private Response postAccessRules(Web.Request request) throws IOException, Web.ResponseException, RocksDBException {
+    private Response postAccessRules(Web.Request request) throws IOException, Web.ResponseException {
         AccessControl accessControl = getIndex(request).accessControl;
 
         // parse rules
@@ -734,7 +512,7 @@ class Webapp implements Web.Handler {
         return new Response(CREATED, "application/json", JSON_MAPPER.writeValueAsString(map));
     }
 
-    private Response getAccessRule(Web.Request req) throws IOException, Web.ResponseException, RocksDBException {
+    private Response getAccessRule(Web.Request req) throws IOException, Web.ResponseException {
         Index index = getIndex(req);
         long ruleId = Long.parseLong(req.param("ruleId"));
         AccessRule rule = index.accessControl.rule(ruleId);

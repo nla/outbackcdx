@@ -1,13 +1,13 @@
 package outbackcdx;
 
+import com.moaduda.onggi.Store;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
-import org.rocksdb.*;
+import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,30 +16,20 @@ import static org.junit.Assert.assertEquals;
 public class IndexTest {
 
     private static Index index;
-    private static RocksDB db;
-    private static ColumnFamilyHandle defaultCf, aliasCf;
-    private static RocksMemEnv env;
+    private static Store store;
+
+    @ClassRule
+    public static TemporaryFolder folder = new TemporaryFolder();
 
     @BeforeClass
-    public static void setUp() throws RocksDBException, IOException {
-        RocksDB.loadLibrary();
-        env = new RocksMemEnv(Env.getDefault());
-        try (Options options = new Options()
-                .setCreateIfMissing(true)
-                .setEnv(env)) {
-            db = RocksDB.open(options, Paths.get("test").toAbsolutePath().toString());
-            defaultCf = db.getDefaultColumnFamily();
-            aliasCf = db.createColumnFamily(new ColumnFamilyDescriptor("alias".getBytes(StandardCharsets.UTF_8)));
-            index = new Index("test", db, defaultCf, aliasCf, null);
-        }
+    public static void setUp() throws IOException {
+        store = Store.open(folder.newFolder("test").toPath());
+        index = new Index("test", store, store.keyspace("default"), store.keyspace("alias"), null);
     }
 
     @AfterClass
     public static void tearDown() {
-        aliasCf.close();
-        defaultCf.close();
-        db.close();
-        env.close();
+        store.close();
     }
 
     private static List<Capture> list(CloseableIterator<Capture> iterator) {
@@ -188,7 +178,7 @@ public class IndexTest {
     }
 
     @Test
-    public void testUpgradeInPlace() throws IOException, RocksDBException {
+    public void testUpgradeInPlace() throws IOException {
         int initialVersion = FeatureFlags.indexVersion();
         try {
 

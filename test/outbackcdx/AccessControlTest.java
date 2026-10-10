@@ -1,13 +1,14 @@
 package outbackcdx;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.moaduda.onggi.Store;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
-import org.rocksdb.*;
+import org.junit.rules.TemporaryFolder;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
+import java.io.IOException;
 import java.time.Period;
 import java.util.ArrayList;
 import java.util.Date;
@@ -20,34 +21,24 @@ import static org.junit.Assert.assertTrue;
 public class AccessControlTest {
 
     private static AccessControl accessControl;
-    private static RocksDB db;
-    private static ColumnFamilyHandle ruleCf, policyCf;
-    private static RocksMemEnv env;
+    private static Store store;
+
+    @ClassRule
+    public static TemporaryFolder folder = new TemporaryFolder();
 
     @BeforeClass
-    public static void setUp() throws RocksDBException {
-        RocksDB.loadLibrary();
-        env = new RocksMemEnv(Env.getDefault());
-        try (Options options = new Options()
-                     .setCreateIfMissing(true)
-                     .setEnv(env)) {
-            db = RocksDB.open(options, Paths.get("test").toAbsolutePath().toString());
-            ruleCf = db.getDefaultColumnFamily();
-            policyCf = db.createColumnFamily(new ColumnFamilyDescriptor("policies".getBytes(StandardCharsets.UTF_8)));
-            accessControl = new AccessControl(db, ruleCf, policyCf);
-        }
+    public static void setUp() throws IOException {
+        store = Store.open(folder.newFolder("test").toPath());
+        accessControl = new AccessControl(store.keyspace("default"), store.keyspace("policies"));
     }
 
     @AfterClass
     public static void tearDown() {
-        ruleCf.close();
-        policyCf.close();
-        db.close();
-        env.close();
+        store.close();
     }
 
     @Test
-    public void test() throws RocksDBException {
+    public void test() {
         AccessPolicy publicPolicy = new AccessPolicy();
         publicPolicy.name = "Public";
         publicPolicy.accessPoints.add("public");
@@ -129,7 +120,7 @@ public class AccessControlTest {
     }
 
     @Test
-    public void testWildcardPatternOverride() throws RocksDBException {
+    public void testWildcardPatternOverride() {
         // Create two policies: one public, one staff-only
         AccessPolicy publicPolicy = new AccessPolicy();
         publicPolicy.name = "Public Access";

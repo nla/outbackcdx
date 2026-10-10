@@ -6,10 +6,8 @@ import com.googlecode.concurrenttrees.radixinverted.ConcurrentInvertedRadixTree;
 import com.googlecode.concurrenttrees.radixinverted.InvertedRadixTree;
 import org.netpreserve.urlcanon.Canonicalizer;
 import org.netpreserve.urlcanon.ParsedUrl;
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
-import org.rocksdb.RocksIterator;
+import com.moaduda.onggi.Cursor;
+import com.moaduda.onggi.Keyspace;
 
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
@@ -27,29 +25,27 @@ import static outbackcdx.Json.JSON_MAPPER;
 
 /**
  * Manages a set of access control rules and policies. Rules are persisted
- * in RocksDB but are also kept in-memory in a radix tree for fast filtering
+ * in Onggi but are also kept in-memory in a radix tree for fast filtering
  * of results.
  */
 class AccessControl {
     private final Map<Long,AccessPolicy> policies;
     private final Map<Long,AccessRule> rules;
     private final RulesBySsurt rulesBySurt;
-    private final RocksDB db;
-    private final ColumnFamilyHandle ruleCf, policyCf;
+    private final Keyspace ruleCf, policyCf;
     private final AtomicLong nextRuleId, nextPolicyId;
 
-    public AccessControl(RocksDB db, ColumnFamilyHandle ruleCf, ColumnFamilyHandle policyCf) throws RocksDBException {
-        this.db = db;
+    public AccessControl(Keyspace ruleCf, Keyspace policyCf) {
         this.ruleCf = ruleCf;
         this.policyCf = policyCf;
 
-        rules = loadRules(db, ruleCf);
-        policies = loadPolicies(db, policyCf);
+        rules = loadRules(ruleCf);
+        policies = loadPolicies(policyCf);
 
         rulesBySurt = new RulesBySsurt(rules.values());
 
-        nextRuleId = new AtomicLong(calculateNextId(db, ruleCf));
-        nextPolicyId = new AtomicLong(calculateNextId(db, policyCf));
+        nextRuleId = new AtomicLong(calculateNextId(ruleCf));
+        nextPolicyId = new AtomicLong(calculateNextId(policyCf));
 
         if (policies.isEmpty()) {
             // create some default policies
@@ -59,18 +55,16 @@ class AccessControl {
         }
     }
 
-    private long calculateNextId(RocksDB db, ColumnFamilyHandle cf) {
-        try (RocksIterator it = db.newIterator(cf)) {
-            it.seekToLast();
-            return it.isValid() ? decodeKey(it.key()) + 1 : 0;
+    private long calculateNextId(Keyspace cf) {
+        try (Cursor it = cf.cursor()) {
+            return it.last() ? decodeKey(it.key()) + 1 : 0;
         }
     }
 
-    private static Map<Long,AccessPolicy> loadPolicies(RocksDB db, ColumnFamilyHandle policyCf) {
+    private static Map<Long,AccessPolicy> loadPolicies(Keyspace policyCf) {
         Map<Long,AccessPolicy> map = new TreeMap<>();
-        try (RocksIterator it = db.newIterator(policyCf)) {
-            it.seekToFirst();
-            while (it.isValid()) {
+        try (Cursor it = policyCf.cursor()) {
+            for (boolean valid = it.first(); valid; valid = it.next()) {
                 try {
                     AccessPolicy policy = JSON_MAPPER.readValue(new String(it.value(), UTF_8), AccessPolicy.class);
                     map.put(policy.id, policy);
@@ -78,17 +72,15 @@ class AccessControl {
                     System.err.println("WARNING: Exception parsing access policy " + decodeKey(it.key()));
                     e.printStackTrace();
                 }
-                it.next();
             }
         }
         return map;
     }
 
-    private static Map<Long, AccessRule> loadRules(RocksDB db, ColumnFamilyHandle ruleCf) {
+    private static Map<Long, AccessRule> loadRules(Keyspace ruleCf) {
         Map<Long,AccessRule> map = new TreeMap<>();
-        try (RocksIterator it = db.newIterator(ruleCf)) {
-            it.seekToFirst();
-            while (it.isValid()) {
+        try (Cursor it = ruleCf.cursor()) {
+            for (boolean valid = it.first(); valid; valid = it.next()) {
                 try {
                     AccessRule rule = JSON_MAPPER.readValue(new String(it.value(), UTF_8), AccessRule.class);
                     map.put(rule.id, rule);
@@ -96,7 +88,6 @@ class AccessControl {
                     System.err.println("WARNING: Exception parsing access rule " + decodeKey(it.key()));
                     e.printStackTrace();
                 }
-                it.next();
             }
         }
         return map;
@@ -112,7 +103,7 @@ class AccessControl {
     /**
      * Save an access control rule to the database.
      */
-    public Long put(AccessRule rule, String username) throws RocksDBException {
+    public Long put(AccessRule rule, String username) {
         if (rule.policyId == null || policies.get(rule.policyId) == null) {
             throw new IllegalArgumentException("no such policyId: " + rule.policyId);
         }
@@ -143,7 +134,7 @@ class AccessControl {
 
             try {
                 byte[] value = JSON_MAPPER.writeValueAsBytes(rule);
-                db.put(ruleCf, encodeKey(rule.id), value);
+                ruleCf.put(encodeKey(rule.id), value);
             } catch (JsonProcessingException e) {
                 throw new UncheckedIOException("Exception serializing access rule " + rule.id, e);
             }
@@ -158,14 +149,14 @@ class AccessControl {
     /**
      * Save an access control policy to the database.
      */
-    public Long put(AccessPolicy policy) throws RocksDBException {
+    public Long put(AccessPolicy policy) {
         Long generatedId = null;
         if (policy.id == null) {
             generatedId = policy.id = nextPolicyId.getAndIncrement();
         }
         try {
             byte[] value = JSON_MAPPER.writeValueAsBytes(policy);
-            db.put(policyCf, encodeKey(policy.id), value);
+            policyCf.put(encodeKey(policy.id), value);
         } catch (JsonProcessingException e) {
             throw new UncheckedIOException("Exception serializing access policy " + policy.id, e);
         }
@@ -309,7 +300,7 @@ class AccessControl {
     /**
      * Lookup an access rule by id.
      */
-    public AccessRule rule(long ruleId) throws RocksDBException {
+    public AccessRule rule(long ruleId) {
         return rules.get(ruleId);
     }
 
@@ -325,14 +316,14 @@ class AccessControl {
         return policies.get(policyId);
     }
 
-    public boolean deleteRule(long ruleId) throws RocksDBException {
+    public boolean deleteRule(long ruleId) {
         // XXX: sync?
         AccessRule rule = rules.remove(ruleId);
         if (rule == null) {
             return false;
         }
         rulesBySurt.remove(rule);
-        db.delete(ruleCf, encodeKey(ruleId));
+        ruleCf.delete(encodeKey(ruleId));
         return true;
     }
 

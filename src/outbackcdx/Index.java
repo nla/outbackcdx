@@ -4,35 +4,36 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Predicate;
 
-import org.rocksdb.*;
+import com.moaduda.onggi.Cursor;
+import com.moaduda.onggi.Keyspace;
+import com.moaduda.onggi.Store;
+import com.moaduda.onggi.WriteBatch;
 
 /**
- * Wraps RocksDB with a higher-level query interface.
+ * Wraps an Onggi store with a higher-level query interface.
  */
 public class Index {
     final String name;
-    final RocksDB db;
-    final ColumnFamilyHandle defaultCF;
-    final ColumnFamilyHandle aliasCF;
+    final Store store;
+    final Keyspace defaultCF;
+    final Keyspace aliasCF;
     final AccessControl accessControl;
     final long scanCap;
     final UrlCanonicalizer canonicalizer;
     private Thread upgradeThread;
     private Thread compactThread;
 
-    public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl) {
-        this(name, db, defaultCF, aliasCF, accessControl, Long.MAX_VALUE, new UrlCanonicalizer());
+    public Index(String name, Store store, Keyspace defaultCF, Keyspace aliasCF, AccessControl accessControl) {
+        this(name, store, defaultCF, aliasCF, accessControl, Long.MAX_VALUE, new UrlCanonicalizer());
     }
 
-    public Index(String name, RocksDB db, ColumnFamilyHandle defaultCF, ColumnFamilyHandle aliasCF, AccessControl accessControl, long scanCap, UrlCanonicalizer canonicalizer) {
+    public Index(String name, Store store, Keyspace defaultCF, Keyspace aliasCF, AccessControl accessControl, long scanCap, UrlCanonicalizer canonicalizer) {
         this.name = name;
-        this.db = db;
+        this.store = store;
         this.defaultCF = defaultCF;
         this.aliasCF = aliasCF;
         this.accessControl = accessControl;
@@ -40,13 +41,8 @@ public class Index {
         this.canonicalizer = canonicalizer;
     }
 
-    public void flushWal() throws RocksDBException{
-        this.db.flushWal(true);
-    }
-
-    public TransactionLogIterator getUpdatesSince(long sequenceNumber) throws RocksDBException {
-        TransactionLogIterator logReader = db.getUpdatesSince(sequenceNumber);
-        return logReader;
+    public void flushWal() {
+        store.sync();
     }
 
     /**
@@ -57,14 +53,14 @@ public class Index {
      */
     static final byte[] REPLICATION_SEQUENCE_KEY = "#ReplicationSequence".getBytes(US_ASCII);
 
-    public OptionalLong getReplicationSequence() throws RocksDBException {
-        byte[] value = db.get(REPLICATION_SEQUENCE_KEY);
+    public OptionalLong getReplicationSequence() {
+        byte[] value = defaultCF.get(REPLICATION_SEQUENCE_KEY);
         return value == null ? OptionalLong.empty()
                              : OptionalLong.of(Long.parseLong(new String(value, US_ASCII)));
     }
 
     public long getLatestSequenceNumber() {
-        return db.getLatestSequenceNumber();
+        return store.sequence();
     }
 
     /**
@@ -72,19 +68,10 @@ public class Index {
      * or empty if no WAL files are retained. A replica whose cursor has fallen
      * below this can no longer catch up from the change feed.
      *
-     * Includes archived WALs, which is what --replication-window retains via
-     * WalTtlSeconds. Retention is enforced by age, not by sequence, so this
-     * rises as WALs are purged.
+     * Always empty until Onggi has a change feed (its milestone 6).
      */
-    public OptionalLong getOldestAvailableSequenceNumber() throws RocksDBException {
-        OptionalLong oldest = OptionalLong.empty();
-        for (LogFile walFile : db.getSortedWalFiles()) {
-            long start = walFile.startSequence();
-            if (!oldest.isPresent() || start < oldest.getAsLong()) {
-                oldest = OptionalLong.of(start);
-            }
-        }
-        return oldest;
+    public OptionalLong getOldestAvailableSequenceNumber() {
+        return OptionalLong.empty();
     }
 
     /**
@@ -202,22 +189,6 @@ public class Index {
         return i < 0 ? surtPrefix : surtPrefix.substring(0, i);
     }
 
-    /**
-     * Creates a consistent on-disk snapshot of this collection's RocksDB at {@code target}.
-     * The target directory must not already exist; RocksDB will create it. If on the same
-     * filesystem as the live DB, SST files are hard-linked (near-instant); otherwise they
-     * are copied. Safe to call while the database is being read and written.
-     */
-    public synchronized void checkpoint(Path target) throws RocksDBException, IOException {
-        if (Files.exists(target)) {
-            throw new IllegalArgumentException("Checkpoint target already exists: " + target);
-        }
-        Files.createDirectories(target.getParent());
-        try (Checkpoint cp = Checkpoint.create(db)) {
-            cp.createCheckpoint(target.toString());
-        }
-    }
-
     public synchronized boolean compactInBackground() {
         if (compactThread != null && compactThread.isAlive()) return false;
         compactThread = new Thread(this::compact, "Index compaction (" + name + ")");
@@ -230,8 +201,8 @@ public class Index {
         System.out.println("Compacting index '" + name + "'");
         long startTime = System.currentTimeMillis();
         try {
-            db.compactRange(defaultCF);
-        } catch (RocksDBException e) {
+            store.compact();
+        } catch (RuntimeException e) {
             e.printStackTrace();
         }
         System.out.println("Compaction complete (" + name + ") in " +
@@ -263,11 +234,9 @@ public class Index {
 
         System.out.println("Upgrading index '" + name + "' (~" + estimatedTotal + " records) to index version " + targetVersion);
 
-        try (ReadOptions readOptions = new ReadOptions().setTailing(true);
-                WriteOptions writeOptions = new WriteOptions();
-                WriteBatch writeBatch = new WriteBatch();
-                RocksIterator it = db.newIterator(defaultCF, readOptions)) {
-            for (it.seekToFirst(); it.isValid(); it.next()) {
+        WriteBatch writeBatch = store.newBatch();
+        try (ScanCursor it = new ScanCursor(defaultCF)) {
+            for (; it.isValid(); it.next()) {
                 byte[] oldKey = it.key();
                 byte[] oldValue = it.value();
                 Capture capture = new Capture(oldKey, oldValue);
@@ -282,7 +251,7 @@ public class Index {
                     recordsChanged++;
                     recordsInBatch++;
                     if (recordsInBatch >= batchSize) {
-                        db.write(writeOptions, writeBatch);
+                        store.write(writeBatch, false);
                         writeBatch.clear();
                         recordsInBatch = 0;
                     }
@@ -308,13 +277,13 @@ public class Index {
             }
 
             if (recordsInBatch > 0) {
-                db.write(writeOptions, writeBatch);
+                store.write(writeBatch, false);
                 writeBatch.clear();
             }
             Duration duration = Duration.ofMillis(System.currentTimeMillis() - startTime);
             System.out.println("Upgrade complete (" + name + "): " + recordsSeen + " records"
                     + " (" + recordsChanged + " changed) in " + duration);
-        } catch (RocksDBException e) {
+        } catch (RuntimeException e) {
             System.err.println("Upgrade failed (" + name + ") at urlkey: " + lastSeenUrlKey);
             e.printStackTrace();
             throw new RuntimeException(e);
@@ -415,20 +384,16 @@ public class Index {
     }
 
     public String resolveAliasOnce(String surt) {
-        try {
-            byte[] resolved = db.get(aliasCF, surt.getBytes(StandardCharsets.US_ASCII));
-            if (resolved != null) {
-                return new String(resolved, StandardCharsets.US_ASCII);
-            } else {
-                return surt;
-            }
-        } catch (RocksDBException e) {
-            throw new RuntimeException(e);
+        byte[] resolved = aliasCF.get(surt.getBytes(StandardCharsets.US_ASCII));
+        if (resolved != null) {
+            return new String(resolved, StandardCharsets.US_ASCII);
+        } else {
+            return surt;
         }
     }
 
     private CloseableIterator<Capture> filteredCaptures(byte[] key, Predicate<Capture> scope, Predicate<Capture> filter, boolean reverse) {
-        CloseableIterator<Capture> captures = new Records<>(db, defaultCF, key, Capture::new, scope, reverse, scanCap);
+        CloseableIterator<Capture> captures = new Records<>(defaultCF, key, Capture::new, scope, reverse, scanCap);
         if (filter != null) {
             captures = new FilteringIterator<>(captures, filter);
         }
@@ -437,15 +402,11 @@ public class Index {
 
     public Iterable<Alias> listAliases(String start) {
         byte[] key = start.getBytes(US_ASCII);
-        return () -> new Records<>(db, aliasCF, key, Alias::new, (alias) -> true, false, scanCap);
+        return () -> new Records<>(aliasCF, key, Alias::new, (alias) -> true, false, scanCap);
     }
 
     public long estimatedRecordCount() {
-        try {
-            return db.getLongProperty(defaultCF, "rocksdb.estimate-num-keys");
-        } catch (RocksDBException e) {
-            throw new RuntimeException(e);
-        }
+        return defaultCF.estimatedKeys();
     }
 
     private interface RecordConstructor<T> {
@@ -453,10 +414,10 @@ public class Index {
     }
 
     /**
-     * Iterates capture records in RocksDb, starting from queryUrl and continuing until scope returns false.
+     * Iterates capture records in Onggi, starting from queryUrl and continuing until scope returns false.
      */
     private static class Records<T> implements CloseableIterator<T> {
-        private final RocksIterator it;
+        private final Cursor it;
         private final Predicate<T> scope;
         private final RecordConstructor<T> constructor;
         private T record = null;
@@ -466,14 +427,14 @@ public class Index {
         private boolean exhausted = false;
         private boolean closed;
 
-        public Records(RocksDB db, ColumnFamilyHandle columnFamilyHandle, byte[] startKey, RecordConstructor<T> constructor, Predicate<T> scope, boolean reverse, long cap) {
-            final RocksIterator it = db.newIterator(columnFamilyHandle);
-            it.seek(startKey);
+        public Records(Keyspace keyspace, byte[] startKey, RecordConstructor<T> constructor, Predicate<T> scope, boolean reverse, long cap) {
+            final Cursor it = keyspace.cursor();
+            boolean found = it.seek(startKey);
             if (reverse) {
-                if (it.isValid()) {
+                if (found) {
                     it.prev();
                 } else {
-                    it.seekToLast();
+                    it.last();
                 }
             }
             this.constructor = constructor;
@@ -570,15 +531,12 @@ public class Index {
         return new Batch();
     }
 
-    public void commitBatch(WriteBatch writeBatch) throws RocksDBException {
-        try (WriteOptions options = new WriteOptions()) {
-            options.setSync(true);
-            db.write(options, writeBatch);
-        }
+    public void commitBatch(WriteBatch writeBatch) {
+        store.write(writeBatch, true);
     }
 
     public class Batch implements AutoCloseable {
-        private WriteBatch dbBatch = new WriteBatch();
+        private final WriteBatch dbBatch = store.newBatch();
         private final Map<String, String> newAliases = new HashMap<>();
 
         private Batch() {
@@ -595,11 +553,7 @@ public class Index {
             } else {
                 capture.urlkey = resolveAlias(capture.urlkey);
             }
-            try {
-                dbBatch.put(capture.encodeKey(), capture.encodeValue());
-            } catch (RocksDBException e) {
-                throw new IOException(e);
-            }
+            dbBatch.put(defaultCF, capture.encodeKey(), capture.encodeValue());
         }
 
         /**
@@ -608,11 +562,7 @@ public class Index {
          */
         void deleteCapture(Capture capture) throws IOException {
             capture.urlkey = resolveAlias(capture.urlkey);
-            try {
-                dbBatch.delete(capture.encodeKey());
-            } catch (RocksDBException e) {
-                throw new IOException(e);
-            }
+            dbBatch.delete(defaultCF, capture.encodeKey());
         }
 
         /**
@@ -623,11 +573,7 @@ public class Index {
             if (aliasSurt.equals(targetSurt)) {
                 return; // a self-referential alias is equivalent to no alias so don't bother storing it
             }
-            try {
-                dbBatch.put(aliasCF, aliasSurt.getBytes(US_ASCII), targetSurt.getBytes(US_ASCII));
-            } catch (RocksDBException e) {
-                throw new IOException(e);
-            }
+            dbBatch.put(aliasCF, aliasSurt.getBytes(US_ASCII), targetSurt.getBytes(US_ASCII));
             newAliases.put(aliasSurt, targetSurt);
             updateExistingRecordsWithNewAlias(dbBatch, aliasSurt, targetSurt);
         }
@@ -639,33 +585,25 @@ public class Index {
             String targetSurt = resolveAlias(aliasSurt);
             if (targetSurt.equals(aliasSurt)) return; // no such alias
 
-            try {
-                dbBatch.delete(aliasCF, aliasSurt.getBytes(US_ASCII));
+            dbBatch.delete(aliasCF, aliasSurt.getBytes(US_ASCII));
 
-                // rekey records that were affected by the alias
-                // FIXME: can race with newly inserted records
-                try (CloseableIterator<Capture> it = rawQuery(targetSurt, null, false)) {
-                    while (it.hasNext()) {
-                        Capture capture = it.next();
-                        String surt = canonicalizer.surtCanonicalize(capture.original);
-                        if (surt.equals(aliasSurt) && !surt.equals(capture.urlkey)) {
-                            dbBatch.delete(capture.encodeKey());
-                            capture.urlkey = surt;
-                            dbBatch.put(capture.encodeKey(), capture.encodeValue());
-                        }
+            // rekey records that were affected by the alias
+            // FIXME: can race with newly inserted records
+            try (CloseableIterator<Capture> it = rawQuery(targetSurt, null, false)) {
+                while (it.hasNext()) {
+                    Capture capture = it.next();
+                    String surt = canonicalizer.surtCanonicalize(capture.original);
+                    if (surt.equals(aliasSurt) && !surt.equals(capture.urlkey)) {
+                        dbBatch.delete(defaultCF, capture.encodeKey());
+                        capture.urlkey = surt;
+                        dbBatch.put(defaultCF, capture.encodeKey(), capture.encodeValue());
                     }
                 }
-            } catch (RocksDBException e) {
-                throw new IOException(e);
             }
         }
 
         public void commit() throws IOException {
-            try {
-                commitBatch(dbBatch);
-            } catch (RocksDBException e) {
-                throw new RuntimeException(e);
-            }
+            commitBatch(dbBatch);
 
             /*
              * Most of the time this will do nothing as we've already updated existing captures in putAlias, but there's
@@ -678,40 +616,27 @@ public class Index {
         }
 
         private void updateExistingRecordsWithNewAliases() throws IOException {
-            try (WriteBatch wb = new WriteBatch()) {
-                for (Map.Entry<String, String> entry : newAliases.entrySet()) {
-                    updateExistingRecordsWithNewAlias(wb, entry.getKey(), entry.getValue());
-                }
-                try {
-                    commitBatch(wb);
-                } catch (RocksDBException e) {
-                    throw new RuntimeException(e);
-                }
+            WriteBatch wb = store.newBatch();
+            for (Map.Entry<String, String> entry : newAliases.entrySet()) {
+                updateExistingRecordsWithNewAlias(wb, entry.getKey(), entry.getValue());
             }
+            commitBatch(wb);
         }
 
         private void updateExistingRecordsWithNewAlias(WriteBatch wb, String aliasSurt, String targetSurt) throws IOException {
             try (CloseableIterator<Capture> it = rawQuery(aliasSurt, null, false)) {
                 while (it.hasNext()) {
                     Capture capture = it.next();
-                    try {
-                        wb.delete(capture.encodeKey());
-                    } catch (RocksDBException e) {
-                        throw new IOException(e);
-                    }
+                    wb.delete(defaultCF, capture.encodeKey());
                     capture.urlkey = targetSurt;
-                    try {
-                        wb.put(capture.encodeKey(), capture.encodeValue());
-                    } catch (RocksDBException e) {
-                        throw new IOException(e);
-                    }
+                    wb.put(defaultCF, capture.encodeKey(), capture.encodeValue());
                 }
             }
         }
 
         @Override
         public void close() {
-            dbBatch.close();
+            dbBatch.clear();
         }
     }
 }
