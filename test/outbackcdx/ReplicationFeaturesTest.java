@@ -8,8 +8,6 @@ import org.junit.rules.TemporaryFolder;
 import outbackcdx.Web.Status;
 import outbackcdx.auth.NullAuthorizer;
 
-import org.rocksdb.FlushOptions;
-
 import java.io.*;
 import java.util.Collections;
 import java.util.OptionalLong;
@@ -107,10 +105,9 @@ public class ReplicationFeaturesTest {
     @Test
     public void testFeedRefusesSequenceOlderThanRetention() throws Exception {
         File root = folder.newFolder();
-        // Two-second WAL retention so archived WALs become purgeable in-test.
-        // This test is necessarily timing-dependent: RocksDB enforces
-        // WalTtlSeconds by file age and only purges from its obsolete-file
-        // cleanup, which a flush triggers.
+        // Two-second WAL retention so old segments become deletable in-test.
+        // This test is necessarily timing-dependent: Onggi enforces retention
+        // by segment age and only deletes segments after a flush.
         try (DataStore store = new DataStore(root, 256, 2L, Long.MAX_VALUE, null)) {
             Webapp app = new Webapp(store, false, Collections.emptyMap(), null,
                     Collections.emptyMap(), 10000, new QueryConfig(), null, null);
@@ -118,8 +115,8 @@ public class ReplicationFeaturesTest {
             Index index = store.getIndex("aged");
             long earlySequence = index.getLatestSequenceNumber();
 
-            // Roll several WALs into the archive, age them past the TTL, then
-            // write and flush again to trigger the purge -- the same sequence
+            // Roll several WAL segments, age them past the retention, then
+            // write and flush again to trigger the deletion -- the same sequence
             // of events as the production incident, where a checkpoint's flush
             // collected WALs that had expired days earlier.
             for (int i = 0; i < 3; i++) {
@@ -152,11 +149,13 @@ public class ReplicationFeaturesTest {
         }
     }
 
-    /** Both column families must flush before their WAL can be archived. */
+    /**
+     * Every keyspace must flush before a WAL segment can go. Onggi has no
+     * flush on its own; compact() flushes every memtable first, which starts
+     * a new segment, and checks for segments to delete after the flush.
+     */
     private static void flushAll(Index index) throws Exception {
-        try (FlushOptions options = new FlushOptions().setWaitForFlush(true)) {
-            index.db.flush(options, java.util.Arrays.asList(index.defaultCF, index.aliasCF));
-        }
+        index.store.compact();
     }
 
     /**
@@ -481,14 +480,9 @@ public class ReplicationFeaturesTest {
     }
 
     /**
-     * A collection whose WAL holds no batches yields an unpositioned
-     * TransactionLogIterator, and getBatch() must not be called on one.
-     *
-     * Without the isValid() guard in ChangeFeedJsonStream this fails here as an
-     * AssertionError from RocksDB's own assert(isValid()), because surefire runs
-     * with assertions enabled. Production does not: there the assert is skipped,
-     * getBatch() returns a WriteBatch whose native handle is 0, and
-     * WriteBatch.data() kills the JVM with a SIGSEGV.
+     * A collection whose WAL holds no batches has a feed that finds nothing.
+     * On RocksDB this was an unpositioned TransactionLogIterator that crashed
+     * the JVM if read; on Onggi it must still answer 204.
      */
     @Test
     public void testChangeFeedOnCollectionWithNoWrites() throws Exception {

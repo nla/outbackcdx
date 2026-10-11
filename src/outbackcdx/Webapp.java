@@ -5,7 +5,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.moaduda.onggi.ChangeFeed;
 import com.moaduda.onggi.Stats;
+import com.moaduda.onggi.StoreException;
 import outbackcdx.auth.Permission;
 
 import javax.xml.stream.XMLStreamException;
@@ -163,12 +165,33 @@ class Webapp implements Web.Handler {
     }
 
     /**
-     * Would create a hot checkpoint of this collection under
-     * {@code <checkpoint-dir>/<name>/<collection>/}. Onggi has no checkpoints
-     * until its milestone 6, so this always returns 501 for now.
+     * Creates a consistent on-disk checkpoint of this collection at
+     * {@code <checkpoint-dir>/<name>/<collection>/}. {@code name} defaults to
+     * "cp-<epoch-ms>" if not supplied. Requires the server to have been
+     * started with --checkpoint-dir; otherwise returns 501.
      */
     Response checkpoint(Web.Request request) throws Web.ResponseException, IOException {
-        return new Response(501, "text/plain", "Checkpoints are not yet available on Onggi.\n");
+        if (checkpointDir == null) {
+            return new Response(501, "text/plain",
+                    "Checkpoint endpoint not configured. Start outbackcdx with --checkpoint-dir <path>.\n");
+        }
+        String name = request.param("name", "cp-" + System.currentTimeMillis());
+        if (!SAFE_CHECKPOINT_NAME.matcher(name).matches()) {
+            return badRequest("Invalid 'name' parameter; must match [A-Za-z0-9._-]+\n");
+        }
+        Index index = getIndex(request);
+        Path target = checkpointDir.resolve(name).resolve(index.name);
+        try {
+            index.checkpoint(target);
+        } catch (StoreException | IllegalArgumentException e) {
+            return new Response(INTERNAL_ERROR, "text/plain",
+                    "Checkpoint failed: " + e.getMessage() + "\n");
+        }
+        Map<String,Object> body = new HashMap<>();
+        body.put("collection", index.name);
+        body.put("name", name);
+        body.put("path", target.toString());
+        return jsonResponse(body);
     }
 
     Response listCollections(Web.Request request) throws JsonProcessingException {
@@ -393,11 +416,131 @@ class Webapp implements Web.Handler {
     }
 
     /**
-     * The change feed. Onggi has none until its milestone 6, so this always
-     * returns 501 for now.
+     * A valid replication position with nothing to read. The cursor is fine and
+     * the client should leave it untouched.
      */
+    private static Response noContent() {
+        Response response = new Response(NO_CONTENT, null, "");
+        response.addHeader("Access-Control-Allow-Origin", "*");
+        return response;
+    }
+
+    /**
+     * Streams batches from a change feed already positioned on its first
+     * batch, until about {@code batchSize} bytes of base64, but always the
+     * first batch and the one after it, as the RocksDB version did. Closes the feed exactly once, from stream() or from the
+     * server's close after it, which covers a response that is never streamed.
+     */
+    static class ChangeFeedJsonStream implements IStreamer, Closeable {
+        final ChangeFeed feed;
+        final long batchSize;
+        private boolean closed = false;
+
+        ChangeFeedJsonStream(ChangeFeed feed, long batchSize) {
+            this.feed = feed;
+            this.batchSize = batchSize;
+        }
+
+        @Override
+        public void stream(OutputStream outputStream) throws IOException {
+            // build and stream json as bytes to avoid overhead of utf-16 String
+            try {
+                BufferedOutputStream output = new BufferedOutputStream(outputStream);
+                output.write("[\n".getBytes(UTF_8));
+                long size = 0L;
+                long initialSeqNo = feed.sequence();
+                boolean more = true;
+                while (more) {
+                    long sequenceNumber = feed.sequence();
+                    output.write("{\"sequenceNumber\": \"".getBytes(UTF_8));
+                    output.write(Long.toString(sequenceNumber).getBytes(UTF_8));
+                    output.write("\", \"writeBatch\": \"".getBytes(UTF_8));
+                    byte[] b64Batch = Base64.getEncoder().encode(feed.data());
+                    output.write(b64Batch);
+                    output.write("\"}".getBytes(UTF_8));
+                    size += b64Batch.length;
+                    more = feed.next() && (size < batchSize || sequenceNumber == initialSeqNo);
+                    if (more) output.write(",\n".getBytes(UTF_8));
+                }
+                output.write("\n]\n".getBytes(UTF_8));
+                output.flush();
+            } finally {
+                close();
+            }
+        }
+
+        @Override
+        public synchronized void close() {
+            if (!closed) {
+                closed = true;
+                feed.close();
+            }
+        }
+    }
+
     Response changeFeed(Web.Request request) throws Web.ResponseException, IOException {
-        return new Response(501, "text/plain", "The change feed is not yet available on Onggi.\n");
+        String collection = request.param("collection");
+        long since = Long.parseLong(request.param("since", "0"));
+        long size = 10*1024*1024;
+        if (request.param("size") != null) {
+            size = Long.parseLong(request.param("size"));
+        }
+
+        final Index index = getIndex(request);
+
+        if (verbose) {
+            out.printf("%s Received request %s. Retrieving deltas for collection <%s> since sequenceNumber %s%n", new Date(), request, collection, since);
+        }
+
+        long latest = index.getLatestSequenceNumber();
+        OptionalLong oldestAvailable = index.getOldestAvailableSequenceNumber();
+
+        // Refuse an aged-out position here, before a feed exists and the status
+        // is committed. Sequence 0 holds no data, hence the clamp to 1.
+        long firstPossibleSequence = Math.max(since, 1);
+        boolean pointsAtRealData = firstPossibleSequence <= latest;
+        boolean walCoversIt = oldestAvailable.isPresent()
+                && firstPossibleSequence >= oldestAvailable.getAsLong();
+        if (pointsAtRealData && !walCoversIt) {
+            return gone(request, since, collection, oldestAvailable, latest);
+        }
+
+        // A valid position with nothing after it is 204, not 410.
+        ChangeFeed feed;
+        try {
+            feed = index.getUpdatesSince(firstPossibleSequence);
+        } catch (StoreException e) {
+            // Retention deleted it since the check above.
+            return gone(request, since, collection, index.getOldestAvailableSequenceNumber(), latest);
+        }
+        try {
+            if (!feed.next()) {
+                feed.close();
+                return noContent();
+            }
+            ChangeFeedJsonStream streamer = new ChangeFeedJsonStream(feed, size);
+            Response response = new Response(OK, "application/json", streamer);
+            response.addHeader("Access-Control-Allow-Origin", "*");
+            return response;
+        } catch (RuntimeException | Error e) {
+            feed.close();
+            throw e;
+        }
+    }
+
+    private static Response gone(Web.Request request, long since, String collection, OptionalLong oldestAvailable,
+                                 long latest) {
+        String detail = String.format(
+                "Sequence %d is no longer available for collection %s. Oldest available: %s. "
+                + "Latest: %d. The replica cannot catch up from the change feed and must be "
+                + "reseeded from the primary, or its replication cursor reset to an available "
+                + "sequence.%n",
+                since, collection,
+                oldestAvailable.isPresent() ? String.valueOf(oldestAvailable.getAsLong())
+                                            : "none (no WAL retained)",
+                latest);
+        System.err.println(new Date() + " " + request.method() + " " + request.url() + " - " + detail.trim());
+        return new Response(GONE, "text/plain", detail);
     }
 
     Response query(Web.Request request) throws IOException, Web.ResponseException {

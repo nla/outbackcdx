@@ -3,11 +3,14 @@ package outbackcdx;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Predicate;
 
+import com.moaduda.onggi.ChangeFeed;
 import com.moaduda.onggi.Cursor;
 import com.moaduda.onggi.Keyspace;
 import com.moaduda.onggi.Store;
@@ -65,13 +68,35 @@ public class Index {
 
     /**
      * The oldest sequence number still recoverable from the write-ahead log,
-     * or empty if no WAL files are retained. A replica whose cursor has fallen
+     * or empty if the store keeps none. A replica whose cursor has fallen
      * below this can no longer catch up from the change feed.
      *
-     * Always empty until Onggi has a change feed (its milestone 6).
+     * --replication-window sets how long Onggi keeps WAL segments, by age, so
+     * this rises as they are deleted. With nothing retained it is latest + 1.
      */
     public OptionalLong getOldestAvailableSequenceNumber() {
-        return OptionalLong.empty();
+        return store.oldestAvailableSequence();
+    }
+
+    /**
+     * Batches from the one holding {@code sequenceNumber} on. Throws
+     * StoreException if that sequence is older than
+     * {@link #getOldestAvailableSequenceNumber()}.
+     */
+    public ChangeFeed getUpdatesSince(long sequenceNumber) {
+        return store.changesSince(sequenceNumber);
+    }
+
+    /**
+     * Writes a checkpoint of this collection to {@code target}, which must not
+     * exist; its parent directories are created.
+     */
+    public synchronized void checkpoint(Path target) throws IOException {
+        if (Files.exists(target)) {
+            throw new IllegalArgumentException("Checkpoint target already exists: " + target);
+        }
+        Files.createDirectories(target.getParent());
+        store.checkpoint(target);
     }
 
     /**

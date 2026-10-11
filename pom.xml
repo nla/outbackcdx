@@ -31,13 +31,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <!-- Onggi has no checkpoints or change feed until its milestone 6. -->
-                    <testExcludes>
-                        <testExclude>outbackcdx/CheckpointTest.java</testExclude>
-                        <testExclude>outbackcdx/ReplicationFeaturesTest.java</testExclude>
-                    </testExcludes>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

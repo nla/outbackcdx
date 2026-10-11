@@ -1,25 +1,23 @@
 package outbackcdx;
 
+import com.moaduda.onggi.Options;
+import com.moaduda.onggi.Store;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.rocksdb.*;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 /**
- * Exercises Index#checkpoint. Uses a real on-disk RocksDB (not RocksMemEnv) so
- * the checkpoint API can actually link/copy SST files to a filesystem path.
+ * Exercises Index#checkpoint on a real on-disk store, so the checkpoint can
+ * actually link tables to a filesystem path.
  */
 public class CheckpointTest {
 
@@ -27,81 +25,63 @@ public class CheckpointTest {
     public TemporaryFolder tmp = new TemporaryFolder();
 
     @Test
-    public void checkpointWhileDbIsOpenSucceedsAndIsReadable()
-            throws RocksDBException, IOException {
-        RocksDB.loadLibrary();
+    public void checkpointWhileDbIsOpenSucceedsAndIsReadable() throws IOException {
         Path dbPath = tmp.newFolder("db").toPath();
         Path checkpointPath = tmp.getRoot().toPath().resolve("snapshots").resolve("cp1");
 
-        try (Options options = new Options().setCreateIfMissing(true);
-             RocksDB db = RocksDB.open(options, dbPath.toString())) {
-            ColumnFamilyHandle defaultCf = db.getDefaultColumnFamily();
-            ColumnFamilyHandle aliasCf = db.createColumnFamily(
-                    new ColumnFamilyDescriptor("alias".getBytes(StandardCharsets.UTF_8)));
-            Index index = new Index("test", db, defaultCf, aliasCf, null);
+        long sequence;
+        try (Store store = Store.open(dbPath)) {
+            Index index = new Index("test", store, store.keyspace("default"), store.keyspace("alias"), null);
 
-            // Write at least one record so there's something to flush into an SST.
+            // Write one record, flushed into a table, and leave another in the memtable.
             try (Index.Batch batch = index.beginUpdate()) {
                 batch.putCapture(Capture.fromCdxLine(
                         "- 20240101000000 http://example.org/ text/html 200 - - 0 w1",
                         index.canonicalizer));
                 batch.commit();
             }
-            db.flush(new FlushOptions().setWaitForFlush(true));
+            store.compact();
+            try (Index.Batch batch = index.beginUpdate()) {
+                batch.putCapture(Capture.fromCdxLine(
+                        "- 20240101000001 http://example.org/two text/html 200 - - 0 w1",
+                        index.canonicalizer));
+                batch.commit();
+            }
+            sequence = store.sequence();
 
-            // The whole point: take the checkpoint with the DB still open
+            // The whole point: take the checkpoint with the store still open
             // (i.e. with the LOCK still held by this process).
             index.checkpoint(checkpointPath);
 
-            // The checkpoint dir must contain the bits a fresh RocksDB needs to open.
             assertTrue("CURRENT should exist in checkpoint",
                     Files.exists(checkpointPath.resolve("CURRENT")));
-            assertTrue("at least one MANIFEST should exist",
-                    Files.list(checkpointPath)
-                            .anyMatch(p -> p.getFileName().toString().startsWith("MANIFEST-")));
-
-            aliasCf.close();
-            defaultCf.close();
+            try (var files = Files.list(checkpointPath)) {
+                assertTrue("at least one MANIFEST should exist",
+                        files.anyMatch(p -> p.getFileName().toString().startsWith("MANIFEST-")));
+            }
         }
 
-        // Open the checkpoint as a standalone DB to prove it's a valid snapshot.
-        // Must enumerate column families first since the source DB had a non-default
-        // family ("alias") which RocksDB.open() alone won't open.
-        try (Options listOpts = new Options()) {
-            List<byte[]> cfNames = RocksDB.listColumnFamilies(listOpts, checkpointPath.toString());
-            List<ColumnFamilyDescriptor> descriptors = cfNames.stream()
-                    .map(ColumnFamilyDescriptor::new)
-                    .collect(Collectors.toList());
-            List<ColumnFamilyHandle> handles = new ArrayList<>();
-            try (DBOptions dbOpts = new DBOptions().setCreateIfMissing(false);
-                 RocksDB reopened = RocksDB.open(dbOpts, checkpointPath.toString(), descriptors, handles)) {
-                assertEquals("checkpoint preserves alias column family",
-                        2, handles.size());
-            } finally {
-                for (ColumnFamilyHandle h : handles) h.close();
+        // Open the checkpoint as a standalone store to prove it's a valid snapshot.
+        try (Store reopened = Store.open(checkpointPath, Options.defaults().withCreateIfMissing(false))) {
+            assertEquals("checkpoint preserves the alias keyspace",
+                    List.of("alias", "default"), reopened.keyspaceNames());
+            assertEquals(sequence, reopened.sequence());
+            Index index = new Index("test", reopened, reopened.keyspace("default"), reopened.keyspace("alias"), null);
+            try (var captures = index.query("org,example)/two", null)) {
+                assertTrue("checkpoint holds the unflushed record", captures.hasNext());
             }
         }
     }
 
     @Test
-    public void checkpointRefusesExistingTargetDirectory()
-            throws RocksDBException, IOException {
-        RocksDB.loadLibrary();
+    public void checkpointRefusesExistingTargetDirectory() throws IOException {
         Path dbPath = tmp.newFolder("db").toPath();
         Path checkpointPath = tmp.newFolder("already-here").toPath();
 
-        try (Options options = new Options().setCreateIfMissing(true);
-             RocksDB db = RocksDB.open(options, dbPath.toString())) {
-            ColumnFamilyHandle defaultCf = db.getDefaultColumnFamily();
-            ColumnFamilyHandle aliasCf = db.createColumnFamily(
-                    new ColumnFamilyDescriptor("alias".getBytes(StandardCharsets.UTF_8)));
-            Index index = new Index("test", db, defaultCf, aliasCf, null);
-
+        try (Store store = Store.open(dbPath)) {
+            Index index = new Index("test", store, store.keyspace("default"), store.keyspace("alias"), null);
             assertThrows(IllegalArgumentException.class,
                     () -> index.checkpoint(checkpointPath));
-
-            aliasCf.close();
-            defaultCf.close();
         }
     }
 }
