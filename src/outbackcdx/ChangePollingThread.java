@@ -265,8 +265,7 @@ public class ChangePollingThread extends Thread {
     }
 
     private void commitWriteBatch(Index index, long sequenceNumber, byte[] writeBatchData) {
-        {
-            WriteBatch batch = WriteBatch.fromBytes(index.store, writeBatchData);
+        try (WriteBatch batch = WriteBatch.fromBytes(index.store, writeBatchData)) {
             // count() must be read before the marker put below, which would
             long nextSequenceNumber = sequenceNumber + batch.count();
             batch.put(index.defaultCF, Index.REPLICATION_SEQUENCE_KEY, String.valueOf(nextSequenceNumber).getBytes(StandardCharsets.US_ASCII));

@@ -259,8 +259,7 @@ public class Index {
 
         System.out.println("Upgrading index '" + name + "' (~" + estimatedTotal + " records) to index version " + targetVersion);
 
-        WriteBatch writeBatch = store.newBatch();
-        try (ScanCursor it = new ScanCursor(defaultCF)) {
+        try (WriteBatch writeBatch = store.newBatch(); ScanCursor it = new ScanCursor(defaultCF)) {
             for (; it.isValid(); it.next()) {
                 byte[] oldKey = it.key();
                 byte[] oldValue = it.value();
@@ -641,11 +640,12 @@ public class Index {
         }
 
         private void updateExistingRecordsWithNewAliases() throws IOException {
-            WriteBatch wb = store.newBatch();
-            for (Map.Entry<String, String> entry : newAliases.entrySet()) {
-                updateExistingRecordsWithNewAlias(wb, entry.getKey(), entry.getValue());
+            try (WriteBatch wb = store.newBatch()) {
+                for (Map.Entry<String, String> entry : newAliases.entrySet()) {
+                    updateExistingRecordsWithNewAlias(wb, entry.getKey(), entry.getValue());
+                }
+                commitBatch(wb);
             }
-            commitBatch(wb);
         }
 
         private void updateExistingRecordsWithNewAlias(WriteBatch wb, String aliasSurt, String targetSurt) throws IOException {
@@ -659,9 +659,10 @@ public class Index {
             }
         }
 
+        /** Deletes any operations the batch spilled to disk. */
         @Override
         public void close() {
-            dbBatch.clear();
+            dbBatch.close();
         }
     }
 }
