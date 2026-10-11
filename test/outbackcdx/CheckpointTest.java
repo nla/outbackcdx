@@ -53,11 +53,11 @@ public class CheckpointTest {
             // (i.e. with the LOCK still held by this process).
             index.checkpoint(checkpointPath);
 
-            assertTrue("CURRENT should exist in checkpoint",
-                    Files.exists(checkpointPath.resolve("CURRENT")));
+            assertTrue("onggi.current should exist in checkpoint",
+                    Files.exists(checkpointPath.resolve("onggi.current")));
             try (var files = Files.list(checkpointPath)) {
-                assertTrue("at least one MANIFEST should exist",
-                        files.anyMatch(p -> p.getFileName().toString().startsWith("MANIFEST-")));
+                assertTrue("at least one manifest should exist",
+                        files.anyMatch(p -> p.getFileName().toString().endsWith(".manifest")));
             }
         }
 
