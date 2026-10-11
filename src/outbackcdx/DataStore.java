@@ -1,5 +1,6 @@
 package outbackcdx;
 
+import com.moaduda.onggi.Compression;
 import com.moaduda.onggi.Options;
 import com.moaduda.onggi.Store;
 import com.moaduda.onggi.StoreException;
@@ -59,7 +60,9 @@ public class DataStore implements Closeable {
             return null;
         }
 
-        Options options = Options.defaults().withCreateIfMissing(createAllowed);
+        // JLZ in place of the Snappy that OutbackCDX used on RocksDB. Each block records its codec, so stores written
+        // uncompressed still open, and compaction compresses their old blocks over time.
+        Options options = Options.defaults().withCreateIfMissing(createAllowed).withCompression(Compression.JLZ);
         // if not null, replication data will be available this far back in time (in seconds)
         if (replicationWindow != null) {
             options = options.withWalRetention(Duration.ofSeconds(replicationWindow));
