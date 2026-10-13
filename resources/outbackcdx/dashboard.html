@@ -505,14 +505,14 @@
         watch: {
             modelValue: function(value) {
                 this.startPicker.setDate(value && value.start ? moment(value.start).toDate() : null, true);
-                this.endPicker.setDate(value && value.start ? moment(value.end).toDate() : null, true);
+                this.endPicker.setDate(value && value.end ? moment(value.end).toDate() : null, true);
             }
         },
         mounted: function() {
             var emitInput = () => {
                 var value = {
-                    start: startPicker.getMoment().startOf('day').format(),
-                    end: endPicker.getMoment().endOf('day').format()
+                    start: startPicker.getDate() ? startPicker.getMoment().startOf('day').format() : null,
+                    end: endPicker.getDate() ? endPicker.getMoment().endOf('day').format() : null
                 };
                 this.$emit('update:modelValue', value)
             }, startPicker = new Pikaday({
