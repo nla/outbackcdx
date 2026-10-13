@@ -24,7 +24,7 @@ Used in production at the National Library of Australia and British Library with
 Installing
 ----------
 
-OutbackCDX requires [JDK 11](https://adoptopenjdk.net/) (or newer) on Linux, Windows or MacOS (other platforms 
+OutbackCDX requires [JDK 17](https://adoptium.net/) (or newer) on Linux, Windows or MacOS (other platforms 
 may be possible with a custom build of RocksDB JNI).
 
 Pre-compiled jar packages are available from the [releases page](https://github.com/nla/outbackcdx/releases).
