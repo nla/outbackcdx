@@ -360,7 +360,7 @@
     </style>
     <link href="lib/pikaday/${version:org.webjars.npm:pikaday}/pikaday.css" rel="stylesheet">
     <script src="lib/vue/${version:org.webjars.npm:vue}/vue.js"></script>
-    <script src="lib/vue-router/2.0.0/vue-router.js"></script>
+    <script src="lib/vue-router/${version:org.webjars.npm:vue-router}/vue-router.js"></script>
     <script src="lib/lodash/${version:org.webjars:lodash}/lodash.js"></script>
     <script src="lib/moment/${version:org.webjars.npm:moment}/moment.min.js"></script>
     <script src="lib/pikaday/${version:org.webjars.npm:pikaday}/pikaday.js"></script>
@@ -498,11 +498,12 @@
 </script>
 
 <script>
-    Vue.component('date-range', {
+    var DateRange = {
         template: '#date-range-template',
-        props: ['value'],
+        props: ['modelValue'],
+        emits: ['update:modelValue'],
         watch: {
-            value: function(value) {
+            modelValue: function(value) {
                 this.startPicker.setDate(value && value.start ? moment(value.start).toDate() : null, true);
                 this.endPicker.setDate(value && value.start ? moment(value.end).toDate() : null, true);
             }
@@ -513,7 +514,7 @@
                     start: startPicker.getMoment().startOf('day').format(),
                     end: endPicker.getMoment().endOf('day').format()
                 };
-                this.$emit('input', value)
+                this.$emit('update:modelValue', value)
             }, startPicker = new Pikaday({
                 field: this.$el.getElementsByTagName('input')[0],
                 onSelect: function() {
@@ -534,7 +535,7 @@
             this.startPicker = startPicker;
             this.endPicker = endPicker;
         }
-    });
+    };
 </script>
 
 <!-----------------------------------------------------------------------
@@ -544,17 +545,17 @@
 <script type="x-template" id="period-template">
     <div class="period-field field">
         <label>For a period of</label>
-        <label>years <input type="number" min="0" v-model="value.years" @input="onInput"></label>
-        <label>months <input type="number" min="0" v-model="value.months" @input="onInput"></label>
-        <label>days <input type="number" min="0" v-model="value.days" @input="onInput"></label>
+        <label>years <input type="number" min="0" v-model="modelValue.years" @input="onInput"></label>
+        <label>months <input type="number" min="0" v-model="modelValue.months" @input="onInput"></label>
+        <label>days <input type="number" min="0" v-model="modelValue.days" @input="onInput"></label>
         <label>after capture</label>
     </div>
 </script>
 
 <script>
-    Vue.component('period', {
+    var Period = {
         template: '#period-template',
-        props: ['value'],
+        props: ['modelValue'],
         methods: {
             onInput: function(event) {
                 if (event.target.value == '0') {
@@ -562,7 +563,7 @@
                 }
             }
         }
-    });
+    };
 </script>
 
 <!-----------------------------------------------------------------------
@@ -778,7 +779,7 @@
 <script type="x-template" id="access-rule-list-template">
     <main id="access-rule-list">
         <div class="row">
-            <input placeholder="Search" class="searchbox" :value="this.$route.query.search" @input="onQueryInput" @paste="onQueryInput">
+            <input placeholder="Search" class="searchbox" :value="$route.query.search" @input="onQueryInput" @paste="onQueryInput">
 
             <router-link :to="{name: 'access-rule', params: { collection: $route.params.collection, ruleId: 'new' }}" class="button">New Rule</router-link>
             <a :href="$route.params.collection + '/access/rules?output=csv'" class="button">Export CSV</a>
@@ -791,16 +792,16 @@
                     <th style="width: 3em"><router-link :to="{
                                     name: 'access-rule-list',
                                     params: {
-                                        collection: this.$route.params.collection,
+                                        collection: $route.params.collection,
                                     },
-                                    query: { sort: (this.$route.query.sort || '-id') == '-id' ? 'id' : '-id' }
+                                    query: { sort: ($route.query.sort || '-id') == '-id' ? 'id' : '-id' }
                                 }">ID</router-link></th>
                     <th><router-link :to="{
                                     name: 'access-rule-list',
                                     params: {
-                                        collection: this.$route.params.collection,
+                                        collection: $route.params.collection,
                                     },
-                                    query: { sort: this.$route.query.sort == 'surt' ? '-surt' : 'surt' }
+                                    query: { sort: $route.query.sort == 'surt' ? '-surt' : 'surt' }
                                 }">URL</router-link></th>
                     <th>Date</th>
                     <th>Policy</th>
@@ -868,7 +869,7 @@
                     params: {
                         collection: this.$route.params.collection,
                     },
-                    query: search ? {search} : null,
+                    query: search ? {search} : {},
                 });
             },
             fetchData: _.throttle(function() {
@@ -947,8 +948,8 @@
     <div class="app-bar">
         <nav class="tabs" v-if="$route && $route.params.collection">
             <ul>
-                <li><router-link :to="'/' + $route.params.collection" exact>Query</router-link></li>
-                <li v-if="featureFlags.experimentalAccessControl"><router-link :to="'/' + $route.params.collection + '/access/rules'">Access Rules</router-link></li>
+                <li><router-link :to="'/' + $route.params.collection">Query</router-link></li>
+                <li v-if="featureFlags.experimentalAccessControl"><router-link :to="'/' + $route.params.collection + '/access/rules'" :class="{active: $route.name == 'access-rule'}">Access Rules</router-link></li>
                 <li v-if="featureFlags.experimentalAccessControl"><router-link :to="'/' + $route.params.collection + '/access/policies'">Access Policies</router-link></li>
             </ul>
         </nav>
@@ -958,7 +959,7 @@
         <h2>Collections <img src="add.svg" width="18px" height="18px" style="vertical-align: top" alt="Add"></h2>
         <ul>
             <li v-for="col in collections">
-                <router-link :to="'/' + col">
+                <router-link :to="'/' + col" :class="{active: $route.params.collection == col}">
                     <img class="icon" src="database.svg" width="20px" height="20px">{{ col }}
                 </router-link>
             </li>
@@ -969,7 +970,8 @@
 
 <script>
 
-    var router = new VueRouter({
+    var router = VueRouter.createRouter({
+        history: VueRouter.createWebHashHistory(),
         linkActiveClass: "active",
         routes: [
             {path: '/:collection', name: 'query', component: Query},
@@ -979,33 +981,37 @@
         ]
     });
 
-    var app = new Vue({
-        router,
-        el: "#app",
-        data: {
-            collection: null,
-            collections: {},
-            stats: null,
-            featureFlags: {},
-            user: null,
+    var app = Vue.createApp({
+        data: function() {
+            return {
+                collection: null,
+                activeCollection: null,
+                collections: {},
+                stats: null,
+                featureFlags: {},
+                user: null,
+            };
         },
         created: function() {
-            var self = this;
             fetchApi("config.json").then(r => r.json())
                     .then(config => {
                         this.featureFlags = config.featureFlags;
                         if (config.keycloak) {
-                            initKeycloak(app, config.keycloak);
+                            initKeycloak(this, config.keycloak);
                         }
                     });
             fetchApi("api/collections").then(r => r.json()).then(collections => {
                 this.collections = collections;
-                if (collections && !self.activeCollection) {
-                    self.activeCollection = collections[0];
+                if (collections && !this.activeCollection) {
+                    this.activeCollection = collections[0];
                 }
             });
         }
     });
+    app.component('date-range', DateRange);
+    app.component('period', Period);
+    app.use(router);
+    app.mount('#app');
 </script>
 
 </body>
