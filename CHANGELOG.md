@@ -1,5 +1,11 @@
 # OutbackCDX Changelog
 
+## 1.3.1 (unreleased)
+
+### Dependency upgrades
+
+* Upgraded the dashboard from Vue 2.0.1 to Vue 3.5 and from vue-router 2.0.0 to 5.0. vue-router is now served from a webjar instead of a vendored copy.
+
 ## 1.3.0 (unreleased)
 
 ### New features

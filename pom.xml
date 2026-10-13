@@ -118,7 +118,26 @@
         <dependency>
             <groupId>org.webjars.npm</groupId>
             <artifactId>vue</artifactId>
-            <version>2.0.1</version>
+            <version>3.5.43</version>
+            <exclusions>
+                <!-- we only serve the prebuilt dist/vue.global.prod.js -->
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.webjars.npm</groupId>
+            <artifactId>vue-router</artifactId>
+            <version>5.0.7</version>
+            <exclusions>
+                <!-- we only serve the prebuilt dist/vue-router.global.prod.js -->
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.webjars.npm</groupId>
