@@ -1008,6 +1008,8 @@
             });
         }
     });
+    // keep Vue 2's whitespace handling so inline elements like buttons stay spaced apart
+    app.config.compilerOptions.whitespace = 'preserve';
     app.component('date-range', DateRange);
     app.component('period', Period);
     app.use(router);
